@@ -1,15 +1,80 @@
 import { SQLiteProvider } from 'expo-sqlite';
 import { Stack } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 
 import { DATABASE_NAME, initializeDatabase } from '@/db/database';
-import { ThemeProvider } from '@/theme/ThemeProvider';
+import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
+
+import { BootstrapScreen } from './BootstrapScreen';
+
+function DatabaseContent({
+  isReady,
+  onReady,
+}: {
+  isReady: boolean;
+  onReady: () => void;
+}) {
+  useEffect(onReady, [onReady]);
+
+  return isReady ? <Stack screenOptions={{ headerShown: false }} /> : null;
+}
+
+function AppBootstrap() {
+  const { isDark, isReady: isThemeReady, tokens } = useTheme();
+  const [isDatabaseReady, setIsDatabaseReady] = useState(false);
+  const [databaseError, setDatabaseError] = useState<Error | null>(null);
+  const markDatabaseReady = useCallback(() => setIsDatabaseReady(true), []);
+  const handleDatabaseError = useCallback((error: Error) => setDatabaseError(error), []);
+
+  if (!isThemeReady) {
+    return (
+      <BootstrapScreen
+        isDark={isDark}
+        isLoading
+        message="Carregando suas preferências…"
+        title="Hedge"
+        tokens={tokens}
+      />
+    );
+  }
+
+  if (databaseError) {
+    return (
+      <BootstrapScreen
+        isDark={isDark}
+        message="Não foi possível preparar o armazenamento local. Feche e abra o aplicativo novamente."
+        title="Não foi possível abrir o Hedge"
+        tokens={tokens}
+      />
+    );
+  }
+
+  return (
+    <>
+      {!isDatabaseReady ? (
+        <BootstrapScreen
+          isDark={isDark}
+          isLoading
+          message="Preparando seu armazenamento local…"
+          title="Hedge"
+          tokens={tokens}
+        />
+      ) : null}
+      <SQLiteProvider
+        databaseName={DATABASE_NAME}
+        onError={handleDatabaseError}
+        onInit={initializeDatabase}
+      >
+        <DatabaseContent isReady={isDatabaseReady} onReady={markDatabaseReady} />
+      </SQLiteProvider>
+    </>
+  );
+}
 
 export default function RootLayout() {
   return (
-    <SQLiteProvider databaseName={DATABASE_NAME} onInit={initializeDatabase}>
-      <ThemeProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </ThemeProvider>
-    </SQLiteProvider>
+    <ThemeProvider>
+      <AppBootstrap />
+    </ThemeProvider>
   );
 }
