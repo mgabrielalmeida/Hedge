@@ -45,8 +45,8 @@ listas inválidas e rollback de migração com falha.
 - Instantes técnicos usam ISO 8601 em UTC.
 - `created_at` recebe um valor padrão do SQLite. Os repositórios atualizarão
   `updated_at` explicitamente; não há triggers de atualização.
-- Strings opcionais vazias devem ser normalizadas para `NULL` pelos
-  repositórios.
+- Strings opcionais vazias devem ser normalizadas para `NULL` pelo domínio
+  antes de serem persistidas pelos repositórios.
 - Não há colunas de moeda porque BRL é a única moeda do MVP.
 - Não há saldos, totais ou gastos materializados. Todos são derivados dos
   lançamentos.
