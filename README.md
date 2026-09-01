@@ -25,7 +25,7 @@ SQLite.
 
 ## Desenvolvimento
 
-O ambiente de desenvolvimento requer somente Node.js LTS e npm. Não usamos
+O ambiente de desenvolvimento requer Node.js 22.5 ou superior e npm. Não usamos
 Android Studio, JDK, Android SDK, emulador, React Native CLI nem projetos
 nativos locais.
 

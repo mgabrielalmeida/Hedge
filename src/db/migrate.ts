@@ -1,7 +1,8 @@
-import type { SQLiteDatabase } from 'expo-sqlite';
-
 import { migrations } from './migrations';
-import type { Migration } from './migrations/migration';
+import type {
+  Migration,
+  MigrationExecutorDatabase,
+} from './migrations/migration';
 
 type SchemaVersionRow = {
   user_version: number;
@@ -20,7 +21,7 @@ function validateMigrations(items: readonly Migration[]): void {
 }
 
 export async function runMigrations(
-  db: SQLiteDatabase,
+  db: MigrationExecutorDatabase,
   items: readonly Migration[] = migrations,
 ): Promise<void> {
   validateMigrations(items);

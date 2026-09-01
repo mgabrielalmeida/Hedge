@@ -229,6 +229,13 @@ Testes serão colocados próximos ao código testado com os sufixos `.test.ts` o
 uma base compatível com módulos Expo. A prioridade será dada a cálculos
 financeiros, conversão de valores, validações, repositórios e migrações.
 
+Testes de infraestrutura SQLite usam `src/db/testDatabase.ts`, um adapter
+exclusivo de testes sobre `node:sqlite`. Ele cria bancos em memória para o
+executor e bancos temporários em arquivo para validar `WAL`, `foreign_keys`,
+migrações e schema real. Essa ferramenta não é importada pelo aplicativo e não
+é uma dependência de runtime. O ambiente de desenvolvimento precisa de Node.js
+22.5 ou superior para executar essa parte da suíte.
+
 ## Dependências deliberadamente excluídas
 
 Não fazem parte da arquitetura inicial:

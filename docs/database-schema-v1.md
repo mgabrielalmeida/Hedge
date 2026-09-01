@@ -28,9 +28,11 @@ O schema foi definido em quatro etapas:
 
 A validação temporária usou SQLite 3.50.4. O `expo-sqlite` instalado no projeto
 inclui SQLite 3.50.3, compatível com as tabelas `STRICT` e demais recursos
-utilizados. Foram verificados `integrity_check`, `foreign_key_check`, criação e
-exclusão de registros, sinais monetários, transferências, cálculo de saldos,
-categorias, saldo inicial único e idempotência de recorrências.
+utilizados. A suíte automatizada usa o adapter `src/db/testDatabase.ts` sobre
+`node:sqlite` para verificar a execução da migração, `foreign_keys`, WAL,
+`user_version`, categorias iniciais e idempotência da inicialização. O executor
+também é testado contra SQLite real para aplicação parcial, versão futura,
+listas inválidas e rollback de migração com falha.
 
 ## Convenções comuns
 
