@@ -1,6 +1,6 @@
 # MVP funcional do Hedge
 
-**Status:** em definição  
+**Status:** definido
 **Data:** 1 de setembro de 2026
 
 Este documento registra as convenções funcionais já decididas para a primeira
@@ -36,21 +36,26 @@ As funcionalidades iniciais são:
 
 ## Contas e saldos
 
-- O usuário pode cadastrar diferentes contas bancárias.
-- A criação de uma conta exige que o usuário informe seu saldo inicial.
-- Despesas pontuais decrementam o saldo da conta selecionada.
-- Rendas pontuais incrementam o saldo da conta selecionada.
-- A tela inicial mostra o saldo atual consolidado do usuário e o quanto foi
-  gasto em cada categoria.
+O usuário pode cadastrar diferentes contas bancárias. Uma conta possui nome,
+banco relacionado, saldo e um indicador visual único e customizável, escolhido
+como um ícone de uma seleção ou uma cor.
 
-As regras exatas de cálculo do saldo a partir do saldo inicial e dos
-lançamentos serão formalizadas antes do schema, respeitando os comportamentos
-acima.
+Na criação, o usuário informa obrigatoriamente o saldo inicial. Esse valor é
+registrado como um lançamento comum, sujeito às mesmas regras de edição e
+exclusão dos demais lançamentos. Contas podem ter saldo negativo.
+
+Despesas pontuais decrementam o saldo da conta selecionada e rendas pontuais o
+incrementam. A tela inicial mostra o saldo atual consolidado do usuário e o
+quanto foi gasto em cada categoria.
 
 ## Lançamentos pontuais e histórico
 
 Despesa pontual e renda pontual são lançamentos distintos para o usuário. Cada
 um afeta uma conta, respectivamente reduzindo ou aumentando seu saldo.
+
+Todo lançamento pontual possui nome, valor e data; a descrição é opcional. A
+categoria é obrigatória para uma despesa e não é necessária para uma renda.
+Não é permitido registrar lançamentos pontuais com data futura.
 
 O usuário pode acessar um histórico de despesas e rendas pontuais e pode
 editar ou excluir seus lançamentos. A exclusão é permanente: o lançamento
@@ -63,27 +68,45 @@ funcionalidade **nova transferência**. Ela não deve exigir que o usuário
 registre separadamente uma saída na conta de origem e uma entrada na conta de
 destino.
 
-As regras complementares — por exemplo, as validações de origem, destino e
-valor, e seu reflexo em históricos e categorias — ainda precisam ser definidas.
-
 ## Categorias e orçamento mensal
 
-O MVP começa com categorias genéricas, como **Compras** e **Alimentação**.
+O MVP cria inicialmente as seguintes categorias genéricas: **Compras**,
+**Assinatura**, **Entretenimento**, **Alimentação** e **Outros**.
 
 O usuário pode criar, editar e excluir categorias. Ao criar uma categoria,
-deve definir seu orçamento mensal. A tela inicial apresenta o valor gasto em
-cada categoria, conforme o período mensal e demais critérios que ainda serão
-especificados.
+deve definir seu orçamento mensal, que pode ser zero. Alterar o orçamento não
+altera o histórico.
+
+O gasto mensal de uma categoria é determinado pela data informada em cada
+lançamento de despesa. A tela inicial apresenta esse valor por categoria.
+
+Ao excluir uma categoria, os lançamentos que a utilizavam permanecem no
+histórico e nos cálculos. Neles, a categoria passa a ser ausente e a interface
+deve exibir **Categoria excluída**.
 
 ## Lançamentos recorrentes
 
 O usuário pode cadastrar despesas recorrentes e rendas recorrentes. Cada regra
-recorrente deve gerar automaticamente lançamentos pontuais de despesa ou renda
-de acordo com a definição fornecida pelo usuário.
+recorrente gera automaticamente lançamentos pontuais de despesa ou renda de
+acordo com sua definição. As regras recorrentes possuem período de repetição,
+dia de cobrança e datas de início e de término opcionais.
+
+O período de repetição inclui, inicialmente, semanal, mensal e anual. Em uma
+recorrência semanal, o dia de cobrança é um dia da semana. Nas demais, ele é
+um dia do calendário.
+
+Em recorrências mensais, o dia 31 sempre significa o último dia do mês. Para
+os dias 29 e 30, em fevereiro é usado o último dia daquele mês: dia 29 em ano
+bissexto e dia 28 nos demais anos. Assim, nenhum lançamento recorrente é
+gerado em uma data civil inexistente.
+
+Se o dia de cobrança da iteração atual já passou, nenhum lançamento pontual é
+criado retroativamente; a cobrança ocorre somente na próxima iteração.
 
 O usuário pode visualizar, editar e excluir suas regras de despesas e rendas
-recorrentes. A definição de recorrência não substitui o histórico: os
-lançamentos pontuais gerados precisam permanecer acessíveis como parte dele.
+recorrentes. Editar ou excluir uma regra não altera lançamentos pontuais já
+gerados. A definição de recorrência não substitui o histórico: os lançamentos
+gerados permanecem acessíveis como parte dele.
 
 ## Tema
 
