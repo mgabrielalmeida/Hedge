@@ -4,8 +4,9 @@ Hedge será um gestor de finanças pessoais para Android e iOS, inteiramente
 offline. O projeto usará Expo, React Native, TypeScript e SQLite, priorizando
 uma implementação pequena e fácil de manter.
 
-O aplicativo ainda não foi inicializado. Neste momento, o repositório contém
-somente a estrutura de pastas e as decisões que orientarão o desenvolvimento.
+O projeto usa Expo SDK 57, React Native e TypeScript estrito. A navegação é
+feita pelo Expo Router e os dados financeiros serão persistidos localmente com
+SQLite.
 
 ## Documentação
 
@@ -20,3 +21,18 @@ somente a estrutura de pastas e as decisões que orientarão o desenvolvimento.
 - separar telas, regras financeiras e persistência sem criar camadas
   cerimoniais;
 - permitir múltiplos temas por meio de tokens visuais semânticos.
+
+## Desenvolvimento
+
+O ambiente de desenvolvimento requer somente Node.js LTS e npm. Não usamos
+Android Studio, JDK, Android SDK, emulador, React Native CLI nem projetos
+nativos locais.
+
+```text
+npm install
+npm run start
+```
+
+Durante o desenvolvimento inicial, o aplicativo é executado em um dispositivo
+físico pelo Expo Go. Os comandos `npm run typecheck`, `npm run lint` e
+`npm test` verificam, respectivamente, tipos, estilo e testes.

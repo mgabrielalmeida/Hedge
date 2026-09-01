@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Hedge",
+    "slug": "hedge",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "hedge",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-sqlite"
+    ]
+  }
+}

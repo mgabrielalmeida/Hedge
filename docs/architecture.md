@@ -33,6 +33,8 @@ distribuída.
 | Estado local | `useState` e `useReducer` |
 | Estado global | React Context apenas para tema e configurações pequenas |
 | Preferências | `expo-sqlite/kv-store` |
+| Testes | Jest com `jest-expo` |
+| Lint | ESLint com `eslint-config-expo` |
 | Dados remotos | Nenhum |
 
 As versões compatíveis devem ser instaladas pelo Expo. Pacotes do ecossistema
@@ -208,9 +210,9 @@ introduzida silenciosamente durante outra funcionalidade.
 ## Testes
 
 Testes serão colocados próximos ao código testado com os sufixos `.test.ts` ou
-`.test.tsx`. A prioridade será dada a cálculos financeiros, conversão de valores,
-validações e migrações. A ferramenta de testes será escolhida ao inicializar o
-projeto, evitando adicionar uma dependência antes de existir código testável.
+`.test.tsx`. A ferramenta adotada é Jest com o preset `jest-expo`, que fornece
+uma base compatível com módulos Expo. A prioridade será dada a cálculos
+financeiros, conversão de valores, validações, repositórios e migrações.
 
 ## Dependências deliberadamente excluídas
 
