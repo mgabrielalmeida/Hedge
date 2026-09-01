@@ -181,18 +181,19 @@ Além dos índices implícitos de chaves e restrições únicas, o schema cria:
 - regras recorrentes ativas;
 - ocorrências pelo lançamento relacionado.
 
-## Próxima etapa: adaptador de preferências
+## Adaptador de preferências
 
-O adaptador ainda não está implementado. A próxima mudança deverá:
+O adaptador foi implementado em `src/db/preferences.ts`. Ele é a única área do
+aplicativo que acessa diretamente `expo-sqlite/kv-store`; o `ThemeProvider`
+usa apenas sua API tipada.
 
-1. ficar em `src/db`, que é o limite autorizado para acesso ao `kv-store`;
-2. encapsular as chaves `preferences.themeName` e
-   `preferences.appearance`;
-3. oferecer leitura e escrita tipadas de tema e aparência;
-4. validar valores persistidos e retornar os padrões conhecidos quando forem
-   inválidos ou ausentes;
-5. tornar o armazenamento substituível em testes;
-6. tratar falhas de leitura e escrita sem produzir rejeições não observadas;
-7. remover do `ThemeProvider` o acesso direto ao `expo-sqlite/kv-store`.
+As chaves persistidas são `preferences.themeName` e
+`preferences.appearance`. Leituras inválidas, ausentes ou que falhem retornam
+os padrões `hedge` e `system`, sem impedir a inicialização da interface. As
+gravações são expostas separadamente para tema e aparência e continuam
+propagando falhas ao chamador.
 
-Essa etapa não deve criar tabelas no banco financeiro nem alterar a migração 1.
+O contexto de tema atualiza a aparência da sessão de forma imediata e retorna
+`false` quando a persistência falha, evitando rejeições não observadas. O
+armazenamento é injetável no adaptador para testes. Essa infraestrutura não
+cria tabelas no banco financeiro nem altera a migração 1.

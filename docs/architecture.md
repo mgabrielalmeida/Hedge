@@ -117,6 +117,10 @@ Centraliza a conexão, inicialização, migrações e consultas ao SQLite. Somen
 repositórios podem executar consultas relacionadas aos dados financeiros. Eles
 retornam modelos do domínio, e não detalhes internos do driver SQLite.
 
+Também abriga adaptadores pequenos para armazenamento local auxiliar. O
+`preferences.ts` encapsula o `expo-sqlite/kv-store`; nenhum outro módulo acessa
+esse storage diretamente.
+
 ### `src/components`
 
 Contém componentes reutilizados por mais de uma funcionalidade, como botão,
@@ -187,9 +191,12 @@ Um tema fornecerá tokens semânticos, incluindo pelo menos `background`,
 `positive`, `negative` e `warning`. O provider resolverá tema e aparência para
 um conjunto final de tokens.
 
-A seleção será armazenada no `expo-sqlite/kv-store`. Inicialmente, temas podem
-alterar cores e propriedades visuais pequenas, mas não a estrutura ou o
-espaçamento fundamental das telas.
+A seleção é armazenada no `expo-sqlite/kv-store` pelo adaptador
+`src/db/preferences.ts`. Essa é a única área autorizada a acessar o storage
+diretamente: o `ThemeProvider` consome sua API tipada, aplica os padrões para
+dados inválidos ou indisponíveis e expõe gravações que informam falha sem gerar
+rejeições não observadas. Inicialmente, temas podem alterar cores e propriedades
+visuais pequenas, mas não a estrutura ou o espaçamento fundamental das telas.
 
 ## Funcionamento offline
 
