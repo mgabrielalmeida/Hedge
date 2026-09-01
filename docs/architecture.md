@@ -49,7 +49,8 @@ Hedge/
 │   ├── fonts/                 # Fontes empacotadas no aplicativo
 │   └── images/                # Imagens e ilustrações locais
 ├── docs/
-│   └── architecture.md        # Decisões estruturais do projeto
+│   ├── architecture.md        # Decisões estruturais do projeto
+│   └── database-schema-v1.md  # Schema SQLite inicial congelado
 └── src/
     ├── app/                   # Rotas, layouts e composição de telas
     ├── components/            # Componentes visuais compartilhados
@@ -154,9 +155,16 @@ As seguintes regras foram decididas:
 - o schema evoluirá por migrações pequenas, sequenciais e versionadas;
 - as migrações serão executadas durante o `onInit` do `SQLiteProvider`.
 
-As primeiras entidades previstas são contas, categorias e lançamentos. Seus
-campos e relacionamentos serão definidos somente quando os requisitos
-funcionais forem especificados.
+O [schema v1](database-schema-v1.md) está congelado na primeira migração. Ele
+usa tabelas `STRICT` para contas, categorias, lançamentos, regras recorrentes e
+ocorrências recorrentes. Identificadores são inteiros locais, saldos são
+derivados dos lançamentos e transferências são representadas por uma única
+linha com conta de origem e destino.
+
+Regras recorrentes usam exclusão lógica para preservar procedência. Uma tabela
+de ocorrências registra cada data processada mesmo depois da exclusão do
+lançamento gerado, evitando geração duplicada. A migração 1 não deve ser
+alterada depois de aplicada; mudanças futuras exigem novas migrações.
 
 ## Estado da interface
 

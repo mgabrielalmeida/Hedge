@@ -12,6 +12,7 @@ SQLite.
 
 - [Arquitetura do projeto](docs/architecture.md)
 - [Especificação funcional do MVP](docs/mvp.md)
+- [Schema v1 do banco de dados](docs/database-schema-v1.md)
 
 ## Princípios
 
