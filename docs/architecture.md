@@ -1,0 +1,232 @@
+# Arquitetura do Hedge
+
+**Status:** aceita  
+**Data:** 1 de setembro de 2026
+
+Este documento registra as decisões iniciais de arquitetura do Hedge. Ele deve
+ser atualizado quando uma decisão estrutural for alterada. O objetivo não é
+antecipar todas as necessidades futuras, mas estabelecer limites simples para
+que o aplicativo continue compreensível à medida que crescer.
+
+## Objetivos arquiteturais
+
+1. Manter o desenvolvimento acessível para uma pessoa com pouca experiência.
+2. Fazer todas as funcionalidades do aplicativo operarem sem internet.
+3. Usar o menor número razoável de dependências e abstrações.
+4. Preservar a correção dos cálculos e dos dados financeiros.
+5. Permitir múltiplos temas sem acoplar componentes a cores específicas.
+
+Não são objetivos iniciais: versão web, backend, contas de usuário,
+sincronização entre dispositivos, colaboração, plugins ou uma arquitetura
+distribuída.
+
+## Stack decidida
+
+| Área | Decisão |
+| --- | --- |
+| Plataformas | Android e iOS |
+| Aplicativo | Expo no fluxo gerenciado e React Native |
+| Linguagem | TypeScript com modo estrito |
+| Navegação | Expo Router |
+| Persistência | `expo-sqlite`, usando sua API diretamente |
+| Estilos | `StyleSheet` do React Native |
+| Estado local | `useState` e `useReducer` |
+| Estado global | React Context apenas para tema e configurações pequenas |
+| Preferências | `expo-sqlite/kv-store` |
+| Dados remotos | Nenhum |
+
+As versões compatíveis devem ser instaladas pelo Expo. Pacotes do ecossistema
+Expo não devem ter versões escolhidas manualmente quando `expo install` puder
+resolvê-las.
+
+## Estrutura de pastas
+
+```text
+Hedge/
+├── assets/
+│   ├── fonts/                 # Fontes empacotadas no aplicativo
+│   └── images/                # Imagens e ilustrações locais
+├── docs/
+│   └── architecture.md        # Decisões estruturais do projeto
+└── src/
+    ├── app/                   # Rotas, layouts e composição de telas
+    ├── components/            # Componentes visuais compartilhados
+    ├── db/
+    │   ├── migrations/        # Alterações sequenciais do schema
+    │   └── repositories/      # Único acesso aos dados financeiros
+    ├── domain/
+    │   ├── calculations/      # Cálculos financeiros puros
+    │   └── models/            # Tipos e conceitos do domínio
+    ├── features/
+    │   ├── accounts/          # Casos de uso e UI específicos de contas
+    │   ├── categories/        # Casos de uso e UI específicos de categorias
+    │   └── transactions/      # Casos de uso e UI específicos de lançamentos
+    ├── theme/                 # Tokens, temas, provider e hook de tema
+    └── utils/                 # Funções pequenas, genéricas e sem estado
+```
+
+Arquivos `.gitkeep` existem somente para tornar as pastas vazias versionáveis.
+Eles devem ser removidos quando a pasta receber seu primeiro arquivo real.
+
+Pastas genéricas como `services`, `store`, `hooks`, `types` e `helpers` não
+serão criadas antecipadamente. Um módulo permanece junto da funcionalidade que
+o utiliza; ele só será promovido para uma área compartilhada depois que houver
+reutilização concreta.
+
+## Responsabilidades e dependências
+
+O fluxo principal será:
+
+```text
+rota/tela -> funcionalidade -> repositório -> SQLite
+                    |              |
+                    +----> domínio <+
+```
+
+### `src/app`
+
+Contém as rotas reconhecidas pelo Expo Router, layouts de navegação e a
+composição das telas. Rotas podem ler parâmetros, coordenar componentes e
+acionar operações de uma funcionalidade.
+
+Uma rota não deve conter SQL, cálculos financeiros nem regras de persistência.
+
+### `src/features`
+
+Organiza código pelo conceito percebido pelo usuário. Cada funcionalidade pode
+conter seus componentes exclusivos, validações, hooks e operações. Não é
+necessário criar subpastas internas até que a quantidade de arquivos justifique
+isso.
+
+Uma funcionalidade não deve importar detalhes internos de outra. Código comum
+de domínio vai para `domain`; UI genuinamente compartilhada vai para
+`components`.
+
+### `src/domain`
+
+Contém modelos e cálculos financeiros puros. Não pode importar React, React
+Native, Expo Router ou SQLite. Essa restrição mantém a parte mais sensível do
+aplicativo simples de testar e independente da interface.
+
+### `src/db`
+
+Centraliza a conexão, inicialização, migrações e consultas ao SQLite. Somente
+repositórios podem executar consultas relacionadas aos dados financeiros. Eles
+retornam modelos do domínio, e não detalhes internos do driver SQLite.
+
+### `src/components`
+
+Contém componentes reutilizados por mais de uma funcionalidade, como botão,
+campo monetário ou cartão. Componentes usam tokens do tema e não conhecem o
+banco de dados.
+
+### `src/theme`
+
+Define os contratos visuais, temas disponíveis, resolução da aparência e o
+`ThemeProvider`. Nenhum componente deve usar uma cor literal quando existir um
+token semântico equivalente.
+
+### `src/utils`
+
+Aceita apenas funções genéricas, pequenas e sem estado. Uma função relacionada
+especificamente a contas ou lançamentos permanece na respectiva funcionalidade
+ou no domínio.
+
+## Persistência
+
+O SQLite é a fonte de verdade. Não haverá uma cópia de todas as contas e
+transações em um estado global. As telas consultarão o banco ao entrar em foco
+e atualizarão o resultado após uma escrita relevante. Uma solução de cache ou
+reatividade só será adicionada se esse modelo demonstrar uma limitação real.
+
+As seguintes regras foram decididas:
+
+- valores monetários serão armazenados como `INTEGER` em centavos;
+- `REAL` não será usado para dinheiro;
+- datas civis serão textos no formato `YYYY-MM-DD`;
+- instantes técnicos, quando necessários, serão ISO 8601 em UTC;
+- chaves estrangeiras serão ativadas com `PRAGMA foreign_keys = ON`;
+- o banco usará `PRAGMA journal_mode = WAL`;
+- consultas receberão valores por parâmetros, nunca por concatenação de texto;
+- operações com várias escritas relacionadas usarão transações;
+- o schema evoluirá por migrações pequenas, sequenciais e versionadas;
+- as migrações serão executadas durante o `onInit` do `SQLiteProvider`.
+
+As primeiras entidades previstas são contas, categorias e lançamentos. Seus
+campos e relacionamentos serão definidos somente quando os requisitos
+funcionais forem especificados.
+
+## Estado da interface
+
+Estado temporário de tela, como campos de formulário e abertura de modais,
+permanece local com hooks do React. React Context será usado somente para dados
+pequenos e realmente transversais, inicialmente tema e preferências.
+
+Redux, Zustand, React Query e bibliotecas equivalentes não fazem parte da
+arquitetura inicial.
+
+## Temas
+
+Tema visual e aparência do sistema serão dimensões separadas:
+
+- **tema:** Hedge, Forest, Ocean ou outro conjunto futuro;
+- **aparência:** clara, escura ou acompanhar o sistema.
+
+Um tema fornecerá tokens semânticos, incluindo pelo menos `background`,
+`surface`, `surfaceElevated`, `text`, `textMuted`, `primary`, `border`,
+`positive`, `negative` e `warning`. O provider resolverá tema e aparência para
+um conjunto final de tokens.
+
+A seleção será armazenada no `expo-sqlite/kv-store`. Inicialmente, temas podem
+alterar cores e propriedades visuais pequenas, mas não a estrutura ou o
+espaçamento fundamental das telas.
+
+## Funcionamento offline
+
+O aplicativo instalado não dependerá de conexão de rede. Portanto:
+
+- não haverá backend, autenticação remota ou cliente HTTP;
+- fontes, imagens e demais recursos serão incluídos no pacote;
+- não serão instalados analytics ou relatórios remotos de falhas;
+- o EAS Update não será configurado para atualizações durante a execução;
+- builds e publicação podem usar internet, mas o aplicativo produzido deve
+  continuar funcional sem ela.
+
+Se “offline” também precisar impedir backups do sistema operacional, isso será
+tratado como uma decisão de privacidade separada antes da distribuição.
+
+## Segurança
+
+Na fase inicial será usado o SQLite padrão, protegido pelo sandbox e pelos
+mecanismos do dispositivo. Isso não representa criptografia própria do banco.
+
+Antes de uma distribuição pública, será tomada uma decisão explícita sobre
+SQLCipher e armazenamento da chave com `expo-secure-store`. Essa decisão está
+adiada porque altera o fluxo de build e a gestão de chaves; ela não deve ser
+introduzida silenciosamente durante outra funcionalidade.
+
+## Testes
+
+Testes serão colocados próximos ao código testado com os sufixos `.test.ts` ou
+`.test.tsx`. A prioridade será dada a cálculos financeiros, conversão de valores,
+validações e migrações. A ferramenta de testes será escolhida ao inicializar o
+projeto, evitando adicionar uma dependência antes de existir código testável.
+
+## Dependências deliberadamente excluídas
+
+Não fazem parte da arquitetura inicial:
+
+- ORM;
+- biblioteca de estado global;
+- biblioteca de busca/cache de servidor;
+- biblioteca de componentes ou CSS utilitário;
+- biblioteca de datas;
+- biblioteca genérica de validação;
+- framework de injeção de dependências;
+- cliente de API;
+- monorepo.
+
+Uma nova dependência só deve ser adicionada quando uma API nativa ou já
+instalada não resolver adequadamente o problema e quando a redução de
+complexidade for maior que seu custo de configuração e manutenção. Dependências
+que mudem limites arquiteturais devem ser registradas neste documento.
