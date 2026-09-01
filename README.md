@@ -10,6 +10,7 @@ somente a estrutura de pastas e as decisões que orientarão o desenvolvimento.
 ## Documentação
 
 - [Arquitetura do projeto](docs/architecture.md)
+- [Especificação funcional do MVP](docs/mvp.md)
 
 ## Princípios
 
