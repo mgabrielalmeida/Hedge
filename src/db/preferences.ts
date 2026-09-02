@@ -21,7 +21,7 @@ export type PreferenceStorage = Pick<
 >;
 
 function isThemeName(value: string | null): value is ThemeName {
-  return value === 'hedge';
+  return value === 'hedge' || value === 'ocean';
 }
 
 function isAppearancePreference(value: string | null): value is AppearancePreference {

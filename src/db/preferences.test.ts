@@ -34,6 +34,15 @@ describe('theme preferences', () => {
     });
   });
 
+  it('loads the alternate visual theme', async () => {
+    const storage = createStorage({ 'preferences.themeName': 'ocean' });
+
+    await expect(loadThemePreferences(storage)).resolves.toEqual({
+      appearance: 'system',
+      themeName: 'ocean',
+    });
+  });
+
   it('falls back only for missing or invalid values', async () => {
     const storage = createStorage({
       'preferences.appearance': 'unsupported',
@@ -80,13 +89,13 @@ describe('theme preferences', () => {
   it('persists each preference through the injected storage', async () => {
     const storage = createStorage();
 
-    await saveThemeName('hedge', storage);
+    await saveThemeName('ocean', storage);
     await saveAppearancePreference('light', storage);
 
     expect(storage.setItem).toHaveBeenNthCalledWith(
       1,
       'preferences.themeName',
-      'hedge',
+      'ocean',
     );
     expect(storage.setItem).toHaveBeenNthCalledWith(
       2,

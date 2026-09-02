@@ -186,10 +186,12 @@ Tema visual e aparência do sistema serão dimensões separadas:
 - **tema:** Hedge, Forest, Ocean ou outro conjunto futuro;
 - **aparência:** clara, escura ou acompanhar o sistema.
 
-Um tema fornecerá tokens semânticos, incluindo pelo menos `background`,
-`surface`, `surfaceElevated`, `text`, `textMuted`, `primary`, `border`,
-`positive`, `negative` e `warning`. O provider resolverá tema e aparência para
-um conjunto final de tokens.
+Um tema fornecerá tokens semânticos de cor, incluindo pelo menos `background`,
+`surface`, `surfaceElevated`, `text`, `textMuted`, `primary`, `onPrimary`,
+`border`, `positive`, `negative` e `warning`, além dos tokens compartilhados
+de espaçamento, raio e tipografia. O provider resolverá tema e aparência para
+um conjunto final de tokens. Os temas iniciais são Hedge e Ocean; o segundo
+existe para validar que componentes não dependem de uma paleta específica.
 
 A seleção é armazenada no `expo-sqlite/kv-store` pelo adaptador
 `src/db/preferences.ts`. Essa é a única área autorizada a acessar o storage
@@ -197,6 +199,10 @@ diretamente: o `ThemeProvider` consome sua API tipada, aplica os padrões para
 dados inválidos ou indisponíveis e expõe gravações que informam falha sem gerar
 rejeições não observadas. Inicialmente, temas podem alterar cores e propriedades
 visuais pequenas, mas não a estrutura ou o espaçamento fundamental das telas.
+
+Os componentes compartilhados mínimos são `Screen`, `Text`, `Card`, `Field` e
+`Button`. Eles ficam em `src/components`, recebem suas decisões visuais do
+tema e não têm conhecimento de funcionalidades ou do banco de dados.
 
 ## Funcionamento offline
 
