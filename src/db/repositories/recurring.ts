@@ -1,4 +1,4 @@
-import { normalizeOptionalText, parseCivilDate, validateRequiredText } from '@/domain';
+import { isRecurringRuleDueOn, normalizeOptionalText, parseCivilDate, validateRequiredText } from '@/domain';
 import type { Cents, CivilDate, EntityId, RecurringRule } from '@/domain';
 
 import { type Clock, type RepositoryDatabase, systemClock } from './database';
@@ -38,20 +38,23 @@ export async function deleteRecurringRule(db: RepositoryDatabase, id: number, cl
   const timestamp = clock();
   await db.runAsync('UPDATE recurring_rules SET is_active = 0, deleted_at = ?, updated_at = ? WHERE id = ?;', timestamp, timestamp, id); return true;
 }
-export async function createDueOccurrence(db: RepositoryDatabase, rule: RecurringRule, scheduledDate: CivilDate, clock: Clock = systemClock) {
-  if (!rule.isActive || !parseCivilDate(scheduledDate).ok) throw new Error('Invalid recurring occurrence.');
-  const timestamp = clock(); let transactionId: number | null = null; let occurrence: ReturnType<typeof mapRecurringOccurrence> | null = null;
+export async function createDueOccurrence(db: RepositoryDatabase, ruleId: EntityId, scheduledDate: CivilDate, clock: Clock = systemClock) {
+  if (!validId(ruleId) || !parseCivilDate(scheduledDate).ok) throw new Error('Invalid recurring occurrence.');
+  const timestamp = clock(); let generatedTransaction: ReturnType<typeof mapTransaction> | null = null; let occurrence: ReturnType<typeof mapRecurringOccurrence> | null = null;
   await db.withExclusiveTransactionAsync(async (session) => {
+    const ruleRow = await session.getFirstAsync<RecurringRuleRow>(`SELECT ${ruleColumns} FROM recurring_rules WHERE id = ?;`, ruleId);
+    if (!ruleRow) throw new Error('Recurring rule was not found.');
+    const rule = mapRecurringRule(ruleRow);
+    if (!rule.isActive || !isRecurringRuleDueOn(rule, scheduledDate)) throw new Error('Recurring rule is not due.');
     await session.runAsync(`INSERT INTO transactions (kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?);`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, scheduledDate, timestamp, timestamp);
     const transactionRow = await session.getFirstAsync<TransactionRow>(`SELECT ${transactionColumns} FROM transactions WHERE id = last_insert_rowid();`);
-    if (!transactionRow) throw new Error('Generated transaction was not found.'); transactionId = transactionRow.id;
-    await session.runAsync('INSERT INTO recurring_occurrences (recurring_rule_id, scheduled_date, transaction_id, created_at) VALUES (?, ?, ?, ?);', rule.id, scheduledDate, transactionId, timestamp);
+    if (!transactionRow) throw new Error('Generated transaction was not found.'); generatedTransaction = mapTransaction(transactionRow);
+    await session.runAsync('INSERT INTO recurring_occurrences (recurring_rule_id, scheduled_date, transaction_id, created_at) VALUES (?, ?, ?, ?);', rule.id, scheduledDate, generatedTransaction.id, timestamp);
     const occurrenceRow = await session.getFirstAsync<RecurringOccurrenceRow>('SELECT id, recurring_rule_id, scheduled_date, transaction_id, created_at FROM recurring_occurrences WHERE id = last_insert_rowid();');
     if (!occurrenceRow) throw new Error('Generated recurring occurrence was not found.'); occurrence = mapRecurringOccurrence(occurrenceRow);
   });
-  if (!transactionId || !occurrence) throw new Error('Recurring occurrence creation did not complete.');
-  const transaction = await db.getFirstAsync<TransactionRow>(`SELECT ${transactionColumns} FROM transactions WHERE id = ?;`, transactionId);
-  if (!transaction) throw new Error('Generated transaction was not found.'); return { occurrence, transaction: mapTransaction(transaction) };
+  if (!generatedTransaction || !occurrence) throw new Error('Recurring occurrence creation did not complete.');
+  return { occurrence, transaction: generatedTransaction };
 }
 function normalized(input: RecurringRuleInput): Required<Omit<RecurringRuleInput, 'categoryId' | 'description' | 'chargeMonth' | 'endDate'>> & { categoryId: EntityId | null; description: string | null; chargeMonth: number | null; endDate: CivilDate | null } {
   const name = validateRequiredText(input.name); const categoryId = input.categoryId ?? null; const chargeMonth = input.chargeMonth ?? null; const endDate = input.endDate ?? null;

@@ -27,12 +27,19 @@ export async function updateCategory(db: RepositoryDatabase, id: number, input: 
   return findCategoryById(db, id);
 }
 export async function deleteCategory(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
-  if (!await findCategoryById(db, id)) return false;
   const timestamp = clock();
+  let wasDeleted = false;
   await db.withExclusiveTransactionAsync(async (transaction) => {
+    const category = await transaction.getFirstAsync<CategoryRow>(
+      `SELECT ${categoryColumns} FROM categories WHERE id = ?;`,
+      id,
+    );
+    if (!category) return;
     await transaction.runAsync('UPDATE recurring_rules SET is_active = 0, category_id = NULL, deleted_at = ?, updated_at = ? WHERE category_id = ? AND is_active = 1;', timestamp, timestamp, id);
     await transaction.runAsync('DELETE FROM categories WHERE id = ?;', id);
-  }); return true;
+    wasDeleted = true;
+  });
+  return wasDeleted;
 }
 function validated(input: CategoryInput): CategoryInput {
   const name = validateRequiredText(input.name);

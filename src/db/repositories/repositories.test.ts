@@ -52,6 +52,23 @@ describe('SQLite repositories', () => {
     await expect(listAccounts(database)).resolves.toHaveLength(1);
   });
 
+  it('rolls back account creation when the related opening balance cannot be completed', async () => {
+    await database.execAsync(`
+      CREATE TRIGGER reject_opening_balance
+      BEFORE INSERT ON transactions
+      WHEN NEW.kind = 'opening_balance'
+      BEGIN
+        SELECT RAISE(ABORT, 'opening balance rejected');
+      END;
+    `);
+    await expect(createAccount(database, {
+      name: 'Main', institutionName: 'Bank', visualType: 'icon', visualValue: 'bank', initialBalanceCents: 0, openingBalanceDate: '2026-09-02',
+    }, () => createdAt)).rejects.toThrow('opening balance rejected');
+
+    await expect(listAccounts(database)).resolves.toEqual([]);
+    await expect(listTransactions(database)).resolves.toEqual([]);
+  });
+
   it('updates categories and deactivates affected rules before deleting a category', async () => {
     const account = await createAccount(database, {
       name: 'Main', institutionName: 'Bank', visualType: 'icon', visualValue: 'bank', initialBalanceCents: 0, openingBalanceDate: '2026-09-02',
@@ -97,12 +114,14 @@ describe('SQLite repositories', () => {
     const rule = await createRecurringRule(database, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Internet', amountCents: -150, frequency: 'monthly', chargeDay: 31, startDate: '2026-01-01' }, () => createdAt);
     await expect(updateRecurringRule(database, rule.id, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Internet plus', amountCents: -200, frequency: 'yearly', chargeDay: 29, chargeMonth: 2, startDate: '2026-01-01', endDate: '2028-02-29' }, () => updatedAt)).resolves.toEqual(expect.objectContaining({ name: 'Internet plus', updatedAt, schedule: { frequency: 'yearly', chargeDay: 29, chargeMonth: 2 } }));
     const activeRule = (await listRecurringRules(database, true))[0];
-    const generated = await createDueOccurrence(database, activeRule, '2028-02-29', () => updatedAt);
+    await expect(createDueOccurrence(database, activeRule.id, '2028-02-28', () => updatedAt)).rejects.toThrow('not due');
+    const generated = await createDueOccurrence(database, activeRule.id, '2028-02-29', () => updatedAt);
     expect(generated).toEqual({ occurrence: expect.objectContaining({ recurringRuleId: rule.id, scheduledDate: '2028-02-29' }), transaction: expect.objectContaining({ kind: 'expense', name: 'Internet plus', amountCents: -200 }) });
     const countBeforeDuplicate = (await listTransactions(database)).length;
-    await expect(createDueOccurrence(database, activeRule, '2028-02-29', () => updatedAt)).rejects.toThrow();
+    await expect(createDueOccurrence(database, activeRule.id, '2028-02-29', () => updatedAt)).rejects.toThrow();
     expect((await listTransactions(database)).length).toBe(countBeforeDuplicate);
     await expect(deleteRecurringRule(database, rule.id, () => updatedAt)).resolves.toBe(true);
     await expect(listRecurringRules(database, true)).resolves.toEqual([]);
+    await expect(createDueOccurrence(database, activeRule.id, '2029-02-28', () => updatedAt)).rejects.toThrow('not due');
   });
 });
