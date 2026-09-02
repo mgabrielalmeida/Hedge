@@ -1,0 +1,41 @@
+import { validateCategoryBudget, validateRequiredText } from '@/domain';
+import type { Category, Cents } from '@/domain';
+
+import { type Clock, type RepositoryDatabase, systemClock } from './database';
+import { mapCategory, type CategoryRow } from './rows';
+
+const categoryColumns = 'id, name, monthly_budget_cents, created_at, updated_at';
+export type CategoryInput = { readonly name: string; readonly monthlyBudgetCents: Cents };
+
+export async function listCategories(db: RepositoryDatabase): Promise<readonly Category[]> {
+  const rows = await db.getAllAsync<CategoryRow>(`SELECT ${categoryColumns} FROM categories ORDER BY name COLLATE NOCASE, id;`);
+  return rows.map(mapCategory);
+}
+export async function findCategoryById(db: RepositoryDatabase, id: number): Promise<Category | null> {
+  const row = await db.getFirstAsync<CategoryRow>(`SELECT ${categoryColumns} FROM categories WHERE id = ?;`, id);
+  return row ? mapCategory(row) : null;
+}
+export async function createCategory(db: RepositoryDatabase, input: CategoryInput, clock: Clock = systemClock): Promise<Category> {
+  const { name, monthlyBudgetCents } = validated(input); const timestamp = clock();
+  await db.runAsync('INSERT INTO categories (name, monthly_budget_cents, created_at, updated_at) VALUES (?, ?, ?, ?);', name, monthlyBudgetCents, timestamp, timestamp);
+  const row = await db.getFirstAsync<CategoryRow>(`SELECT ${categoryColumns} FROM categories WHERE id = last_insert_rowid();`);
+  if (!row) throw new Error('Created category was not found.'); return mapCategory(row);
+}
+export async function updateCategory(db: RepositoryDatabase, id: number, input: CategoryInput, clock: Clock = systemClock): Promise<Category | null> {
+  const { name, monthlyBudgetCents } = validated(input);
+  await db.runAsync('UPDATE categories SET name = ?, monthly_budget_cents = ?, updated_at = ? WHERE id = ?;', name, monthlyBudgetCents, clock(), id);
+  return findCategoryById(db, id);
+}
+export async function deleteCategory(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
+  if (!await findCategoryById(db, id)) return false;
+  const timestamp = clock();
+  await db.withExclusiveTransactionAsync(async (transaction) => {
+    await transaction.runAsync('UPDATE recurring_rules SET is_active = 0, category_id = NULL, deleted_at = ?, updated_at = ? WHERE category_id = ? AND is_active = 1;', timestamp, timestamp, id);
+    await transaction.runAsync('DELETE FROM categories WHERE id = ?;', id);
+  }); return true;
+}
+function validated(input: CategoryInput): CategoryInput {
+  const name = validateRequiredText(input.name);
+  if (!name.ok || !validateCategoryBudget(input.monthlyBudgetCents).ok) throw new Error('Invalid category input.');
+  return { name: name.value, monthlyBudgetCents: input.monthlyBudgetCents };
+}

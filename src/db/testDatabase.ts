@@ -7,6 +7,7 @@ import type {
   MigrationDatabase,
   MigrationExecutorDatabase,
 } from './migrations/migration';
+import type { RepositorySession } from './repositories/database';
 
 export class TestDatabase implements MigrationExecutorDatabase {
   private readonly database: DatabaseSync;
@@ -45,8 +46,14 @@ export class TestDatabase implements MigrationExecutorDatabase {
     this.database.prepare(source).run(...parameters);
   }
 
-  public async withExclusiveTransactionAsync(
+  public withExclusiveTransactionAsync(
     task: (transaction: MigrationDatabase) => Promise<void>,
+  ): Promise<void>;
+  public withExclusiveTransactionAsync(
+    task: (transaction: RepositorySession) => Promise<void>,
+  ): Promise<void>;
+  public async withExclusiveTransactionAsync(
+    task: (transaction: TestDatabase) => Promise<void>,
   ): Promise<void> {
     this.database.exec('BEGIN EXCLUSIVE;');
 
