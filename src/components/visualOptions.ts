@@ -9,6 +9,12 @@ export type ColorOption = {
   value: string;
 };
 
+export type HslColor = {
+  hue: number;
+  lightness: number;
+  saturation: number;
+};
+
 export const ACCOUNT_ICON_OPTIONS: readonly IconOption[] = [
   { label: 'Banco', value: 'bank', symbol: '🏦' },
   { label: 'Carteira', value: 'wallet', symbol: '👛' },
@@ -103,12 +109,56 @@ export function normalizeHexColor(value: string): string | null {
   return /^#[0-9A-F]{6}$/.test(withPrefix) ? withPrefix : null;
 }
 
-export function formatHexColorDraft(value: string): string {
-  const digits = value
-    .replace(/^#/, '')
-    .replace(/[^0-9A-F]/gi, '')
-    .slice(0, 6)
-    .toUpperCase();
+export function hexToHsl(value: string): HslColor | null {
+  const normalized = normalizeHexColor(value);
+  if (!normalized) return null;
 
-  return `#${digits}`;
+  const red = Number.parseInt(normalized.slice(1, 3), 16) / 255;
+  const green = Number.parseInt(normalized.slice(3, 5), 16) / 255;
+  const blue = Number.parseInt(normalized.slice(5, 7), 16) / 255;
+  const maximum = Math.max(red, green, blue);
+  const minimum = Math.min(red, green, blue);
+  const difference = maximum - minimum;
+  const lightness = (maximum + minimum) / 2;
+
+  if (difference === 0) {
+    return { hue: 0, saturation: 0, lightness: lightness * 100 };
+  }
+
+  const saturation = difference / (1 - Math.abs(2 * lightness - 1));
+  let hue: number;
+
+  if (maximum === red) hue = 60 * (((green - blue) / difference) % 6);
+  else if (maximum === green) hue = 60 * ((blue - red) / difference + 2);
+  else hue = 60 * ((red - green) / difference + 4);
+
+  return {
+    hue: hue < 0 ? hue + 360 : hue,
+    lightness: lightness * 100,
+    saturation: saturation * 100,
+  };
+}
+
+export function hslToHex(hue: number, saturation: number, lightness: number): string {
+  const normalizedHue = ((hue % 360) + 360) % 360;
+  const normalizedSaturation = Math.min(Math.max(saturation, 0), 100) / 100;
+  const normalizedLightness = Math.min(Math.max(lightness, 0), 100) / 100;
+  const chroma = (1 - Math.abs(2 * normalizedLightness - 1)) * normalizedSaturation;
+  const middle = chroma * (1 - Math.abs(((normalizedHue / 60) % 2) - 1));
+  const adjustment = normalizedLightness - chroma / 2;
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+
+  if (normalizedHue < 60) [red, green] = [chroma, middle];
+  else if (normalizedHue < 120) [red, green] = [middle, chroma];
+  else if (normalizedHue < 180) [green, blue] = [chroma, middle];
+  else if (normalizedHue < 240) [green, blue] = [middle, chroma];
+  else if (normalizedHue < 300) [red, blue] = [middle, chroma];
+  else [red, blue] = [chroma, middle];
+
+  return `#${[red, green, blue]
+    .map((channel) => Math.round((channel + adjustment) * 255).toString(16).padStart(2, '0'))
+    .join('')
+    .toUpperCase()}`;
 }

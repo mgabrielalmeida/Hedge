@@ -10,7 +10,8 @@ export {
   ACCOUNT_ICON_OPTIONS,
   CATEGORY_ICON_OPTIONS,
   VISUAL_COLOR_OPTIONS,
-  formatHexColorDraft,
   getAccountIconSymbol,
+  hexToHsl,
+  hslToHex,
   normalizeHexColor,
 } from './visualOptions';

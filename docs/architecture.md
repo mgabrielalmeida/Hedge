@@ -208,8 +208,10 @@ Os componentes compartilhados mínimos são `Screen`, `Text`, `Card`, `Field` e
 tema e não têm conhecimento de funcionalidades ou do banco de dados.
 Seletores visuais reutilizados por contas e categorias também permanecem nessa
 área, com opções locais de ícones e cores e sem dependência de recursos remotos.
-Além das cores predefinidas, esses seletores aceitam um valor hexadecimal de
-seis dígitos para permitir uma escolha exata e persistível.
+Além das cores predefinidas, esses seletores oferecem uma roda de tons e
+controles de vivacidade e luminosidade. A escolha visual é convertida para uma
+cor hexadecimal antes da persistência, sem expor esse formato técnico na
+interface.
 
 ## Funcionamento offline
 

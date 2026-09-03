@@ -237,8 +237,8 @@ recebem seus dados e referências temporais por argumento e permanecem puras.
 Após criar a primeira conta, o usuário pode trocar o tema durante o onboarding
 ou pela ação de personalização na tela inicial. Tema e aparência continuam
 sendo preferências separadas, conforme definido na [arquitetura](architecture.md).
-Contas e categorias podem usar uma cor predefinida ou uma cor exata informada
-no formato hexadecimal de seis dígitos.
+Contas e categorias podem usar uma cor predefinida ou criar uma cor com uma
+roda de tons e controles simples de vivacidade e luminosidade.
 
 ## Fora do escopo por enquanto
 

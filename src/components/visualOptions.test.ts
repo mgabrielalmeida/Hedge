@@ -2,8 +2,9 @@ import {
   ACCOUNT_ICON_OPTIONS,
   CATEGORY_ICON_OPTIONS,
   VISUAL_COLOR_OPTIONS,
-  formatHexColorDraft,
   getAccountIconSymbol,
+  hexToHsl,
+  hslToHex,
   normalizeHexColor,
 } from './visualOptions';
 
@@ -31,8 +32,15 @@ describe('shared visual options', () => {
     expect(normalizeHexColor('#12GG56')).toBeNull();
   });
 
-  it('formats exact color input as a six-digit uppercase draft', () => {
-    expect(formatHexColorDraft('c0-26-d3')).toBe('#C026D3');
-    expect(formatHexColorDraft('#12345678')).toBe('#123456');
+  it('converts intuitive color controls to persisted hexadecimal colors', () => {
+    expect(hslToHex(0, 100, 50)).toBe('#FF0000');
+    expect(hslToHex(120, 100, 50)).toBe('#00FF00');
+    expect(hslToHex(240, 100, 50)).toBe('#0000FF');
+
+    expect(hexToHsl('#FF0000')).toMatchObject({ hue: 0, saturation: 100, lightness: 50 });
+    expect(hexToHsl('invalid')).toBeNull();
+
+    const rose = hexToHsl('#B32662');
+    expect(rose && hslToHex(rose.hue, rose.saturation, rose.lightness)).toBe('#B32662');
   });
 });
