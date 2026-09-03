@@ -46,7 +46,7 @@ export function CategoriesScreen({ onCreate, onEdit, onFinish }: CategoriesScree
           {categories.map((category) => <CategoryCard category={category} key={category.id} onDelete={() => confirmDelete(category)} onEdit={() => onEdit(category.id)} />)}
         </View>
         <Button label="Nova categoria" onPress={onCreate} />
-        {onFinish ? <Button label="Concluir configuração" onPress={onFinish} variant="secondary" /> : null}
+        {onFinish ? <Button disabled={categories.length === 0} label="Concluir configuração" onPress={onFinish} variant="secondary" /> : null}
       </ScrollView>
     </Screen>
   );

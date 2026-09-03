@@ -5,5 +5,6 @@ import { CategoryEditorScreen } from '@/features/categories/CategoryEditorScreen
 export default function EditCategoryRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  return <CategoryEditorScreen categoryId={Number(id)} onDone={() => router.back()} />;
+  const close = () => router.canGoBack() ? router.back() : router.replace('/');
+  return <CategoryEditorScreen categoryId={Number(id)} onDone={close} />;
 }

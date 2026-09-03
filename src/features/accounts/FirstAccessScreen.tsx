@@ -3,7 +3,6 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Card, Screen, Text } from '@/components';
-import type { Account } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 import { AccountForm } from './AccountForm';
@@ -17,7 +16,6 @@ type FirstAccessScreenProps = {
 export function FirstAccessScreen({ onFinish }: FirstAccessScreenProps) {
   const { tokens } = useTheme();
   const router = useRouter();
-  const [createdAccount, setCreatedAccount] = useState<Account | null>(null);
   const [stage, setStage] = useState<'account' | 'theme' | 'categories'>('account');
 
   if (stage === 'categories') {
@@ -42,7 +40,7 @@ export function FirstAccessScreen({ onFinish }: FirstAccessScreenProps) {
             O saldo inicial é registrado como um lançamento e compõe seu saldo atual.
           </Text>
           <View style={{ marginTop: tokens.spacing.lg }}>
-            <AccountForm onAccountCreated={(account) => { setCreatedAccount(account); setStage('theme'); }} submitLabel="Criar primeira conta" />
+            <AccountForm onAccountCreated={() => setStage('theme')} submitLabel="Criar primeira conta" />
           </View>
         </Card>
       </ScrollView>

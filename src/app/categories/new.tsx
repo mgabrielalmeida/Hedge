@@ -4,5 +4,6 @@ import { CategoryEditorScreen } from '@/features/categories/CategoryEditorScreen
 
 export default function NewCategoryRoute() {
   const router = useRouter();
-  return <CategoryEditorScreen onDone={() => router.back()} />;
+  const close = () => router.canGoBack() ? router.back() : router.replace('/');
+  return <CategoryEditorScreen onDone={close} />;
 }
