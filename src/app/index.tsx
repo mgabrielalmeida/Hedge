@@ -1,14 +1,13 @@
 import { useRouter } from 'expo-router';
 
-import { AccountsHomeScreen } from '@/features/accounts/AccountsHomeScreen';
+import { TransactionsHomeScreen } from '@/features/transactions/TransactionsHomeScreen';
 
 export default function HomeScreen() {
   const router = useRouter();
 
   return (
-    <AccountsHomeScreen
-      onCreateAccount={() => router.push('/accounts/new')}
-      onManageCategories={() => router.push('/categories' as never)}
+    <TransactionsHomeScreen
+      onNewExpense={() => router.push('/expenses/new' as never)}
       onNoAccounts={() => router.replace('/onboarding')}
     />
   );
