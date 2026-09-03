@@ -3,20 +3,13 @@ import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
 import { DATABASE_NAME, initializeDatabase } from '@/db/database';
+import { BootstrapScreen } from '@/components/BootstrapScreen';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
-import { BootstrapScreen } from './BootstrapScreen';
-
-function DatabaseContent({
-  isReady,
-  onReady,
-}: {
-  isReady: boolean;
-  onReady: () => void;
-}) {
+function DatabaseContent({ onReady }: { onReady: () => void }) {
   useEffect(onReady, [onReady]);
 
-  return isReady ? <Stack screenOptions={{ headerShown: false }} /> : null;
+  return <Stack screenOptions={{ headerShown: false }} />;
 }
 
 function AppBootstrap() {
@@ -65,7 +58,7 @@ function AppBootstrap() {
         onError={handleDatabaseError}
         onInit={initializeDatabase}
       >
-        <DatabaseContent isReady={isDatabaseReady} onReady={markDatabaseReady} />
+        <DatabaseContent onReady={markDatabaseReady} />
       </SQLiteProvider>
     </>
   );

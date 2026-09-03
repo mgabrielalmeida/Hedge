@@ -1,4 +1,5 @@
 export { Button } from './Button';
+export { BootstrapScreen } from './BootstrapScreen';
 export { Card } from './Card';
 export { Field } from './Field';
 export { Screen } from './Screen';
