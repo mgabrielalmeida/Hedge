@@ -8,6 +8,7 @@ export default function HomeScreen() {
   return (
     <AccountsHomeScreen
       onCreateAccount={() => router.push('/accounts/new')}
+      onManageCategories={() => router.push('/categories' as never)}
       onNoAccounts={() => router.replace('/onboarding')}
     />
   );

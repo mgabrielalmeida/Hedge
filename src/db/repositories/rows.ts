@@ -29,6 +29,8 @@ export type CategoryRow = {
   id: number;
   name: string;
   monthly_budget_cents: number;
+  visual_type: string;
+  visual_value: string;
   created_at: string;
   updated_at: string;
 };
@@ -92,6 +94,8 @@ export function mapCategory(row: CategoryRow): Category {
     id: row.id,
     name: row.name,
     monthlyBudgetCents: row.monthly_budget_cents,
+    visualType: row.visual_type as import('@/domain').CategoryVisualType,
+    visualValue: row.visual_value,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }), 'category row');

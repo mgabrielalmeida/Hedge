@@ -82,6 +82,8 @@ export function validateCategory(category: Category): ValidationResult<Category,
     !validateEntityId(category.id).ok ||
     !isNormalizedRequiredText(category.name) ||
     !validateCategoryBudget(category.monthlyBudgetCents).ok ||
+    !isNormalizedRequiredText(category.visualValue) ||
+    (category.visualType !== 'icon' && category.visualType !== 'color') ||
     !isUtcTimestamp(category.createdAt) ||
     !isUtcTimestamp(category.updatedAt)
   ) {

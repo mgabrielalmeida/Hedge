@@ -1,11 +1,16 @@
 import { validateCategoryBudget, validateRequiredText } from '@/domain';
-import type { Category, Cents } from '@/domain';
+import type { Category, CategoryVisualType, Cents } from '@/domain';
 
 import { type Clock, type RepositoryDatabase, systemClock } from './database';
 import { mapCategory, type CategoryRow } from './rows';
 
-const categoryColumns = 'id, name, monthly_budget_cents, created_at, updated_at';
-export type CategoryInput = { readonly name: string; readonly monthlyBudgetCents: Cents };
+const categoryColumns = 'id, name, monthly_budget_cents, visual_type, visual_value, created_at, updated_at';
+export type CategoryInput = {
+  readonly name: string;
+  readonly monthlyBudgetCents: Cents;
+  readonly visualType?: CategoryVisualType;
+  readonly visualValue?: string;
+};
 
 export async function listCategories(db: RepositoryDatabase): Promise<readonly Category[]> {
   const rows = await db.getAllAsync<CategoryRow>(`SELECT ${categoryColumns} FROM categories ORDER BY name COLLATE NOCASE, id;`);
@@ -16,14 +21,14 @@ export async function findCategoryById(db: RepositoryDatabase, id: number): Prom
   return row ? mapCategory(row) : null;
 }
 export async function createCategory(db: RepositoryDatabase, input: CategoryInput, clock: Clock = systemClock): Promise<Category> {
-  const { name, monthlyBudgetCents } = validated(input); const timestamp = clock();
-  await db.runAsync('INSERT INTO categories (name, monthly_budget_cents, created_at, updated_at) VALUES (?, ?, ?, ?);', name, monthlyBudgetCents, timestamp, timestamp);
+  const category = validated(input); const timestamp = clock();
+  await db.runAsync('INSERT INTO categories (name, monthly_budget_cents, visual_type, visual_value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?);', category.name, category.monthlyBudgetCents, category.visualType, category.visualValue, timestamp, timestamp);
   const row = await db.getFirstAsync<CategoryRow>(`SELECT ${categoryColumns} FROM categories WHERE id = last_insert_rowid();`);
   if (!row) throw new Error('Created category was not found.'); return mapCategory(row);
 }
 export async function updateCategory(db: RepositoryDatabase, id: number, input: CategoryInput, clock: Clock = systemClock): Promise<Category | null> {
-  const { name, monthlyBudgetCents } = validated(input);
-  await db.runAsync('UPDATE categories SET name = ?, monthly_budget_cents = ?, updated_at = ? WHERE id = ?;', name, monthlyBudgetCents, clock(), id);
+  const category = validated(input);
+  await db.runAsync('UPDATE categories SET name = ?, monthly_budget_cents = ?, visual_type = ?, visual_value = ?, updated_at = ? WHERE id = ?;', category.name, category.monthlyBudgetCents, category.visualType, category.visualValue, clock(), id);
   return findCategoryById(db, id);
 }
 export async function deleteCategory(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
@@ -41,8 +46,10 @@ export async function deleteCategory(db: RepositoryDatabase, id: number, clock: 
   });
   return wasDeleted;
 }
-function validated(input: CategoryInput): CategoryInput {
+function validated(input: CategoryInput): Required<CategoryInput> {
   const name = validateRequiredText(input.name);
-  if (!name.ok || !validateCategoryBudget(input.monthlyBudgetCents).ok) throw new Error('Invalid category input.');
-  return { name: name.value, monthlyBudgetCents: input.monthlyBudgetCents };
+  const visualType = input.visualType ?? 'icon';
+  const visualValue = input.visualValue ?? 'tag';
+  if (!name.ok || !validateCategoryBudget(input.monthlyBudgetCents).ok || !validateRequiredText(visualValue).ok || (visualType !== 'icon' && visualType !== 'color')) throw new Error('Invalid category input.');
+  return { ...input, name: name.value, visualType, visualValue: visualValue.trim() };
 }

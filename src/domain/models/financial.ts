@@ -5,6 +5,7 @@ export type YearMonth = string;
 export type UtcTimestamp = string;
 
 export type AccountVisualType = 'icon' | 'color';
+export type CategoryVisualType = 'icon' | 'color';
 
 export interface Account {
   readonly id: EntityId;
@@ -20,6 +21,8 @@ export interface Category {
   readonly id: EntityId;
   readonly name: string;
   readonly monthlyBudgetCents: Cents;
+  readonly visualType: CategoryVisualType;
+  readonly visualValue: string;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
 }
