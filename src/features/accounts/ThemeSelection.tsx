@@ -49,7 +49,7 @@ export function ThemeSelection({ onFinish }: ThemeSelectionProps) {
                 ]}>
                   <Text variant="title">{choice.title}</Text>
                   <Text tone="muted" style={{ marginTop: tokens.spacing.xs }}>{choice.description}</Text>
-                  {selected ? <Text tone="positive" style={{ marginTop: tokens.spacing.sm }}>Selecionado</Text> : null}
+                  {selected ? <Text style={{ color: tokens.primary, marginTop: tokens.spacing.sm }}>Selecionado</Text> : null}
                 </Card>
               </Pressable>
             );

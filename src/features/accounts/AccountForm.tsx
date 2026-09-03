@@ -2,7 +2,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Field, Text } from '@/components';
+import { Button, Field, MoneyField, Text } from '@/components';
 import { createAccount } from '@/db/repositories';
 import { parseCivilDate, parseMoneyInput, validateRequiredText } from '@/domain';
 import type { Account, AccountVisualType } from '@/domain';
@@ -20,13 +20,22 @@ const BANK_OPTIONS = [
 ] as const;
 
 const ICON_OPTIONS = [
-  { label: 'Banco', value: 'bank', symbol: '▣' },
-  { label: 'Carteira', value: 'wallet', symbol: '▤' },
-  { label: 'Cartão', value: 'card', symbol: '▰' },
-  { label: 'Dinheiro', value: 'cash', symbol: '$' },
+  { label: 'Banco', value: 'bank', symbol: '🏦' },
+  { label: 'Carteira', value: 'wallet', symbol: '👛' },
+  { label: 'Cartão', value: 'card', symbol: '💳' },
+  { label: 'Dinheiro', value: 'cash', symbol: '💵' },
+  { label: 'Cofrinho', value: 'savings', symbol: '🐷' },
+  { label: 'Moedas', value: 'coins', symbol: '🪙' },
+  { label: 'Celular', value: 'mobile', symbol: '📱' },
+  { label: 'Casa', value: 'home', symbol: '🏠' },
+  { label: 'Trabalho', value: 'work', symbol: '💼' },
+  { label: 'Estrela', value: 'star', symbol: '★' },
 ] as const;
 
-const COLOR_OPTIONS = ['#276749', '#176B9C', '#7E3A8A', '#B45309', '#B42318'] as const;
+const COLOR_OPTIONS = [
+  '#276749', '#176B9C', '#7E3A8A', '#B45309', '#B42318', '#0F766E',
+  '#1D4ED8', '#9333EA', '#C2410C', '#BE123C', '#4D7C0F', '#475569',
+] as const;
 
 type AccountFormProps = {
   onAccountCreated: (account: Account) => void;
@@ -39,7 +48,7 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
   const [accountName, setAccountName] = useState('');
   const [bank, setBank] = useState<(typeof BANK_OPTIONS)[number] | null>(null);
   const [customInstitution, setCustomInstitution] = useState('');
-  const [initialBalance, setInitialBalance] = useState('0,00');
+  const [initialBalance, setInitialBalance] = useState('');
   const [openingBalanceDate, setOpeningBalanceDate] = useState(getLocalCivilDate());
   const [visualType, setVisualType] = useState<AccountVisualType>('icon');
   const [visualValue, setVisualValue] = useState('bank');
@@ -51,7 +60,7 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
   async function submit() {
     const name = validateRequiredText(accountName);
     const institution = validateRequiredText(institutionName);
-    const amount = parseMoneyInput(initialBalance, { allowNegative: true });
+    const amount = parseMoneyInput(initialBalance.replace(/\./g, ''), { allowNegative: true });
     const date = parseCivilDate(openingBalanceDate);
 
     if (!name.ok) {
@@ -125,16 +134,13 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
         />
       ) : null}
 
-      <Field
-        keyboardType="decimal-pad"
+      <MoneyField
+        allowNegative
         label="Saldo inicial"
         onChangeText={setInitialBalance}
         placeholder="0,00"
         value={initialBalance}
       />
-      <Text tone="muted" variant="caption" style={styles.hint}>
-        Pode ser positivo, negativo ou zero. O aplicativo mostrará apenas o saldo atual.
-      </Text>
 
       <Field
         keyboardType="numbers-and-punctuation"
@@ -154,8 +160,9 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
           <View style={styles.options}>
             {ICON_OPTIONS.map((option) => (
               <Choice
+                accessibilityLabel={option.label}
                 key={option.value}
-                label={`${option.symbol} ${option.label}`}
+                label={option.symbol}
                 onPress={() => setVisualValue(option.value)}
                 selected={visualValue === option.value}
               />
@@ -189,11 +196,12 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
   );
 }
 
-function Choice({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
+function Choice({ accessibilityLabel, label, onPress, selected }: { accessibilityLabel?: string; label: string; onPress: () => void; selected: boolean }) {
   const { tokens } = useTheme();
 
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       onPress={onPress}
       style={[
@@ -219,7 +227,6 @@ const styles = StyleSheet.create({
   colorOption: { borderRadius: 20, borderWidth: 2, height: 40, width: 40 },
   choice: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   form: { gap: 18 },
-  hint: { marginTop: -10 },
   label: { marginBottom: 8 },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   submit: { marginTop: 6 },

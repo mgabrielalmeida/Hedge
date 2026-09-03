@@ -69,6 +69,10 @@ export function formatBrazilianCurrency(cents: Cents): string {
   return `${isNegative ? '-' : ''}R$ ${groupedInteger},${formattedDecimal}`;
 }
 
+export function formatBrazilianMoneyInput(cents: Cents): string {
+  return formatBrazilianCurrency(cents).replace(/^(-?)R\$ /, '$1');
+}
+
 export function assertSafeCents(value: number): asserts value is Cents {
   if (!isSafeCents(value)) {
     throw new RangeError('Money value must be a safe integer number of cents.');

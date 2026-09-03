@@ -1,6 +1,7 @@
 import {
   addCents,
   formatBrazilianCurrency,
+  formatBrazilianMoneyInput,
   parseMoneyInput,
 } from './money';
 
@@ -33,6 +34,8 @@ describe('money conversion', () => {
     expect(formatBrazilianCurrency(0)).toBe('R$ 0,00');
     expect(formatBrazilianCurrency(123456)).toBe('R$ 1.234,56');
     expect(formatBrazilianCurrency(-1000)).toBe('-R$ 10,00');
+    expect(formatBrazilianMoneyInput(200000)).toBe('2.000,00');
+    expect(formatBrazilianMoneyInput(-1000)).toBe('-10,00');
   });
 
   it('fails explicitly on arithmetic overflow', () => {

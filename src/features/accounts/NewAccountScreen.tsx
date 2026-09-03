@@ -1,33 +1,30 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { Card, Screen, Text } from '@/components';
+import { Button, Card, Screen, Text } from '@/components';
 import type { Account } from '@/domain';
-import { useTheme } from '@/theme/ThemeProvider';
 
 import { AccountForm } from './AccountForm';
 
 type NewAccountScreenProps = {
   onAccountCreated: (account: Account) => void;
+  onCancel: () => void;
 };
 
-export function NewAccountScreen({ onAccountCreated }: NewAccountScreenProps) {
-  const { tokens } = useTheme();
+export function NewAccountScreen({ onAccountCreated, onCancel }: NewAccountScreenProps) {
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View>
           <Text variant="heading">Nova conta</Text>
-          <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
-            Adicione uma conta para organizar os próximos lançamentos.
-          </Text>
         </View>
         <Card elevated>
           <AccountForm onAccountCreated={onAccountCreated} />
+          <Button label="Cancelar" onPress={onCancel} style={styles.cancel} variant="ghost" />
         </Card>
       </ScrollView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({ content: { gap: 24, paddingVertical: 24 } });
+const styles = StyleSheet.create({ cancel: { marginTop: 8 }, content: { gap: 24, paddingVertical: 24 } });

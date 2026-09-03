@@ -41,12 +41,18 @@ A apresentação de uma quantia usa o símbolo `R$`, ponto como separador de
 milhar, vírgula como separador decimal e sempre duas casas decimais. Exemplos:
 `R$ 0,00`, `R$ 12,50`, `R$ 1.234,56` e `-R$ 10,00`.
 
-Na entrada, o usuário não informa separador de milhar. Tanto ponto quanto
-vírgula são aceitos como separador entre reais e centavos. Assim, `12.50` e
-`12,50` representam ambos 1.250 centavos. A entrada segue estas regras:
+Nos campos monetários do aplicativo, a digitação é tratada como centavos: cada
+algarismo informado atualiza automaticamente a vírgula decimal e o ponto de
+milhar. Por exemplo, `200000` é apresentado como `2.000,00`. O usuário não
+informa separador de milhar; o componente de interface o insere somente para
+apresentação antes de entregar a quantia ao domínio. Tanto ponto quanto vírgula
+continuam aceitos como separador entre reais e centavos em entradas textuais
+não formatadas. Assim, `12.50` e `12,50` representam ambos 1.250 centavos.
+A entrada segue estas regras:
 
 - espaços externos são ignorados, mas espaços internos não são aceitos;
-- o símbolo da moeda e separadores de milhar não são aceitos;
+- o símbolo da moeda não é aceito; separadores de milhar são tratados pelo
+  campo formatado de interface e não integram a quantia enviada ao domínio;
 - a parte inteira é obrigatória e contém somente algarismos;
 - a parte decimal é opcional e contém uma ou duas casas;
 - no máximo um separador decimal pode aparecer;
@@ -56,11 +62,12 @@ vírgula são aceitos como separador entre reais e centavos. Assim, `12.50` e
 - mais de duas casas decimais tornam a entrada inválida; valores nunca são
   arredondados implicitamente.
 
-Consequentemente, `1234`, `1234,5`, `1234.50` e `-10,25` são entradas
-sintaticamente válidas, enquanto `R$ 10,00`, `1.234,56`, `10,`, `.50`,
-`1,234` e `10,999` são inválidas. Como não existe separador de milhar na
-entrada, `1.23` significa um real e vinte e três centavos, não cento e vinte e
-três reais.
+Consequentemente, `1234`, `1234,5`, `1234.50` e `-10,25` são entradas textuais
+sintaticamente válidas, enquanto `R$ 10,00`, `10,`, `.50`, `1,234` e `10,999`
+são inválidas. O texto `1.234,56` é uma apresentação criada pelo campo
+monetário, não uma entrada textual bruta para o conversor. Como não existe
+separador de milhar na entrada bruta, `1.23` significa um real e vinte e três
+centavos, não cento e vinte e três reais.
 
 A conversão é feita diretamente entre texto e centavos, sem passar por ponto
 flutuante. O resultado e toda quantia recebida pelo domínio devem ser inteiros

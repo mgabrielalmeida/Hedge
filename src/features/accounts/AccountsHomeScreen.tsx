@@ -97,7 +97,10 @@ function AccountCard({ account }: { account: Account }) {
 }
 
 function iconSymbol(value: string): string {
-  return ({ bank: '▣', wallet: '▤', card: '▰', cash: '$' } as Record<string, string>)[value] ?? '•';
+  return ({
+    bank: '🏦', wallet: '👛', card: '💳', cash: '💵', savings: '🐷', coins: '🪙',
+    mobile: '📱', home: '🏠', work: '💼', star: '★',
+  } as Record<string, string>)[value] ?? '•';
 }
 
 const styles = StyleSheet.create({
