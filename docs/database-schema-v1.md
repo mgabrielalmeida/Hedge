@@ -65,8 +65,15 @@ Representa uma conta financeira e contém:
 | `created_at`, `updated_at` | Instantes técnicos |
 
 Não existe tabela de instituições nem restrição de unicidade para o indicador
-visual. A exclusão de contas não pertence ao MVP. Referências de lançamentos e
-recorrências usam `ON DELETE RESTRICT`, impedindo perda acidental do histórico.
+visual. Referências de lançamentos e recorrências usam `ON DELETE RESTRICT`,
+impedindo perda acidental do histórico.
+
+O MVP passou a permitir a exclusão de uma conta quando ao menos outra conta
+permanecer cadastrada. O schema v1 ainda não permite essa operação, pois toda
+conta possui ao menos seu lançamento de saldo inicial e as referências usam
+`ON DELETE RESTRICT`. A implementação exigirá uma nova migração, sem alterar
+a migração 1, depois que for definida a política para lançamentos,
+transferências, regras recorrentes e ocorrências vinculados à conta excluída.
 
 ## `categories`
 

@@ -1,7 +1,7 @@
 # MVP funcional do Hedge
 
 **Status:** definido
-**Data:** 1 de setembro de 2026
+**Data:** 3 de setembro de 2026
 
 Este documento registra as convenções funcionais já decididas para a primeira
 versão do Hedge. Ele complementa a [arquitetura](architecture.md): não define
@@ -17,6 +17,7 @@ conta de usuário, servidor ou sincronização.
 As funcionalidades iniciais são:
 
 - cadastrar contas bancárias;
+- editar e excluir contas, desde que pelo menos uma conta permaneça;
 - registrar despesas pontuais;
 - registrar rendas pontuais;
 - consultar o histórico de despesas e rendas pontuais;
@@ -99,7 +100,15 @@ como um ícone de uma seleção ou uma cor.
 
 Na criação, o usuário informa obrigatoriamente o saldo inicial. Esse valor é
 registrado como um lançamento comum, sujeito às mesmas regras de edição e
-exclusão dos demais lançamentos. Contas podem ter saldo negativo.
+exclusão dos demais lançamentos. Ele não é apresentado como um atributo ou
+saldo separado da conta: a interface apresenta o saldo atual, sempre derivado
+dos lançamentos. Contas podem ter saldo negativo.
+
+Quando não houver nenhuma conta no banco de dados, o aplicativo abre o fluxo
+de onboarding para criação da primeira conta. A exclusão de uma conta é
+permitida somente quando houver outra conta cadastrada. A regra de tratamento
+do histórico e das referências vinculadas à conta será definida antes de
+implementar essa exclusão.
 
 Despesas pontuais decrementam o saldo da conta selecionada e rendas pontuais o
 incrementam. A tela inicial mostra o saldo atual consolidado do usuário e o
@@ -122,8 +131,10 @@ categoria é obrigatória para uma despesa e não é necessária para uma renda.
 Não é permitido registrar lançamentos pontuais com data futura.
 
 O usuário pode acessar um histórico de despesas e rendas pontuais e pode
-editar ou excluir seus lançamentos. A exclusão é permanente: o lançamento
-deixa de integrar o histórico e os cálculos de saldo e gastos.
+editar ou excluir seus lançamentos. O lançamento de saldo inicial também segue
+essas regras, embora não seja apresentado como um atributo da conta. A
+exclusão é permanente: o lançamento deixa de integrar o histórico e os
+cálculos de saldo e gastos.
 
 ## Transferências
 
@@ -131,6 +142,10 @@ Uma transferência entre contas é registrada como um único lançamento na
 funcionalidade **nova transferência**. Ela não deve exigir que o usuário
 registre separadamente uma saída na conta de origem e uma entrada na conta de
 destino.
+
+As transferências possuem um histórico próprio. O usuário pode editar ou
+excluir uma transferência; sua exclusão é permanente e remove o efeito dela
+dos saldos das duas contas.
 
 ## Categorias e orçamento mensal
 
@@ -175,6 +190,10 @@ semanal, os dias são numerados de 1 a 7, de segunda-feira a domingo.
 Se o dia de cobrança da iteração atual já passou, nenhum lançamento pontual é
 criado retroativamente; a cobrança ocorre somente na próxima iteração.
 
+O aplicativo processa as recorrências devidas no dia civil local ao abrir e ao
+retornar ao primeiro plano. O processamento deve ser idempotente: mais de uma
+execução no mesmo dia não pode gerar lançamentos duplicados.
+
 O usuário pode visualizar, editar e excluir suas regras de despesas e rendas
 recorrentes. Editar ou excluir uma regra não altera lançamentos pontuais já
 gerados. A definição de recorrência não substitui o histórico: os lançamentos
@@ -208,8 +227,8 @@ recebem seus dados e referências temporais por argumento e permanecem puras.
 
 ## Tema
 
-Após concluir o primeiro cadastro, o usuário pode trocar o tema do aplicativo.
-Tema e aparência continuam sendo preferências separadas, conforme definido na
+Após criar a primeira conta, o usuário pode trocar o tema do aplicativo. Tema
+e aparência continuam sendo preferências separadas, conforme definido na
 [arquitetura](architecture.md).
 
 ## Fora do escopo por enquanto
