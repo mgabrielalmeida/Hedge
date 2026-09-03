@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react';
+import { type ComponentProps, useState } from 'react';
 import { StyleSheet, TextInput, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeProvider';
@@ -13,8 +13,9 @@ type FieldProps = Omit<ComponentProps<typeof TextInput>, 'style'> & {
   style?: StyleProp<ViewStyle>;
 };
 
-export function Field({ error, helperText, inputStyle, label, style, ...props }: FieldProps) {
+export function Field({ error, helperText, inputStyle, label, onBlur, onFocus, style, ...props }: FieldProps) {
   const { tokens } = useTheme();
+  const [isFocused, setIsFocused] = useState(false);
   const message = error ?? helperText;
 
   return (
@@ -25,12 +26,23 @@ export function Field({ error, helperText, inputStyle, label, style, ...props }:
       <TextInput
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? label}
+        onBlur={(event) => {
+          setIsFocused(false);
+          onBlur?.(event);
+        }}
+        onFocus={(event) => {
+          setIsFocused(true);
+          onFocus?.(event);
+        }}
         placeholderTextColor={tokens.textMuted}
+        selectionColor={tokens.primary}
         style={[
           styles.input,
           {
-            borderColor: error ? tokens.negative : tokens.border,
+            backgroundColor: tokens.surfaceElevated,
+            borderColor: error ? tokens.negative : isFocused ? tokens.focusRing : tokens.border,
             borderRadius: tokens.radius.md,
+            borderWidth: isFocused ? 2 : 1,
             color: tokens.text,
             fontSize: tokens.typography.body,
             paddingHorizontal: tokens.spacing.md,

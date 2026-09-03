@@ -7,6 +7,7 @@ export default function HomeScreen() {
 
   return (
     <TransactionsHomeScreen
+      onAppearance={() => router.push('/appearance' as never)}
       onNewExpense={() => router.push('/expenses/new' as never)}
       onNoAccounts={() => router.replace('/onboarding')}
     />

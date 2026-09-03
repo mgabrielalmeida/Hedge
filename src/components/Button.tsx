@@ -44,9 +44,9 @@ export function Button({ disabled = false, label, style, variant = 'primary', ..
 
 function getColors(variant: ButtonVariant, tokens: ReturnType<typeof useTheme>['tokens']) {
   if (variant === 'primary') return { backgroundColor: tokens.primary, borderColor: tokens.primary, color: tokens.onPrimary };
-  if (variant === 'destructive') return { backgroundColor: tokens.negative, borderColor: tokens.negative, color: tokens.onPrimary };
+  if (variant === 'destructive') return { backgroundColor: tokens.negative, borderColor: tokens.negative, color: tokens.onNegative };
   if (variant === 'ghost') return { backgroundColor: 'transparent', borderColor: 'transparent', color: tokens.primary };
-  return { backgroundColor: tokens.surface, borderColor: tokens.border, color: tokens.text };
+  return { backgroundColor: tokens.primaryContainer, borderColor: tokens.primaryContainer, color: tokens.onPrimaryContainer };
 }
 
 const styles = StyleSheet.create({

@@ -4,7 +4,7 @@ import { StyleSheet, Text as NativeText, type StyleProp, type TextStyle } from '
 import { useTheme } from '@/theme/ThemeProvider';
 
 type TextVariant = 'caption' | 'body' | 'bodyLarge' | 'title' | 'heading' | 'display';
-type TextTone = 'default' | 'muted' | 'positive' | 'negative' | 'warning';
+type TextTone = 'default' | 'muted' | 'positive' | 'negative' | 'warning' | 'info';
 
 type AppTextProps = ComponentProps<typeof NativeText> & {
   tone?: TextTone;
@@ -16,6 +16,7 @@ export function Text({ style, tone = 'default', variant = 'body', ...props }: Ap
   const { tokens } = useTheme();
   const colorByTone = {
     default: tokens.text,
+    info: tokens.info,
     muted: tokens.textMuted,
     negative: tokens.negative,
     positive: tokens.positive,

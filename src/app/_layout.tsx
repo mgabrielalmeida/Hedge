@@ -1,5 +1,6 @@
 import { SQLiteProvider } from 'expo-sqlite';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 
 import { DATABASE_NAME, initializeDatabase } from '@/db/database';
@@ -44,6 +45,7 @@ function AppBootstrap() {
 
   return (
     <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       {!isDatabaseReady ? (
         <BootstrapScreen
           isDark={isDark}

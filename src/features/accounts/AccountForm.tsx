@@ -2,7 +2,14 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Field, MoneyField, Text } from '@/components';
+import {
+  ACCOUNT_ICON_OPTIONS,
+  Button,
+  Field,
+  MoneyField,
+  Text,
+  VisualPicker,
+} from '@/components';
 import { createAccount } from '@/db/repositories';
 import { parseCivilDate, parseMoneyInput, validateRequiredText } from '@/domain';
 import type { Account, AccountVisualType } from '@/domain';
@@ -17,24 +24,6 @@ const BANK_OPTIONS = [
   'Santander',
   'Inter',
   'Outra instituição',
-] as const;
-
-const ICON_OPTIONS = [
-  { label: 'Banco', value: 'bank', symbol: '🏦' },
-  { label: 'Carteira', value: 'wallet', symbol: '👛' },
-  { label: 'Cartão', value: 'card', symbol: '💳' },
-  { label: 'Dinheiro', value: 'cash', symbol: '💵' },
-  { label: 'Cofrinho', value: 'savings', symbol: '🐷' },
-  { label: 'Moedas', value: 'coins', symbol: '🪙' },
-  { label: 'Celular', value: 'mobile', symbol: '📱' },
-  { label: 'Casa', value: 'home', symbol: '🏠' },
-  { label: 'Trabalho', value: 'work', symbol: '💼' },
-  { label: 'Estrela', value: 'star', symbol: '★' },
-] as const;
-
-const COLOR_OPTIONS = [
-  '#276749', '#176B9C', '#7E3A8A', '#B45309', '#B42318', '#0F766E',
-  '#1D4ED8', '#9333EA', '#C2410C', '#BE123C', '#4D7C0F', '#475569',
 ] as const;
 
 type AccountFormProps = {
@@ -150,41 +139,13 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
         value={openingBalanceDate}
       />
 
-      <View>
-        <Text variant="caption" style={[styles.label, { color: tokens.textMuted }]}>Indicador visual</Text>
-        <View style={styles.options}>
-          <Choice label="Ícone" onPress={() => setVisualType('icon')} selected={visualType === 'icon'} />
-          <Choice label="Cor" onPress={() => setVisualType('color')} selected={visualType === 'color'} />
-        </View>
-        {visualType === 'icon' ? (
-          <View style={styles.options}>
-            {ICON_OPTIONS.map((option) => (
-              <Choice
-                accessibilityLabel={option.label}
-                key={option.value}
-                label={option.symbol}
-                onPress={() => setVisualValue(option.value)}
-                selected={visualValue === option.value}
-              />
-            ))}
-          </View>
-        ) : (
-          <View style={styles.options}>
-            {COLOR_OPTIONS.map((color) => (
-              <Pressable
-                key={color}
-                accessibilityLabel={`Indicador ${color}`}
-                accessibilityRole="button"
-                onPress={() => setVisualValue(color)}
-                style={[
-                  styles.colorOption,
-                  { backgroundColor: color, borderColor: visualValue === color ? tokens.text : tokens.border },
-                ]}
-              />
-            ))}
-          </View>
-        )}
-      </View>
+      <VisualPicker
+        iconOptions={ACCOUNT_ICON_OPTIONS}
+        onChange={setVisualValue}
+        onTypeChange={setVisualType}
+        value={visualValue}
+        visualType={visualType}
+      />
 
       <Button
         disabled={isSubmitting}
@@ -224,7 +185,6 @@ function getLocalCivilDate(): string {
 }
 
 const styles = StyleSheet.create({
-  colorOption: { borderRadius: 20, borderWidth: 2, height: 40, width: 40 },
   choice: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   form: { gap: 18 },
   label: { marginBottom: 8 },

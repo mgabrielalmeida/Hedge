@@ -234,9 +234,9 @@ recebem seus dados e referências temporais por argumento e permanecem puras.
 
 ## Tema
 
-Após criar a primeira conta, o usuário pode trocar o tema do aplicativo. Tema
-e aparência continuam sendo preferências separadas, conforme definido na
-[arquitetura](architecture.md).
+Após criar a primeira conta, o usuário pode trocar o tema durante o onboarding
+ou pela ação de personalização na tela inicial. Tema e aparência continuam
+sendo preferências separadas, conforme definido na [arquitetura](architecture.md).
 
 ## Fora do escopo por enquanto
 

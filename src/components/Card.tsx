@@ -21,7 +21,7 @@ export function Card({ children, elevated = false, style }: CardProps) {
           borderRadius: tokens.radius.lg,
           padding: tokens.spacing.lg,
         },
-        elevated ? [styles.elevated, { shadowColor: tokens.text }] : undefined,
+        elevated ? [styles.elevated, { shadowColor: tokens.shadow }] : undefined,
         style,
       ]}
     >

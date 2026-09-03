@@ -9,7 +9,7 @@ import type { Account, Category } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 export function ExpenseScreen({ onDone }: { onDone: () => void }) {
-  const db = useSQLiteContext(); const { tokens } = useTheme();
+  const db = useSQLiteContext();
   const [accounts, setAccounts] = useState<readonly Account[]>([]); const [categories, setCategories] = useState<readonly Category[]>([]);
   const [accountId, setAccountId] = useState<number | null>(null); const [categoryId, setCategoryId] = useState<number | null>(null);
   const [name, setName] = useState(''); const [amount, setAmount] = useState(''); const [date, setDate] = useState(today()); const [description, setDescription] = useState(''); const [error, setError] = useState<string | null>(null); const [saving, setSaving] = useState(false);

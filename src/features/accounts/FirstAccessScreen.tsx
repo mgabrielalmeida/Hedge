@@ -22,7 +22,7 @@ export function FirstAccessScreen({ onFinish }: FirstAccessScreenProps) {
     return <CategoriesScreen onCreate={() => router.push('/categories/new' as never)} onEdit={(id) => router.push(`/categories/${id}` as never)} onFinish={onFinish} />;
   }
   if (stage === 'theme') {
-    return <ThemeSelection onFinish={() => setStage('categories')} />;
+    return <ThemeSelection actionLabel="Continuar para categorias" onFinish={() => setStage('categories')} />;
   }
 
   return (

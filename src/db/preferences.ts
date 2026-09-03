@@ -1,6 +1,10 @@
 import AsyncStorage from 'expo-sqlite/kv-store';
 
-import type { AppearancePreference, ThemeName } from '@/theme/theme';
+import {
+  isThemeName,
+  type AppearancePreference,
+  type ThemeName,
+} from '@/theme/theme';
 
 const THEME_NAME_KEY = 'preferences.themeName';
 const APPEARANCE_KEY = 'preferences.appearance';
@@ -19,10 +23,6 @@ export type PreferenceStorage = Pick<
   typeof AsyncStorage,
   'getItem' | 'setItem'
 >;
-
-function isThemeName(value: string | null): value is ThemeName {
-  return value === 'hedge' || value === 'ocean';
-}
 
 function isAppearancePreference(value: string | null): value is AppearancePreference {
   return value === 'light' || value === 'dark' || value === 'system';

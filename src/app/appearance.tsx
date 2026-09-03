@@ -1,0 +1,15 @@
+import { useRouter } from 'expo-router';
+
+import { ThemeSelection } from '@/features/accounts/ThemeSelection';
+
+export default function AppearanceRoute() {
+  const router = useRouter();
+
+  return (
+    <ThemeSelection
+      actionLabel="Voltar ao início"
+      onFinish={() => router.back()}
+      title="Aparência"
+    />
+  );
+}

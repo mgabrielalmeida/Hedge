@@ -4,7 +4,8 @@ import { INITIAL_SCHEMA_SQL, initialSchemaMigration } from './001_initial_schema
 describe('initialSchemaMigration', () => {
   it('is registered as the immutable first migration', () => {
     expect(initialSchemaMigration.version).toBe(1);
-    expect(migrations).toEqual([initialSchemaMigration]);
+    expect(migrations[0]).toBe(initialSchemaMigration);
+    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3]);
   });
 
   it('creates the complete v1 schema as strict tables', () => {

@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Button, Card, Screen, Text } from '@/components';
+import { Button, Card, getAccountIconSymbol, Screen, Text } from '@/components';
 import { listAccounts } from '@/db/repositories';
 import type { Account } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -75,7 +75,7 @@ export function AccountsHomeScreen({ onCreateAccount, onManageCategories, onNoAc
 
 function AccountCard({ account }: { account: Account }) {
   const { tokens } = useTheme();
-  const symbol = account.visualType === 'icon' ? iconSymbol(account.visualValue) : '';
+  const symbol = account.visualType === 'icon' ? getAccountIconSymbol(account.visualValue) : '';
 
   return (
     <Card>
@@ -96,13 +96,6 @@ function AccountCard({ account }: { account: Account }) {
       </View>
     </Card>
   );
-}
-
-function iconSymbol(value: string): string {
-  return ({
-    bank: '🏦', wallet: '👛', card: '💳', cash: '💵', savings: '🐷', coins: '🪙',
-    mobile: '📱', home: '🏠', work: '💼', star: '★',
-  } as Record<string, string>)[value] ?? '•';
 }
 
 const styles = StyleSheet.create({
