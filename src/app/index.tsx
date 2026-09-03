@@ -8,6 +8,7 @@ export default function HomeScreen() {
   return (
     <TransactionsHomeScreen
       onAppearance={() => router.push('/appearance' as never)}
+      onEditTransaction={(id) => router.push(`/transactions/${id}` as never)}
       onManageCategories={() => router.push('/categories' as never)}
       onNewExpense={() => router.push('/expenses/new' as never)}
       onNewIncome={() => router.push('/incomes/new' as never)}
