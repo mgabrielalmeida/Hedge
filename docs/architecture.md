@@ -93,6 +93,10 @@ composição das telas. Rotas podem ler parâmetros, coordenar componentes e
 acionar operações de uma funcionalidade.
 
 Uma rota não deve conter SQL, cálculos financeiros nem regras de persistência.
+As áreas principais são Início, Histórico, Categorias e Contas; a navegação
+entre elas é apresentada pela interface como uma barra inferior. Telas de
+criação, edição e aparência ficam fora dessas áreas para manter os fluxos
+focados.
 
 ### `src/features`
 
