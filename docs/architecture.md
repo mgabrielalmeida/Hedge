@@ -183,7 +183,8 @@ arquitetura inicial.
 
 Tema visual e aparência do sistema serão dimensões separadas:
 
-- **tema:** Hedge, Oceano, Pôr do sol, Amora ou outro conjunto futuro;
+- **tema:** Hedge, Oceano, Pôr do sol, Amora, Rosa, Areia, Meia-noite ou outro
+  conjunto futuro;
 - **aparência:** clara, escura ou acompanhar o sistema.
 
 Um tema fornece tokens semânticos de cor, incluindo `background`, `surface`,
@@ -191,9 +192,9 @@ Um tema fornece tokens semânticos de cor, incluindo `background`, `surface`,
 `onPrimary`, contêineres de destaque, bordas, foco, estados positivo,
 negativo, de atenção e informativo, além dos tokens compartilhados de
 espaçamento, raio e tipografia. O provider resolve tema e aparência para um
-conjunto final de tokens. Os temas disponíveis são Hedge, Oceano, Pôr do sol
-e Amora; todos oferecem variantes clara e escura para validar que componentes
-não dependem de uma paleta específica.
+conjunto final de tokens. Os temas disponíveis são Hedge, Oceano, Pôr do sol,
+Amora, Rosa, Areia e Meia-noite; todos oferecem variantes clara e escura para
+validar que componentes não dependem de uma paleta específica.
 
 A seleção é armazenada no `expo-sqlite/kv-store` pelo adaptador
 `src/db/preferences.ts`. Essa é a única área autorizada a acessar o storage
@@ -207,6 +208,8 @@ Os componentes compartilhados mínimos são `Screen`, `Text`, `Card`, `Field` e
 tema e não têm conhecimento de funcionalidades ou do banco de dados.
 Seletores visuais reutilizados por contas e categorias também permanecem nessa
 área, com opções locais de ícones e cores e sem dependência de recursos remotos.
+Além das cores predefinidas, esses seletores aceitam um valor hexadecimal de
+seis dígitos para permitir uma escolha exata e persistível.
 
 ## Funcionamento offline
 

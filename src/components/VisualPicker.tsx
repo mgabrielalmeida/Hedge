@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { AccountVisualType, CategoryVisualType } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 import { Text } from './Text';
+import { Field } from './Field';
 import {
+  formatHexColorDraft,
+  normalizeHexColor,
   VISUAL_COLOR_OPTIONS,
   type IconOption,
 } from './visualOptions';
@@ -92,6 +96,87 @@ export function VisualPicker({
           );
         })}
       </View>
+
+      {visualType === 'color' ? (
+        <ExactColorPicker
+          onChange={onChange}
+          value={value}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function ExactColorPicker({ onChange, value }: { onChange: (value: string) => void; value: string }) {
+  const { tokens } = useTheme();
+  const [partialColor, setPartialColor] = useState<{ baseValue: string; draft: string } | null>(null);
+  const customColor = partialColor?.baseValue === value
+    ? partialColor.draft
+    : normalizeHexColor(value) ?? VISUAL_COLOR_OPTIONS[0].value;
+  const normalizedCustomColor = normalizeHexColor(customColor);
+  const missingDigits = 6 - Math.max(customColor.length - 1, 0);
+
+  function updateCustomColor(input: string) {
+    const draft = formatHexColorDraft(input);
+    const normalized = normalizeHexColor(draft);
+    if (normalized) {
+      setPartialColor(null);
+      onChange(normalized);
+    } else {
+      setPartialColor({ baseValue: value, draft });
+    }
+  }
+
+  return (
+    <View
+      style={[
+        styles.exactPicker,
+        {
+          backgroundColor: tokens.surfaceSubtle,
+          borderColor: tokens.border,
+          borderRadius: tokens.radius.lg,
+        },
+      ]}
+    >
+      <View style={styles.exactPickerHeader}>
+        <View>
+          <Text variant="title">Cor exata</Text>
+          <Text tone="muted" variant="caption">Informe um código hexadecimal.</Text>
+        </View>
+        <View
+          accessible
+          accessibilityLabel={normalizedCustomColor ? `Prévia da cor ${normalizedCustomColor}` : 'Cor incompleta'}
+          style={[
+            styles.exactPreview,
+            {
+              backgroundColor: normalizedCustomColor ?? tokens.surface,
+              borderColor: normalizedCustomColor === value ? tokens.focusRing : tokens.borderStrong,
+              borderRadius: tokens.radius.md,
+            },
+          ]}
+        >
+          {normalizedCustomColor === value ? (
+            <View style={[styles.badge, { backgroundColor: tokens.surface, borderColor: tokens.border }]}>
+              <Text style={[styles.check, { color: tokens.primary }]}>✓</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+      <Field
+        autoCapitalize="characters"
+        autoCorrect={false}
+        helperText={
+          normalizedCustomColor
+            ? 'A cor é aplicada automaticamente ao completar os 6 dígitos.'
+            : `Digite mais ${missingDigits} ${missingDigits === 1 ? 'dígito' : 'dígitos'}.`
+        }
+        label="Código HEX"
+        maxLength={7}
+        onChangeText={updateCustomColor}
+        placeholder="#1F6B45"
+        spellCheck={false}
+        value={customColor}
+      />
     </View>
   );
 }
@@ -134,6 +219,9 @@ const styles = StyleSheet.create({
   },
   check: { fontSize: 12, fontWeight: '800', lineHeight: 16 },
   container: { gap: 12 },
+  exactPicker: { borderWidth: 1, gap: 14, padding: 14 },
+  exactPickerHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  exactPreview: { borderWidth: 3, height: 48, width: 48 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   icon: { fontSize: 22, lineHeight: 28 },
   option: { alignItems: 'center', height: 48, justifyContent: 'center', width: 48 },

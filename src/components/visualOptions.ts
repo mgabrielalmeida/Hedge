@@ -95,3 +95,20 @@ export const VISUAL_COLOR_OPTIONS: readonly ColorOption[] = [
 export function getAccountIconSymbol(value: string): string {
   return ACCOUNT_ICON_OPTIONS.find((option) => option.value === value)?.symbol ?? '•';
 }
+
+export function normalizeHexColor(value: string): string | null {
+  const trimmed = value.trim().toUpperCase();
+  const withPrefix = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+
+  return /^#[0-9A-F]{6}$/.test(withPrefix) ? withPrefix : null;
+}
+
+export function formatHexColorDraft(value: string): string {
+  const digits = value
+    .replace(/^#/, '')
+    .replace(/[^0-9A-F]/gi, '')
+    .slice(0, 6)
+    .toUpperCase();
+
+  return `#${digits}`;
+}

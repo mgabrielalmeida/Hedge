@@ -35,11 +35,11 @@ describe('theme preferences', () => {
   });
 
   it('loads the alternate visual theme', async () => {
-    const storage = createStorage({ 'preferences.themeName': 'plum' });
+    const storage = createStorage({ 'preferences.themeName': 'rose' });
 
     await expect(loadThemePreferences(storage)).resolves.toEqual({
       appearance: 'system',
-      themeName: 'plum',
+      themeName: 'rose',
     });
   });
 
@@ -89,13 +89,13 @@ describe('theme preferences', () => {
   it('persists each preference through the injected storage', async () => {
     const storage = createStorage();
 
-    await saveThemeName('sunset', storage);
+    await saveThemeName('midnight', storage);
     await saveAppearancePreference('light', storage);
 
     expect(storage.setItem).toHaveBeenNthCalledWith(
       1,
       'preferences.themeName',
-      'sunset',
+      'midnight',
     );
     expect(storage.setItem).toHaveBeenNthCalledWith(
       2,

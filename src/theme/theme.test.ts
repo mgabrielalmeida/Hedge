@@ -1,10 +1,12 @@
-import { getThemeTokens, isThemeName } from './theme';
+import { getThemeTokens, isThemeName, THEME_NAMES } from './theme';
+
+const appearances = ['light', 'dark'] as const;
+const themeCases = THEME_NAMES.flatMap((theme) =>
+  appearances.map((appearance) => [theme, appearance] as const),
+);
 
 describe('getThemeTokens', () => {
-  it.each([
-    ['hedge', 'light'], ['hedge', 'dark'], ['ocean', 'light'], ['ocean', 'dark'],
-    ['sunset', 'light'], ['sunset', 'dark'], ['plum', 'light'], ['plum', 'dark'],
-  ] as const)('returns a complete semantic token set for %s %s', (theme, appearance) => {
+  it.each(themeCases)('returns a complete semantic token set for %s %s', (theme, appearance) => {
     const tokens = getThemeTokens(theme, appearance);
 
     expect(tokens).toMatchObject({
@@ -25,7 +27,9 @@ describe('getThemeTokens', () => {
   });
 
   it('recognizes every supported theme name', () => {
-    expect(['hedge', 'ocean', 'sunset', 'plum'].every(isThemeName)).toBe(true);
+    expect(THEME_NAMES).toHaveLength(7);
+    expect(THEME_NAMES.every(isThemeName)).toBe(true);
+    expect(isThemeName('rose')).toBe(true);
     expect(isThemeName('unsupported')).toBe(false);
   });
 });

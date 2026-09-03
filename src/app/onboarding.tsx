@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -28,14 +28,17 @@ export default function OnboardingRoute() {
     void checkAccounts();
   }, [checkAccounts]));
 
+  useEffect(() => {
+    if (hasExistingAccount) {
+      router.replace('/');
+    }
+  }, [hasExistingAccount, router]);
+
   if (failed) {
     return <BootstrapScreen isDark={isDark} message="Não foi possível abrir suas contas. Feche e abra o aplicativo novamente." title="Erro ao abrir o Hedge" tokens={tokens} />;
   }
 
   if (hasExistingAccount !== false) {
-    if (hasExistingAccount) {
-      router.replace('/');
-    }
     return <BootstrapScreen isDark={isDark} isLoading message="Verificando suas contas…" title="Hedge" tokens={tokens} />;
   }
 

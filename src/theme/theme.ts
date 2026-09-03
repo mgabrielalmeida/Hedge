@@ -1,6 +1,14 @@
 export type AppearancePreference = 'light' | 'dark' | 'system';
 
-export const THEME_NAMES = ['hedge', 'ocean', 'sunset', 'plum'] as const;
+export const THEME_NAMES = [
+  'hedge',
+  'ocean',
+  'sunset',
+  'plum',
+  'rose',
+  'sand',
+  'midnight',
+] as const;
 
 export type ThemeName = (typeof THEME_NAMES)[number];
 
@@ -66,6 +74,9 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
   { name: 'ocean', title: 'Oceano', description: 'Azuis profundos e tranquilos.' },
   { name: 'sunset', title: 'Pôr do sol', description: 'Tons quentes e acolhedores.' },
   { name: 'plum', title: 'Amora', description: 'Violetas suaves e sofisticados.' },
+  { name: 'rose', title: 'Rosa', description: 'Tons rosa vibrantes e delicados.' },
+  { name: 'sand', title: 'Areia', description: 'Neutros quentes e naturais.' },
+  { name: 'midnight', title: 'Meia-noite', description: 'Grafite elegante com azul glacial.' },
 ];
 
 const themes: Record<ThemeName, Record<ResolvedAppearance, ThemeColors>> = {
@@ -155,6 +166,72 @@ const themes: Record<ThemeName, Record<ResolvedAppearance, ThemeColors>> = {
       warning: '#EAC66F', warningContainer: '#4C3A00', onWarningContainer: '#FFE7A6',
       info: '#A8CDEF', infoContainer: '#264964', onInfoContainer: '#D4EAFF',
       focusRing: '#E7C0F8', shadow: 'rgba(0, 0, 0, 0.48)', overlay: 'rgba(0, 0, 0, 0.64)',
+    },
+  },
+  rose: {
+    light: {
+      background: '#FFF7FA', surface: '#FFFFFF', surfaceElevated: '#FFFFFF', surfaceSubtle: '#FCEAF1',
+      text: '#321C25', textMuted: '#725B65', primary: '#B32662', onPrimary: '#FFFFFF',
+      primaryContainer: '#FFD8E7', onPrimaryContainer: '#631336', border: '#EAD5DE', borderStrong: '#C5A6B3',
+      positive: '#397151', positiveContainer: '#D8F1E2', onPositiveContainer: '#173F2A',
+      negative: '#B3263B', onNegative: '#FFFFFF', negativeContainer: '#FFD9DE', onNegativeContainer: '#641525',
+      warning: '#825500', warningContainer: '#FFE7BE', onWarningContainer: '#472E00',
+      info: '#5657A6', infoContainer: '#E3E1FF', onInfoContainer: '#2B2C6B',
+      focusRing: '#B32662', shadow: 'rgba(50, 28, 37, 0.18)', overlay: 'rgba(50, 28, 37, 0.36)',
+    },
+    dark: {
+      background: '#1B1015', surface: '#27181E', surfaceElevated: '#332029', surfaceSubtle: '#3E2731',
+      text: '#FCECF2', textMuted: '#D2B5C1', primary: '#FFAFCC', onPrimary: '#5E1134',
+      primaryContainer: '#7B294E', onPrimaryContainer: '#FFD8E7', border: '#513640', borderStrong: '#87616F',
+      positive: '#98D5B2', positiveContainer: '#214B34', onPositiveContainer: '#C8F1D9',
+      negative: '#FFB2BC', onNegative: '#670018', negativeContainer: '#7B1730', onNegativeContainer: '#FFD9DE',
+      warning: '#F0C16B', warningContainer: '#503900', onWarningContainer: '#FFE4A5',
+      info: '#C3C0FF', infoContainer: '#3E3F7A', onInfoContainer: '#E5E3FF',
+      focusRing: '#FFD0DF', shadow: 'rgba(0, 0, 0, 0.48)', overlay: 'rgba(0, 0, 0, 0.64)',
+    },
+  },
+  sand: {
+    light: {
+      background: '#FAF7F0', surface: '#FFFEFA', surfaceElevated: '#FFFFFF', surfaceSubtle: '#F1EBDD',
+      text: '#2C281F', textMuted: '#6B6456', primary: '#765B20', onPrimary: '#FFFFFF',
+      primaryContainer: '#F5E3B4', onPrimaryContainer: '#443208', border: '#E3DCCD', borderStrong: '#B8AE9B',
+      positive: '#4F6F35', positiveContainer: '#DFEFCF', onPositiveContainer: '#293F18',
+      negative: '#A93D32', onNegative: '#FFFFFF', negativeContainer: '#F9DED9', onNegativeContainer: '#621710',
+      warning: '#7B5D00', warningContainer: '#F5E7BC', onWarningContainer: '#443300',
+      info: '#49667D', infoContainer: '#DCEAF2', onInfoContainer: '#233F53',
+      focusRing: '#765B20', shadow: 'rgba(44, 40, 31, 0.18)', overlay: 'rgba(44, 40, 31, 0.36)',
+    },
+    dark: {
+      background: '#17150F', surface: '#221F18', surfaceElevated: '#2D2920', surfaceSubtle: '#383329',
+      text: '#F3EFE5', textMuted: '#C6BDAA', primary: '#DEC277', onPrimary: '#3D2F06',
+      primaryContainer: '#584611', onPrimaryContainer: '#F7E3A8', border: '#474238', borderStrong: '#777064',
+      positive: '#B4D296', positiveContainer: '#354B22', onPositiveContainer: '#D7F2B7',
+      negative: '#FFB4AA', onNegative: '#690005', negativeContainer: '#701E18', onNegativeContainer: '#FFDAD5',
+      warning: '#E7C66C', warningContainer: '#4A3A00', onWarningContainer: '#FFE7A2',
+      info: '#AFCDE1', infoContainer: '#304B5E', onInfoContainer: '#D5EBF9',
+      focusRing: '#F1D890', shadow: 'rgba(0, 0, 0, 0.48)', overlay: 'rgba(0, 0, 0, 0.64)',
+    },
+  },
+  midnight: {
+    light: {
+      background: '#F5F7F9', surface: '#FFFFFF', surfaceElevated: '#FFFFFF', surfaceSubtle: '#E9EEF2',
+      text: '#1B2329', textMuted: '#5D6971', primary: '#315D78', onPrimary: '#FFFFFF',
+      primaryContainer: '#D4E9F6', onPrimaryContainer: '#143C53', border: '#D6DEE3', borderStrong: '#A5B2BA',
+      positive: '#36705A', positiveContainer: '#D5F0E4', onPositiveContainer: '#173F31',
+      negative: '#A83A42', onNegative: '#FFFFFF', negativeContainer: '#FADEE0', onNegativeContainer: '#61161D',
+      warning: '#7C5E00', warningContainer: '#F5E8BD', onWarningContainer: '#443400',
+      info: '#315D78', infoContainer: '#D4E9F6', onInfoContainer: '#143C53',
+      focusRing: '#315D78', shadow: 'rgba(27, 35, 41, 0.18)', overlay: 'rgba(27, 35, 41, 0.38)',
+    },
+    dark: {
+      background: '#0D1114', surface: '#161C20', surfaceElevated: '#20282D', surfaceSubtle: '#293238',
+      text: '#EEF3F6', textMuted: '#B2C0C8', primary: '#9BD2F2', onPrimary: '#07344B',
+      primaryContainer: '#234E67', onPrimaryContainer: '#CBEAFF', border: '#344149', borderStrong: '#64747E',
+      positive: '#8FD3B3', positiveContainer: '#1D4937', onPositiveContainer: '#C1F2DA',
+      negative: '#FFB3B8', onNegative: '#68000B', negativeContainer: '#741923', onNegativeContainer: '#FFDADC',
+      warning: '#EAC76F', warningContainer: '#4C3A00', onWarningContainer: '#FFE7A6',
+      info: '#9BD2F2', infoContainer: '#234E67', onInfoContainer: '#CBEAFF',
+      focusRing: '#C6E8FA', shadow: 'rgba(0, 0, 0, 0.58)', overlay: 'rgba(0, 0, 0, 0.7)',
     },
   },
 };
