@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Button, Card, Screen, Text } from '@/components';
+import { Card, Screen, Text } from '@/components';
 import { listAccounts, listCategories, listRecurringRules, listTransactions } from '@/db/repositories';
 import { calculateAccountBalance, formatBrazilianCurrency } from '@/domain';
 import type { Account, Category, RecurringRule, Transaction, TransferTransaction } from '@/domain';
@@ -14,24 +14,14 @@ import { subscribeToRecurringProcessing } from './useRecurringProcessing';
 type HistoryType = 'transactions' | 'transfers' | 'recurring';
 
 type TransactionsHomeScreenProps = {
-  onAppearance: () => void;
   onEditRecurringRule: (id: number) => void;
   onEditTransaction: (id: number) => void;
-  onManageCategories: () => void;
-  onNewExpense: () => void;
-  onNewIncome: () => void;
-  onNewTransfer: () => void;
   onNoAccounts: () => void;
 };
 
 export function TransactionsHomeScreen({
-  onAppearance,
   onEditRecurringRule,
   onEditTransaction,
-  onManageCategories,
-  onNewExpense,
-  onNewIncome,
-  onNewTransfer,
   onNoAccounts,
 }: TransactionsHomeScreenProps) {
   const db = useSQLiteContext();
@@ -138,19 +128,6 @@ export function TransactionsHomeScreen({
             </Pressable>
           ))}
         </View>
-        <Button label="Nova despesa" onPress={onNewExpense} />
-        <Button label="Nova renda" onPress={onNewIncome} variant="secondary" />
-        <Button
-          disabled={accounts.length < 2}
-          label="Nova transferência"
-          onPress={onNewTransfer}
-          variant="secondary"
-        />
-        {accounts.length < 2 ? (
-          <Text tone="muted" variant="caption">Cadastre outra conta para fazer transferências.</Text>
-        ) : null}
-        <Button label="Gerenciar categorias" onPress={onManageCategories} variant="ghost" />
-        <Button label="Personalizar aparência" onPress={onAppearance} variant="ghost" />
       </ScrollView>
     </Screen>
   );
@@ -204,7 +181,17 @@ function ToggleOption({ label, onPress, selected }: { label: string; onPress: ()
         },
       ]}
     >
-      <Text style={{ color: selected ? tokens.primary : tokens.textMuted, fontWeight: '600' }}>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        numberOfLines={1}
+        variant="caption"
+        style={{
+          color: selected ? tokens.primary : tokens.textMuted,
+          fontWeight: '600',
+          textAlign: 'center',
+        }}
+      >
         {label}
       </Text>
     </Pressable>
@@ -277,5 +264,13 @@ const styles = StyleSheet.create({
   content: { gap: 18, paddingVertical: 24 },
   list: { gap: 10 },
   toggle: { borderWidth: 1, flexDirection: 'row', padding: 4 },
-  toggleOption: { alignItems: 'center', borderWidth: 1, flex: 1, paddingHorizontal: 10, paddingVertical: 10 },
+  toggleOption: {
+    alignItems: 'center',
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+  },
 });
