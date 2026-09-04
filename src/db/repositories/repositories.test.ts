@@ -104,8 +104,11 @@ describe('SQLite repositories', () => {
       expect.objectContaining({ kind: 'transfer', destinationAccountId: destination.id }),
     ]);
     await expect(updateTransaction(database, expense.id, { kind: 'expense', accountId: source.id, categoryId: category.id, name: 'Dinner', amountCents: -1_500, transactionDate: '2026-09-02' }, () => updatedAt)).resolves.toEqual(expect.objectContaining({ name: 'Dinner', amountCents: -1_500, updatedAt }));
+    await expect(updateTransaction(database, transfer.id, { kind: 'transfer', accountId: destination.id, destinationAccountId: source.id, name: 'Return', amountCents: -750, transactionDate: '2026-09-01' }, () => updatedAt)).resolves.toEqual(expect.objectContaining({ accountId: destination.id, destinationAccountId: source.id, name: 'Return', amountCents: -750, transactionDate: '2026-09-01', updatedAt }));
     await expect(deleteTransaction(database, income.id)).resolves.toBe(true);
+    await expect(deleteTransaction(database, transfer.id)).resolves.toBe(true);
     expect((await listTransactions(database)).some((item) => item.id === income.id)).toBe(false);
+    expect((await listTransactions(database)).some((item) => item.id === transfer.id)).toBe(false);
   });
 
   it('handles recurring rule lifecycle and rolls back a duplicate occurrence with its generated transaction', async () => {

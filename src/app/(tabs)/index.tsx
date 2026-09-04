@@ -9,6 +9,7 @@ export default function HomeScreen() {
     <DashboardScreen
       onNewExpense={() => router.push('/expenses/new' as never)}
       onNewIncome={() => router.push('/incomes/new' as never)}
+      onNewTransfer={() => router.push('/transfers/new' as never)}
       onNoAccounts={() => router.replace('/onboarding')}
     />
   );

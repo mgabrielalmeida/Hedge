@@ -1,9 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { ExpenseScreen } from '@/features/transactions/ExpenseScreen';
+import { TransactionEditorScreen } from '@/features/transactions/TransactionEditorScreen';
 
 export default function EditTransactionRoute() {
   const router = useRouter(); const { id } = useLocalSearchParams<{ id: string }>();
   const close = () => router.canGoBack() ? router.back() : router.replace('/' as never);
-  return <ExpenseScreen onDone={close} transactionId={Number(id)} />;
+  return <TransactionEditorScreen onDone={close} transactionId={Number(id)} />;
 }

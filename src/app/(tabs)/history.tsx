@@ -12,6 +12,7 @@ export default function HistoryRoute() {
       onManageCategories={() => router.push('/categories' as never)}
       onNewExpense={() => router.push('/expenses/new' as never)}
       onNewIncome={() => router.push('/incomes/new' as never)}
+      onNewTransfer={() => router.push('/transfers/new' as never)}
       onNoAccounts={() => router.replace('/onboarding')}
     />
   );
