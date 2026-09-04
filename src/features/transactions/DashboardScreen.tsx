@@ -16,6 +16,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 import { calculateCategoryBudgetProgress } from './categoryBudgetProgress';
+import { formatYearMonth, shiftYearMonth } from './monthNavigation';
 import { subscribeToRecurringProcessing } from './useRecurringProcessing';
 
 type DashboardScreenProps = {
@@ -37,6 +38,7 @@ export function DashboardScreen({
   const [categories, setCategories] = useState<readonly Category[]>([]);
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState(() => getLocalCivilDate().slice(0, 7));
 
   const load = useCallback(async () => {
     const [loadedAccounts, loadedCategories, loadedTransactions] = await Promise.all([
@@ -65,13 +67,15 @@ export function DashboardScreen({
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
   const currentMonth = getLocalCivilDate().slice(0, 7);
   const consolidatedBalance = calculateConsolidatedBalance(transactions);
+  const previousMonth = shiftYearMonth(selectedMonth, -1);
+  const nextMonth = selectedMonth === currentMonth ? null : shiftYearMonth(selectedMonth, 1);
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <View>
           <Text variant="heading">Visão financeira</Text>
-          <Text tone="muted">Acompanhe seu dinheiro neste mês.</Text>
+          <Text tone="muted">Acompanhe seu dinheiro e seus orçamentos.</Text>
         </View>
 
         <Card elevated>
@@ -123,9 +127,17 @@ export function DashboardScreen({
         <View>
           <Text variant="title">Orçamentos por categoria</Text>
           <Text tone="muted" variant="caption">
-            Acompanhe o que já foi gasto em relação ao limite mensal.
+            Acompanhe o que foi gasto em relação ao limite mensal.
           </Text>
         </View>
+
+        <MonthSelector
+          nextMonth={nextMonth}
+          onNextMonth={() => nextMonth && setSelectedMonth(nextMonth)}
+          onPreviousMonth={() => previousMonth && setSelectedMonth(previousMonth)}
+          previousMonth={previousMonth}
+          selectedMonth={selectedMonth}
+        />
 
         <View style={styles.categoryList}>
           {categories.map((category) => (
@@ -135,7 +147,7 @@ export function DashboardScreen({
               spendingCents={calculateCategoryMonthlySpending(
                 transactions,
                 category.id,
-                currentMonth,
+                selectedMonth,
               )}
             />
           ))}
@@ -156,6 +168,89 @@ export function DashboardScreen({
         ) : null}
       </ScrollView>
     </Screen>
+  );
+}
+
+function MonthSelector({
+  nextMonth,
+  onNextMonth,
+  onPreviousMonth,
+  previousMonth,
+  selectedMonth,
+}: {
+  nextMonth: string | null;
+  onNextMonth: () => void;
+  onPreviousMonth: () => void;
+  previousMonth: string | null;
+  selectedMonth: string;
+}) {
+  const { tokens } = useTheme();
+
+  return (
+    <View
+      accessibilityLabel={`Mês selecionado: ${formatYearMonth(selectedMonth)}`}
+      style={[
+        styles.monthSelector,
+        {
+          backgroundColor: tokens.surfaceSubtle,
+          borderColor: tokens.border,
+          borderRadius: tokens.radius.lg,
+        },
+      ]}
+    >
+      <MonthButton
+        accessibilityLabel="Mês anterior"
+        disabled={previousMonth === null}
+        onPress={onPreviousMonth}
+        symbol="‹"
+      />
+      <View style={styles.monthLabel}>
+        <Text tone="muted" variant="caption">Mês analisado</Text>
+        <Text variant="body" style={{ fontWeight: '700' }}>
+          {formatYearMonth(selectedMonth)}
+        </Text>
+      </View>
+      <MonthButton
+        accessibilityLabel="Próximo mês"
+        disabled={nextMonth === null}
+        onPress={onNextMonth}
+        symbol="›"
+      />
+    </View>
+  );
+}
+
+function MonthButton({
+  accessibilityLabel,
+  disabled,
+  onPress,
+  symbol,
+}: {
+  accessibilityLabel: string;
+  disabled: boolean;
+  onPress: () => void;
+  symbol: string;
+}) {
+  const { tokens } = useTheme();
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.monthButton,
+        {
+          backgroundColor: tokens.surface,
+          borderColor: tokens.border,
+          borderRadius: tokens.radius.pill,
+          opacity: disabled ? 0.42 : pressed ? 0.76 : 1,
+        },
+      ]}
+    >
+      <Text style={{ color: tokens.primary, fontSize: 28, lineHeight: 28 }}>{symbol}</Text>
+    </Pressable>
   );
 }
 
@@ -193,7 +288,7 @@ function CategoryBudgetCard({
         </View>
         <View style={styles.categoryHeading}>
           <Text variant="title">{category.name}</Text>
-          <Text tone="muted" variant="caption">Gasto neste mês</Text>
+          <Text tone="muted" variant="caption">Gasto no período</Text>
         </View>
         <Text tone="negative" variant="title">
           {formatBrazilianCurrency(spendingCents)}
@@ -297,6 +392,25 @@ const styles = StyleSheet.create({
   content: {
     gap: 20,
     paddingVertical: 24,
+  },
+  monthButton: {
+    alignItems: 'center',
+    borderWidth: 1,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  monthLabel: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 2,
+  },
+  monthSelector: {
+    alignItems: 'center',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 8,
   },
   progressBar: {
     height: '100%',

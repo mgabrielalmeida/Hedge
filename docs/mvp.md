@@ -119,10 +119,11 @@ implementar essa exclusão.
 
 Despesas pontuais decrementam o saldo da conta selecionada e rendas pontuais o
 incrementam. A tela inicial mostra o saldo atual consolidado do usuário e, por
-categoria, o quanto foi gasto no mês, o orçamento mensal configurado e a
-proporção entre eles. Categorias com orçamento zero continuam mostrando o gasto
-e o orçamento, mas não recebem percentual ou progresso artificial, pois não
-há limite mensal definido.
+categoria, o quanto foi gasto no mês escolhido, o orçamento mensal configurado
+e a proporção entre eles. O usuário pode consultar o mês atual e os meses
+anteriores. Categorias com orçamento zero continuam mostrando o gasto e o
+orçamento, mas não recebem percentual ou progresso artificial, pois não há
+limite mensal definido.
 
 O saldo de uma conta considera todos os lançamentos em que ela aparece. O valor
 é somado quando ela é a conta principal; em uma transferência recebida, o
@@ -167,9 +168,9 @@ deve definir seu orçamento mensal, que pode ser zero. Alterar o orçamento não
 altera o histórico.
 
 O gasto mensal de uma categoria é determinado pela data informada em cada
-lançamento de despesa. A tela inicial apresenta esse valor por categoria junto
-com seu orçamento mensal e, quando o orçamento for maior que zero, a
-porcentagem de orçamento já utilizada.
+lançamento de despesa. A tela inicial apresenta esse valor no mês selecionado,
+por categoria, junto com seu orçamento mensal e, quando o orçamento for maior
+que zero, a porcentagem de orçamento já utilizada.
 
 Esse gasto é uma quantia não negativa: soma-se a magnitude das despesas da
 categoria cuja data pertença ao ano e mês solicitados. Rendas, transferências,
