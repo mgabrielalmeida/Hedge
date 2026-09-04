@@ -4,6 +4,6 @@ import { ExpenseScreen } from '@/features/transactions/ExpenseScreen';
 
 export default function EditTransactionRoute() {
   const router = useRouter(); const { id } = useLocalSearchParams<{ id: string }>();
-  const close = () => router.canGoBack() ? router.back() : router.replace('/');
+  const close = () => router.canGoBack() ? router.back() : router.replace('/' as never);
   return <ExpenseScreen onDone={close} transactionId={Number(id)} />;
 }

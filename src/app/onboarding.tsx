@@ -30,7 +30,7 @@ export default function OnboardingRoute() {
 
   useEffect(() => {
     if (hasExistingAccount) {
-      router.replace('/');
+      router.replace('/' as never);
     }
   }, [hasExistingAccount, router]);
 
@@ -42,5 +42,5 @@ export default function OnboardingRoute() {
     return <BootstrapScreen isDark={isDark} isLoading message="Verificando suas contas…" title="Hedge" tokens={tokens} />;
   }
 
-  return <FirstAccessScreen onFinish={() => router.replace('/')} />;
+  return <FirstAccessScreen onFinish={() => router.replace('/' as never)} />;
 }
