@@ -8,6 +8,7 @@ export default function HistoryRoute() {
   return (
     <TransactionsHomeScreen
       onAppearance={() => router.push('/appearance' as never)}
+      onEditRecurringRule={(id) => router.push(`/recurring/${id}` as never)}
       onEditTransaction={(id) => router.push(`/transactions/${id}` as never)}
       onManageCategories={() => router.push('/categories' as never)}
       onNewExpense={() => router.push('/expenses/new' as never)}

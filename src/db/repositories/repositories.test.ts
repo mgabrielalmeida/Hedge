@@ -14,6 +14,7 @@ import {
   listCategories,
   listRecurringRules,
   listTransactions,
+  processDueRecurringRules,
   updateAccount,
   updateCategory,
   updateRecurringRule,
@@ -126,5 +127,21 @@ describe('SQLite repositories', () => {
     await expect(deleteRecurringRule(database, rule.id, () => updatedAt)).resolves.toBe(true);
     await expect(listRecurringRules(database, true)).resolves.toEqual([]);
     await expect(createDueOccurrence(database, activeRule.id, '2029-02-28', () => updatedAt)).rejects.toThrow('not due');
+  });
+
+  it('processes every rule due today once and preserves occurrence tombstones', async () => {
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', visualType: 'icon', visualValue: 'bank', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const category = await createCategory(database, { name: 'Recurring bills', monthlyBudgetCents: 0 }, () => createdAt);
+    await createRecurringRule(database, { kind: 'income', accountId: account.id, name: 'Weekly income', amountCents: 1_000, frequency: 'weekly', chargeDay: 3, startDate: '2026-09-01' }, () => createdAt);
+    await createRecurringRule(database, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Yearly fee', amountCents: -250, frequency: 'yearly', chargeDay: 2, chargeMonth: 9, startDate: '2025-01-01' }, () => createdAt);
+    await createRecurringRule(database, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Not today', amountCents: -100, frequency: 'monthly', chargeDay: 3, startDate: '2026-01-01' }, () => createdAt);
+
+    const firstProcessing = await processDueRecurringRules(database, '2026-09-02', () => updatedAt);
+    expect(firstProcessing.generated.map((item) => item.transaction.name)).toEqual(['Weekly income', 'Yearly fee']);
+    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [] });
+
+    await deleteTransaction(database, firstProcessing.generated[0].transaction.id);
+    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [] });
+    expect((await listTransactions(database)).filter((item) => item.transactionDate === '2026-09-02').map((item) => item.name)).toEqual(expect.arrayContaining(['Saldo inicial', 'Yearly fee']));
   });
 });

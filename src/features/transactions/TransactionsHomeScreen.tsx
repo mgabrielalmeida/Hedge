@@ -1,18 +1,21 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { Button, Card, Screen, Text } from '@/components';
-import { listAccounts, listCategories, listTransactions } from '@/db/repositories';
+import { listAccounts, listCategories, listRecurringRules, listTransactions } from '@/db/repositories';
 import { calculateAccountBalance, formatBrazilianCurrency } from '@/domain';
-import type { Account, Category, Transaction, TransferTransaction } from '@/domain';
+import type { Account, Category, RecurringRule, Transaction, TransferTransaction } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
-type HistoryType = 'transactions' | 'transfers';
+import { subscribeToRecurringProcessing } from './useRecurringProcessing';
+
+type HistoryType = 'transactions' | 'transfers' | 'recurring';
 
 type TransactionsHomeScreenProps = {
   onAppearance: () => void;
+  onEditRecurringRule: (id: number) => void;
   onEditTransaction: (id: number) => void;
   onManageCategories: () => void;
   onNewExpense: () => void;
@@ -23,6 +26,7 @@ type TransactionsHomeScreenProps = {
 
 export function TransactionsHomeScreen({
   onAppearance,
+  onEditRecurringRule,
   onEditTransaction,
   onManageCategories,
   onNewExpense,
@@ -36,15 +40,17 @@ export function TransactionsHomeScreen({
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
   const [categories, setCategories] = useState<readonly Category[]>([]);
+  const [recurringRules, setRecurringRules] = useState<readonly RecurringRule[]>([]);
   const [historyType, setHistoryType] = useState<HistoryType>('transactions');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [loadedAccounts, loadedTransactions, loadedCategories] = await Promise.all([
+      const [loadedAccounts, loadedTransactions, loadedCategories, loadedRecurringRules] = await Promise.all([
         listAccounts(db),
         listTransactions(db),
         listCategories(db),
+        listRecurringRules(db, true),
       ]);
       if (loadedAccounts.length === 0) {
         onNoAccounts();
@@ -54,6 +60,7 @@ export function TransactionsHomeScreen({
       setSelectedAccountId((id) => id ?? loadedAccounts[0].id);
       setTransactions(loadedTransactions);
       setCategories(loadedCategories);
+      setRecurringRules(loadedRecurringRules);
       setError(null);
     } catch {
       setError('Não foi possível carregar o histórico.');
@@ -63,6 +70,7 @@ export function TransactionsHomeScreen({
   useFocusEffect(useCallback(() => {
     void load();
   }, [load]));
+  useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
 
   const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null;
   const visibleTransactions = transactions.filter((item) => historyType === 'transfers'
@@ -75,7 +83,7 @@ export function TransactionsHomeScreen({
         <View>
           <Text variant="heading">Histórico</Text>
           <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
-            Consulte lançamentos pontuais ou transferências.
+            Consulte lançamentos, transferências e regras recorrentes.
           </Text>
         </View>
         {selectedAccount ? (
@@ -106,7 +114,13 @@ export function TransactionsHomeScreen({
         <HistoryToggle selected={historyType} onSelect={setHistoryType} />
         {error ? <Text tone="negative">{error}</Text> : null}
         <View style={styles.list}>
-          {visibleTransactions.length === 0 ? (
+          {historyType === 'recurring' ? recurringRules.length === 0 ? (
+            <Card><Text tone="muted">Nenhuma regra recorrente cadastrada ainda.</Text></Card>
+          ) : recurringRules.map((rule) => (
+            <Pressable key={rule.id} onPress={() => onEditRecurringRule(rule.id)}>
+              <RecurringRuleCard accounts={accounts} categories={categories} rule={rule} />
+            </Pressable>
+          )) : visibleTransactions.length === 0 ? (
             <Card>
               <Text tone="muted">
                 {historyType === 'transfers'
@@ -168,6 +182,11 @@ function HistoryToggle({
         onPress={() => onSelect('transfers')}
         selected={selected === 'transfers'}
       />
+      <ToggleOption
+        label="Recorrências"
+        onPress={() => onSelect('recurring')}
+        selected={selected === 'recurring'}
+      />
     </View>
   );
 }
@@ -219,6 +238,40 @@ function TransferCard({ accounts, transaction }: { accounts: readonly Account[];
       <Text tone="muted" variant="caption">{transaction.transactionDate}</Text>
     </Card>
   );
+}
+
+function RecurringRuleCard({ accounts, categories, rule }: {
+  accounts: readonly Account[];
+  categories: readonly Category[];
+  rule: RecurringRule;
+}) {
+  const account = accounts.find((item) => item.id === rule.accountId)?.name ?? 'Conta indisponível';
+  const category = rule.categoryId === null
+    ? null
+    : categories.find((item) => item.id === rule.categoryId)?.name ?? 'Categoria excluída';
+  return (
+    <Card>
+      <Text variant="title">{rule.name}</Text>
+      <Text tone={rule.kind === 'income' ? 'positive' : 'negative'}>
+        {formatBrazilianCurrency(rule.amountCents)}
+      </Text>
+      <Text tone="muted" variant="caption">
+        {formatRecurringSchedule(rule)} · {account}{category ? ` · ${category}` : ''}
+      </Text>
+      <Text tone="muted" variant="caption">
+        Desde {rule.startDate}{rule.endDate ? ` até ${rule.endDate}` : ''}
+      </Text>
+    </Card>
+  );
+}
+
+function formatRecurringSchedule(rule: RecurringRule): string {
+  if (rule.schedule.frequency === 'weekly') {
+    const day = ['segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado', 'domingo'][rule.schedule.chargeDay - 1];
+    return `Semanal, ${day}`;
+  }
+  if (rule.schedule.frequency === 'monthly') return `Mensal, dia ${rule.schedule.chargeDay}`;
+  return `Anual, ${String(rule.schedule.chargeDay).padStart(2, '0')}/${String(rule.schedule.chargeMonth).padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({

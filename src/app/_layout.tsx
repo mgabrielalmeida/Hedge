@@ -5,12 +5,16 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { DATABASE_NAME, initializeDatabase } from '@/db/database';
 import { BootstrapScreen } from '@/components/BootstrapScreen';
+import { useRecurringProcessing } from '@/features/transactions/useRecurringProcessing';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
 function DatabaseContent({ onReady }: { onReady: () => void }) {
-  useEffect(onReady, [onReady]);
+  const isRecurringProcessingReady = useRecurringProcessing();
+  useEffect(() => {
+    if (isRecurringProcessingReady) onReady();
+  }, [isRecurringProcessingReady, onReady]);
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return isRecurringProcessingReady ? <Stack screenOptions={{ headerShown: false }} /> : null;
 }
 
 function AppBootstrap() {

@@ -97,4 +97,12 @@ describe('financial calculations', () => {
     expect(isRecurringRuleDueOn(monthlyRule, '2026-02-27')).toBe(false);
     expect(isRecurringRuleDueOn({ ...monthlyRule, isActive: false, categoryId: null }, '2026-02-28')).toBe(false);
   });
+
+  it('matches weekly and adjusted yearly schedules inside their inclusive date range', () => {
+    expect(isRecurringRuleDueOn({ ...monthlyRule, schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(true);
+    expect(isRecurringRuleDueOn({ ...monthlyRule, schedule: { frequency: 'weekly', chargeDay: 4, chargeMonth: null } }, '2026-09-02')).toBe(false);
+    expect(isRecurringRuleDueOn({ ...monthlyRule, startDate: '2026-09-03', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(false);
+    expect(isRecurringRuleDueOn({ ...monthlyRule, endDate: '2026-09-01', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(false);
+    expect(isRecurringRuleDueOn({ ...monthlyRule, schedule: { frequency: 'yearly', chargeDay: 29, chargeMonth: 2 } }, '2027-02-28')).toBe(true);
+  });
 });
