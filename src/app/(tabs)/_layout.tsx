@@ -4,6 +4,7 @@ import {
   Text as NativeText,
   type ColorValue,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -15,6 +16,8 @@ type TabIconProps = {
 
 export default function MainTabsLayout() {
   const { tokens } = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, tokens.spacing.sm);
 
   return (
     <Tabs
@@ -34,6 +37,8 @@ export default function MainTabsLayout() {
           backgroundColor: tokens.surface,
           borderTopColor: tokens.border,
           borderTopWidth: StyleSheet.hairlineWidth,
+          height: 60 + bottomInset,
+          paddingBottom: bottomInset,
           paddingHorizontal: tokens.spacing.xs,
           paddingTop: tokens.spacing.xs,
         },
