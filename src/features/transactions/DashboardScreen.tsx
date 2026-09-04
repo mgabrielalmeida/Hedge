@@ -5,11 +5,17 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import { Button, Card, Screen, Text } from '@/components';
 import { listAccounts, listCategories, listTransactions } from '@/db/repositories';
-import { calculateAccountBalance, calculateCategoryMonthlySpending, calculateConsolidatedBalance, formatBrazilianCurrency } from '@/domain';
+import {
+  calculateAccountBalance,
+  calculateCategoryMonthlySpending,
+  calculateConsolidatedBalance,
+  formatBrazilianCurrency,
+} from '@/domain';
 import type { Account, Category, Transaction } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
+import { calculateCategoryBudgetProgress } from './categoryBudgetProgress';
 import { subscribeToRecurringProcessing } from './useRecurringProcessing';
 
 type DashboardScreenProps = {
@@ -19,12 +25,285 @@ type DashboardScreenProps = {
   onNoAccounts: () => void;
 };
 
-export function DashboardScreen({ onNewExpense, onNewIncome, onNewTransfer, onNoAccounts }: DashboardScreenProps) {
-  const db = useSQLiteContext(); const { tokens } = useTheme(); const [accounts, setAccounts] = useState<readonly Account[]>([]); const [categories, setCategories] = useState<readonly Category[]>([]); const [transactions, setTransactions] = useState<readonly Transaction[]>([]); const [selectedId, setSelectedId] = useState<number | null>(null);
-  const load = useCallback(async () => { const [a, c, t] = await Promise.all([listAccounts(db), listCategories(db), listTransactions(db)]); if (!a.length) { onNoAccounts(); return; } setAccounts(a); setCategories(c); setTransactions(t); setSelectedId((id) => id ?? a[0].id); }, [db, onNoAccounts]);
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+export function DashboardScreen({
+  onNewExpense,
+  onNewIncome,
+  onNewTransfer,
+  onNoAccounts,
+}: DashboardScreenProps) {
+  const database = useSQLiteContext();
+  const { tokens } = useTheme();
+  const [accounts, setAccounts] = useState<readonly Account[]>([]);
+  const [categories, setCategories] = useState<readonly Category[]>([]);
+  const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    const [loadedAccounts, loadedCategories, loadedTransactions] = await Promise.all([
+      listAccounts(database),
+      listCategories(database),
+      listTransactions(database),
+    ]);
+
+    if (loadedAccounts.length === 0) {
+      onNoAccounts();
+      return;
+    }
+
+    setAccounts(loadedAccounts);
+    setCategories(loadedCategories);
+    setTransactions(loadedTransactions);
+    setSelectedAccountId((accountId) => accountId ?? loadedAccounts[0].id);
+  }, [database, onNoAccounts]);
+
+  useFocusEffect(useCallback(() => {
+    void load();
+  }, [load]));
+
   useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
-  const selected = accounts.find((item) => item.id === selectedId) ?? null; const month = getLocalCivilDate().slice(0, 7); const total = calculateConsolidatedBalance(transactions); const max = Math.max(1, ...categories.map((c) => calculateCategoryMonthlySpending(transactions, c.id, month)));
-  return <Screen><ScrollView contentContainerStyle={styles.content}><View><Text variant="heading">Visão financeira</Text><Text tone="muted">Acompanhe seu dinheiro neste mês.</Text></View><Card elevated><Text tone="muted" variant="caption">Saldo consolidado</Text><Text variant="display">{formatBrazilianCurrency(total)}</Text>{selected ? <><Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.md }}>Conta selecionada: {selected.name}</Text><Text variant="title">{formatBrazilianCurrency(calculateAccountBalance(transactions, selected.id))}</Text><View style={styles.chips}>{accounts.map((account) => <Pressable key={account.id} onPress={() => setSelectedId(account.id)} style={[styles.chip, { borderColor: account.id === selectedId ? tokens.primary : tokens.border }]}><Text variant="caption">{account.name}</Text></Pressable>)}</View></> : null}</Card><View><Text variant="title">Gastos por categoria</Text><Text tone="muted" variant="caption">{month}</Text></View><View style={styles.chart}>{categories.map((category) => { const spending = calculateCategoryMonthlySpending(transactions, category.id, month); return <View key={category.id}><View style={styles.row}><Text>{category.name}</Text><Text tone="negative">{formatBrazilianCurrency(-spending)}</Text></View><View style={[styles.track, { backgroundColor: tokens.surfaceElevated }]}><View style={[styles.bar, { backgroundColor: tokens.primary, width: `${(spending / max) * 100}%` }]} /></View></View>; })}</View><Button label="Nova despesa" onPress={onNewExpense} /><Button label="Nova renda" onPress={onNewIncome} variant="secondary" /><Button disabled={accounts.length < 2} label="Nova transferência" onPress={onNewTransfer} variant="secondary" />{accounts.length < 2 ? <Text tone="muted" variant="caption">Cadastre outra conta para fazer transferências.</Text> : null}</ScrollView></Screen>;
+
+  const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
+  const currentMonth = getLocalCivilDate().slice(0, 7);
+  const consolidatedBalance = calculateConsolidatedBalance(transactions);
+
+  return (
+    <Screen>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View>
+          <Text variant="heading">Visão financeira</Text>
+          <Text tone="muted">Acompanhe seu dinheiro neste mês.</Text>
+        </View>
+
+        <Card elevated>
+          <Text tone="muted" variant="caption">Saldo consolidado</Text>
+          <Text variant="display">{formatBrazilianCurrency(consolidatedBalance)}</Text>
+
+          {selectedAccount ? (
+            <>
+              <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.md }}>
+                Conta selecionada: {selectedAccount.name}
+              </Text>
+              <Text variant="title">
+                {formatBrazilianCurrency(
+                  calculateAccountBalance(transactions, selectedAccount.id),
+                )}
+              </Text>
+              <View style={styles.accountChips}>
+                {accounts.map((account) => {
+                  const selected = account.id === selectedAccountId;
+
+                  return (
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      key={account.id}
+                      onPress={() => setSelectedAccountId(account.id)}
+                      style={[
+                        styles.accountChip,
+                        {
+                          backgroundColor: selected ? tokens.primaryContainer : tokens.surface,
+                          borderColor: selected ? tokens.primary : tokens.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        variant="caption"
+                        style={{ color: selected ? tokens.onPrimaryContainer : tokens.text }}
+                      >
+                        {account.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
+        </Card>
+
+        <View>
+          <Text variant="title">Orçamentos por categoria</Text>
+          <Text tone="muted" variant="caption">
+            Acompanhe o que já foi gasto em relação ao limite mensal.
+          </Text>
+        </View>
+
+        <View style={styles.categoryList}>
+          {categories.map((category) => (
+            <CategoryBudgetCard
+              category={category}
+              key={category.id}
+              spendingCents={calculateCategoryMonthlySpending(
+                transactions,
+                category.id,
+                currentMonth,
+              )}
+            />
+          ))}
+        </View>
+
+        <Button label="Nova despesa" onPress={onNewExpense} />
+        <Button label="Nova renda" onPress={onNewIncome} variant="secondary" />
+        <Button
+          disabled={accounts.length < 2}
+          label="Nova transferência"
+          onPress={onNewTransfer}
+          variant="secondary"
+        />
+        {accounts.length < 2 ? (
+          <Text tone="muted" variant="caption">
+            Cadastre outra conta para fazer transferências.
+          </Text>
+        ) : null}
+      </ScrollView>
+    </Screen>
+  );
 }
-const styles = StyleSheet.create({ bar: { borderRadius: 99, height: 8 }, chart: { gap: 12 }, chip: { borderRadius: 99, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }, content: { gap: 20, paddingVertical: 24 }, row: { flexDirection: 'row', justifyContent: 'space-between' }, track: { borderRadius: 99, height: 8, marginTop: 5, overflow: 'hidden' } });
+
+function CategoryBudgetCard({
+  category,
+  spendingCents,
+}: {
+  category: Category;
+  spendingCents: number;
+}) {
+  const { tokens } = useTheme();
+  const { percentage, progress } = calculateCategoryBudgetProgress(
+    spendingCents,
+    category.monthlyBudgetCents,
+  );
+  const hasBudget = percentage !== null;
+  const percentageLabel = hasBudget ? `${Math.round(percentage)}%` : '—';
+  const progressColor = getProgressColor(percentage, tokens);
+  const visualColor = category.visualType === 'color' ? category.visualValue : tokens.primary;
+  const visualSymbol = category.visualType === 'icon' ? category.visualValue : null;
+  const description = hasBudget
+    ? `${formatBrazilianCurrency(spendingCents)} de ${formatBrazilianCurrency(category.monthlyBudgetCents)} gastos`
+    : `${formatBrazilianCurrency(spendingCents)} gastos · sem orçamento definido`;
+
+  return (
+    <Card>
+      <View style={styles.categoryHeader}>
+        <View
+          style={[
+            styles.categoryVisual,
+            { backgroundColor: visualColor, borderRadius: tokens.radius.md },
+          ]}
+        >
+          {visualSymbol ? <Text style={{ color: tokens.onPrimary }}>{visualSymbol}</Text> : null}
+        </View>
+        <View style={styles.categoryHeading}>
+          <Text variant="title">{category.name}</Text>
+          <Text tone="muted" variant="caption">Gasto neste mês</Text>
+        </View>
+        <Text tone="negative" variant="title">
+          {formatBrazilianCurrency(spendingCents)}
+        </Text>
+      </View>
+
+      <View style={styles.budgetSummary}>
+        <Text tone="muted" variant="caption">
+          Orçamento mensal: {formatBrazilianCurrency(category.monthlyBudgetCents)}
+        </Text>
+        <Text
+          tone={hasBudget ? undefined : 'muted'}
+          variant="caption"
+          style={{ color: hasBudget ? progressColor : tokens.textMuted, fontWeight: '700' }}
+        >
+          {percentageLabel}
+        </Text>
+      </View>
+
+      <View
+        accessibilityLabel={
+          hasBudget
+            ? `${percentageLabel} do orçamento mensal usado`
+            : 'Orçamento mensal não definido'
+        }
+        style={[
+          styles.progressTrack,
+          { backgroundColor: tokens.surfaceSubtle, borderRadius: tokens.radius.pill },
+        ]}
+      >
+        {hasBudget ? (
+          <View
+            style={[
+              styles.progressBar,
+              {
+                backgroundColor: progressColor,
+                borderRadius: tokens.radius.pill,
+                width: `${progress}%`,
+              },
+            ]}
+          />
+        ) : null}
+      </View>
+
+      <Text tone="muted" variant="caption" style={styles.budgetDescription}>
+        {description}
+      </Text>
+    </Card>
+  );
+}
+
+function getProgressColor(
+  percentage: number | null,
+  tokens: ReturnType<typeof useTheme>['tokens'],
+): string {
+  if (percentage === null) return tokens.textMuted;
+  if (percentage >= 100) return tokens.negative;
+  if (percentage >= 80) return tokens.warning;
+  return tokens.primary;
+}
+
+const styles = StyleSheet.create({
+  accountChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  accountChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  budgetDescription: {
+    marginTop: 8,
+  },
+  budgetSummary: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  categoryHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  categoryHeading: {
+    flex: 1,
+  },
+  categoryList: {
+    gap: 12,
+  },
+  categoryVisual: {
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  content: {
+    gap: 20,
+    paddingVertical: 24,
+  },
+  progressBar: {
+    height: '100%',
+  },
+  progressTrack: {
+    height: 8,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+});

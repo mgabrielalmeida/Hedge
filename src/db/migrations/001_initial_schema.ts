@@ -163,11 +163,11 @@ CREATE INDEX recurring_occurrences_by_transaction
   WHERE transaction_id IS NOT NULL;
 
 INSERT INTO categories (name, monthly_budget_cents) VALUES
-  ('Compras', 0),
-  ('Assinatura', 0),
-  ('Entretenimento', 0),
-  ('Alimentação', 0),
-  ('Outros', 0);
+  ('Compras', 100000),
+  ('Assinatura', 10000),
+  ('Entretenimento', 100000),
+  ('Alimentação', 100000),
+  ('Outros', 100000);
 `;
 
 export const initialSchemaMigration: Migration = {
