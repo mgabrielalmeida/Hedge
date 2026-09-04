@@ -59,9 +59,6 @@ export function AccountsHomeScreen({ onCreateAccount, onManageCategories, onNoAc
       <View style={styles.content}>
         <View>
           <Text variant="heading">Suas contas</Text>
-          <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
-            Escolha uma conta quando registrar seus próximos lançamentos.
-          </Text>
         </View>
         <View style={styles.list}>
           {accounts.map((account) => <AccountCard account={account} key={account.id} />)}

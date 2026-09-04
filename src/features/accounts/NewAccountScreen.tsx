@@ -14,7 +14,11 @@ export function NewAccountScreen({ onAccountCreated, onCancel }: NewAccountScree
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View>
           <Text variant="heading">Nova conta</Text>
         </View>

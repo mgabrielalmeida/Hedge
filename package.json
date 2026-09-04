@@ -17,6 +17,7 @@
     "expo": "~57.0.18",
     "expo-constants": "~57.0.16",
     "expo-linking": "~57.0.8",
+    "expo-navigation-bar": "~57.0.2",
     "expo-router": "~57.0.17",
     "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",

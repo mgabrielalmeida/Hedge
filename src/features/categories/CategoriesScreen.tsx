@@ -13,9 +13,15 @@ type CategoriesScreenProps = {
   onCreate: () => void;
   onEdit: (id: number) => void;
   onFinish?: () => void;
+  showDescription?: boolean;
 };
 
-export function CategoriesScreen({ onCreate, onEdit, onFinish }: CategoriesScreenProps) {
+export function CategoriesScreen({
+  onCreate,
+  onEdit,
+  onFinish,
+  showDescription = true,
+}: CategoriesScreenProps) {
   const database = useSQLiteContext();
   const { tokens } = useTheme();
   const [categories, setCategories] = useState<readonly Category[]>([]);
@@ -39,8 +45,15 @@ export function CategoriesScreen({ onCreate, onEdit, onFinish }: CategoriesScree
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View><Text variant="heading">Categorias</Text><Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>Defina seus limites mensais e indicadores.</Text></View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View>
+          <Text variant="heading">Categorias</Text>
+          {showDescription ? (
+            <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
+              Defina seus limites mensais e indicadores.
+            </Text>
+          ) : null}
+        </View>
         {error ? <Text tone="negative">{error}</Text> : null}
         <View style={styles.list}>
           {categories.map((category) => <CategoryCard category={category} key={category.id} onDelete={() => confirmDelete(category)} onEdit={() => onEdit(category.id)} />)}

@@ -27,7 +27,11 @@ export function FirstAccessScreen({ onFinish }: FirstAccessScreenProps) {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View>
           <Text variant="heading">Vamos começar</Text>
           <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>

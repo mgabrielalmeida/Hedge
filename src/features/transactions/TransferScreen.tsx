@@ -153,7 +153,11 @@ export function TransferScreen({ onDone, transactionId }: TransferScreenProps) {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text variant="heading">{existing ? 'Editar' : 'Nova'} transferência</Text>
         <Card elevated>
           <View style={styles.form}>

@@ -79,12 +79,9 @@ export function TransactionsHomeScreen({
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View>
           <Text variant="heading">Histórico</Text>
-          <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
-            Consulte lançamentos, transferências e regras recorrentes.
-          </Text>
         </View>
         {selectedAccount ? (
           <Card>

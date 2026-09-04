@@ -1,4 +1,5 @@
 import { SQLiteProvider } from 'expo-sqlite';
+import { NavigationBar } from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
@@ -49,6 +50,7 @@ function AppBootstrap() {
 
   return (
     <>
+      <NavigationBar hidden={false} style={isDark ? 'dark' : 'light'} />
       <StatusBar style={isDark ? 'light' : 'dark'} />
       {!isDatabaseReady ? (
         <BootstrapScreen

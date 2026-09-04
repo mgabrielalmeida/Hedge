@@ -74,7 +74,11 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text variant="heading">{category ? 'Editar categoria' : 'Nova categoria'}</Text>
         <Card elevated>
           <View style={styles.form}>

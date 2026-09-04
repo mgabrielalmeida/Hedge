@@ -13,6 +13,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 type ThemeSelectionProps = {
   actionLabel?: string;
   onFinish: () => void;
+  showDescription?: boolean;
   title?: string;
 };
 
@@ -29,6 +30,7 @@ const appearanceOptions: readonly {
 export function ThemeSelection({
   actionLabel = 'Continuar',
   onFinish,
+  showDescription = true,
   title = 'Escolha seu tema',
 }: ThemeSelectionProps) {
   const {
@@ -63,12 +65,14 @@ export function ThemeSelection({
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View>
           <Text variant="heading">{title}</Text>
-          <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
-            Personalize as cores e escolha como o Hedge acompanha a aparência do aparelho.
-          </Text>
+          {showDescription ? (
+            <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
+              Personalize as cores e escolha como o Hedge acompanha a aparência do aparelho.
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.section}>

@@ -9,6 +9,7 @@ export default function CategoriesRoute() {
     <CategoriesScreen
       onCreate={() => router.push('/categories/new' as never)}
       onEdit={(id) => router.push(`/categories/${id}` as never)}
+      showDescription={false}
     />
   );
 }

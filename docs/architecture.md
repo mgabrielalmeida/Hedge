@@ -33,6 +33,7 @@ distribuída.
 | Estado local | `useState` e `useReducer` |
 | Estado global | React Context apenas para tema e configurações pequenas |
 | Preferências | `expo-sqlite/kv-store` |
+| Interface do sistema | `expo-status-bar` e `expo-navigation-bar`, acompanhando a aparência resolvida do tema |
 | Testes | Jest com `jest-expo` |
 | Lint | ESLint com `eslint-config-expo` |
 | Dados remotos | Nenhum |
@@ -206,6 +207,9 @@ diretamente: o `ThemeProvider` consome sua API tipada, aplica os padrões para
 dados inválidos ou indisponíveis e expõe gravações que informam falha sem gerar
 rejeições não observadas. Inicialmente, temas podem alterar cores e propriedades
 visuais pequenas, mas não a estrutura ou o espaçamento fundamental das telas.
+No Android, a barra de navegação nativa permanece visível e acompanha a
+aparência clara ou escura resolvida, para manter contraste coerente com a
+interface sem remover os controles do sistema.
 
 Os componentes compartilhados mínimos são `Screen`, `Text`, `Card`, `Field` e
 `Button`. Eles ficam em `src/components`, recebem suas decisões visuais do

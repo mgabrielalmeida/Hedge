@@ -9,6 +9,7 @@ export default function AppearanceRoute() {
     <ThemeSelection
       actionLabel="Voltar ao início"
       onFinish={() => router.replace('/' as never)}
+      showDescription={false}
       title="Aparência"
     />
   );

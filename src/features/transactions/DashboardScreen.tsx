@@ -72,10 +72,9 @@ export function DashboardScreen({
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View>
           <Text variant="heading">Visão financeira</Text>
-          <Text tone="muted">Acompanhe seu dinheiro e seus orçamentos.</Text>
         </View>
 
         <Card elevated>
@@ -126,9 +125,6 @@ export function DashboardScreen({
 
         <View>
           <Text variant="title">Orçamentos por categoria</Text>
-          <Text tone="muted" variant="caption">
-            Acompanhe o que foi gasto em relação ao limite mensal.
-          </Text>
         </View>
 
         <MonthSelector
@@ -205,7 +201,6 @@ function MonthSelector({
         symbol="‹"
       />
       <View style={styles.monthLabel}>
-        <Text tone="muted" variant="caption">Mês analisado</Text>
         <Text variant="body" style={{ fontWeight: '700' }}>
           {formatYearMonth(selectedMonth)}
         </Text>
@@ -288,7 +283,6 @@ function CategoryBudgetCard({
         </View>
         <View style={styles.categoryHeading}>
           <Text variant="title">{category.name}</Text>
-          <Text tone="muted" variant="caption">Gasto no período</Text>
         </View>
         <Text tone="negative" variant="title">
           {formatBrazilianCurrency(spendingCents)}

@@ -200,7 +200,11 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text variant="heading">{title}</Text>
         <Card elevated>
           <View style={styles.form}>
