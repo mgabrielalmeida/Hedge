@@ -34,6 +34,7 @@ distribuída.
 | Estado global | React Context apenas para tema e configurações pequenas |
 | Preferências | `expo-sqlite/kv-store` |
 | Entrada de datas | `@react-native-community/datetimepicker`, usando o controle nativo do sistema |
+| Gráficos vetoriais | `react-native-svg`, para gráficos locais integrados aos temas |
 | Interface do sistema | `expo-status-bar` e `expo-navigation-bar`, acompanhando a aparência resolvida do tema |
 | Testes | Jest com `jest-expo` |
 | Lint | ESLint com `eslint-config-expo` |
@@ -238,6 +239,7 @@ O aplicativo instalado não dependerá de conexão de rede. Portanto:
 - fontes, imagens e demais recursos serão incluídos no pacote;
 - não serão instalados analytics ou relatórios remotos de falhas;
 - o EAS Update não será configurado para atualizações durante a execução;
+- gráficos financeiros serão renderizados no dispositivo com `react-native-svg`;
 - builds e publicação podem usar internet, mas o aplicativo produzido deve
   continuar funcional sem ela.
 

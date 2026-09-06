@@ -20,6 +20,7 @@ import { formatYearMonth, shiftYearMonth } from './monthNavigation';
 import { subscribeToRecurringProcessing } from './useRecurringProcessing';
 
 type DashboardScreenProps = {
+  onCategoryPress: (categoryId: number, selectedMonth: string) => void;
   onNewExpense: () => void;
   onNewIncome: () => void;
   onNewTransfer: () => void;
@@ -27,6 +28,7 @@ type DashboardScreenProps = {
 };
 
 export function DashboardScreen({
+  onCategoryPress,
   onNewExpense,
   onNewIncome,
   onNewTransfer,
@@ -137,15 +139,21 @@ export function DashboardScreen({
 
         <View style={styles.categoryList}>
           {categories.map((category) => (
-            <CategoryBudgetCard
-              category={category}
+            <Pressable
+              accessibilityLabel={`Abrir despesas de ${category.name} em ${formatYearMonth(selectedMonth)}`}
+              accessibilityRole="button"
               key={category.id}
-              spendingCents={calculateCategoryMonthlySpending(
-                transactions,
-                category.id,
-                selectedMonth,
-              )}
-            />
+              onPress={() => onCategoryPress(category.id, selectedMonth)}
+            >
+              <CategoryBudgetCard
+                category={category}
+                spendingCents={calculateCategoryMonthlySpending(
+                  transactions,
+                  category.id,
+                  selectedMonth,
+                )}
+              />
+            </Pressable>
           ))}
         </View>
 
