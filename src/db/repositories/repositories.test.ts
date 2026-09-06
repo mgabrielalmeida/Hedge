@@ -9,13 +9,16 @@ import {
   deleteCategory,
   deleteRecurringRule,
   deleteTransaction,
+  findAccountById,
   findTransactionById,
+  getAccountBalance,
   listAccounts,
   listCategories,
   listRecurringRules,
   listTransactions,
   processDueRecurringRules,
   updateAccount,
+  updateAccountWithBalance,
   updateCategory,
   updateRecurringRule,
   updateTransaction,
@@ -68,6 +71,69 @@ describe('SQLite repositories', () => {
 
     await expect(listAccounts(database)).resolves.toEqual([]);
     await expect(listTransactions(database)).resolves.toEqual([]);
+  });
+
+  it('updates an account balance through income and expense adjustments without duplicating unchanged balances', async () => {
+    const source = await createAccount(database, {
+      name: 'Source', institutionName: 'Bank A', iconValue: 'bank', colorValue: '#276749',
+      initialBalanceCents: 10_000, openingBalanceDate: '2026-09-02',
+    }, () => createdAt);
+    const account = await createAccount(database, {
+      name: 'Reserve', institutionName: 'Bank B', iconValue: 'wallet', colorValue: '#276749',
+      initialBalanceCents: 1_000, openingBalanceDate: '2026-09-02',
+    }, () => createdAt);
+    await createTransaction(database, {
+      kind: 'transfer', accountId: source.id, destinationAccountId: account.id,
+      name: 'Save', amountCents: -2_000, transactionDate: '2026-09-02',
+    }, () => createdAt);
+
+    await expect(getAccountBalance(database, account.id)).resolves.toBe(3_000);
+    await expect(updateAccountWithBalance(database, account.id, {
+      name: 'Emergency reserve', institutionName: 'Bank C', iconValue: 'safe', colorValue: '#123456',
+      themeColorIndex: 1, currentBalanceCents: 5_000, adjustmentDate: '2026-09-03',
+    }, () => updatedAt)).resolves.toEqual(expect.objectContaining({
+      name: 'Emergency reserve', institutionName: 'Bank C', updatedAt,
+    }));
+    await expect(getAccountBalance(database, account.id)).resolves.toBe(5_000);
+
+    await updateAccountWithBalance(database, account.id, {
+      name: 'Emergency reserve', institutionName: 'Bank C', iconValue: 'safe', colorValue: '#123456',
+      themeColorIndex: 1, currentBalanceCents: 4_500, adjustmentDate: '2026-09-04',
+    }, () => updatedAt);
+    await updateAccountWithBalance(database, account.id, {
+      name: 'Reserve fund', institutionName: 'Bank C', iconValue: 'safe', colorValue: '#123456',
+      themeColorIndex: 1, currentBalanceCents: 4_500, adjustmentDate: '2026-09-05',
+    }, () => updatedAt);
+
+    const adjustments = (await listTransactions(database)).filter((item) => item.name === 'Retífica de saldo');
+    expect(adjustments).toEqual([
+      expect.objectContaining({ kind: 'expense', amountCents: -500, transactionDate: '2026-09-04' }),
+      expect.objectContaining({ kind: 'income', amountCents: 2_000, transactionDate: '2026-09-03' }),
+    ]);
+    await expect(getAccountBalance(database, account.id)).resolves.toBe(4_500);
+  });
+
+  it('rolls back account changes when its balance adjustment cannot be created', async () => {
+    const account = await createAccount(database, {
+      name: 'Original', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749',
+      initialBalanceCents: 1_000, openingBalanceDate: '2026-09-02',
+    }, () => createdAt);
+    await database.execAsync(`
+      CREATE TRIGGER reject_balance_adjustment
+      BEFORE INSERT ON transactions
+      WHEN NEW.name = 'Retífica de saldo'
+      BEGIN
+        SELECT RAISE(ABORT, 'balance adjustment rejected');
+      END;
+    `);
+
+    await expect(updateAccountWithBalance(database, account.id, {
+      name: 'Changed', institutionName: 'Other bank', iconValue: 'wallet', colorValue: '#123456',
+      currentBalanceCents: 2_000, adjustmentDate: '2026-09-03',
+    }, () => updatedAt)).rejects.toThrow('balance adjustment rejected');
+
+    await expect(findAccountById(database, account.id)).resolves.toEqual(account);
+    await expect(getAccountBalance(database, account.id)).resolves.toBe(1_000);
   });
 
   it('updates categories and deactivates affected rules before deleting a category', async () => {

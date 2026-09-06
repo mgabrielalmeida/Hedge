@@ -206,7 +206,7 @@ function TransactionCard({ category, transaction }: { category: Category | null;
       <Text tone={income ? 'positive' : 'negative'}>{formatBrazilianCurrency(transaction.amountCents)}</Text>
       <Text tone="muted" variant="caption">
         {transaction.transactionDate}
-        {transaction.kind === 'expense' ? ` · ${category ? category.name : 'Categoria excluída'}` : ''}
+        {transaction.kind === 'expense' ? ` · ${category ? category.name : 'Sem categoria'}` : ''}
       </Text>
     </Card>
   );

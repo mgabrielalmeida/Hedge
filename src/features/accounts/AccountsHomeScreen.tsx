@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -10,10 +10,11 @@ import { useTheme } from '@/theme/ThemeProvider';
 
 type AccountsHomeScreenProps = {
   onCreateAccount: () => void;
+  onEditAccount: (id: number) => void;
   onNoAccounts: () => void;
 };
 
-export function AccountsHomeScreen({ onCreateAccount, onNoAccounts }: AccountsHomeScreenProps) {
+export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccounts }: AccountsHomeScreenProps) {
   const database = useSQLiteContext();
   const { tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[] | null>(null);
@@ -60,7 +61,16 @@ export function AccountsHomeScreen({ onCreateAccount, onNoAccounts }: AccountsHo
           <Text variant="heading">Suas contas</Text>
         </View>
         <View style={styles.list}>
-          {accounts.map((account) => <AccountCard account={account} key={account.id} />)}
+          {accounts.map((account) => (
+            <Pressable
+              accessibilityLabel={`Editar conta ${account.name}`}
+              accessibilityRole="button"
+              key={account.id}
+              onPress={() => onEditAccount(account.id)}
+            >
+              <AccountCard account={account} />
+            </Pressable>
+          ))}
         </View>
         <Button label="Adicionar conta" onPress={onCreateAccount} />
       </View>

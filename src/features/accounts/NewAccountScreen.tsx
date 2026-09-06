@@ -23,7 +23,7 @@ export function NewAccountScreen({ onAccountCreated, onCancel }: NewAccountScree
           <Text variant="heading">Nova conta</Text>
         </View>
         <Card elevated>
-          <AccountForm onAccountCreated={onAccountCreated} />
+          <AccountForm onSaved={onAccountCreated} />
           <Button label="Cancelar" onPress={onCancel} style={styles.cancel} variant="ghost" />
         </Card>
       </ScrollView>

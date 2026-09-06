@@ -11,10 +11,11 @@ import {
   VisualPicker,
   resolveThemeColorValue,
 } from '@/components';
-import { createAccount } from '@/db/repositories';
-import { parseCivilDate, parseMoneyInput, validateRequiredText } from '@/domain';
-import type { Account, ThemeColorIndex } from '@/domain';
+import { createAccount, updateAccountWithBalance } from '@/db/repositories';
+import { formatBrazilianMoneyInput, parseCivilDate, parseMoneyInput, validateRequiredText } from '@/domain';
+import type { Account, Cents, ThemeColorIndex } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
+import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 const BANK_OPTIONS = [
   'Banco do Brasil',
@@ -28,21 +29,30 @@ const BANK_OPTIONS = [
 ] as const;
 
 type AccountFormProps = {
-  onAccountCreated: (account: Account) => void;
+  account?: Account;
+  currentBalanceCents?: Cents;
+  onSaved: (account: Account) => void;
   submitLabel?: string;
 };
 
-export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: AccountFormProps) {
+export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel }: AccountFormProps) {
   const database = useSQLiteContext();
   const { tokens } = useTheme();
-  const [accountName, setAccountName] = useState('');
-  const [bank, setBank] = useState<(typeof BANK_OPTIONS)[number] | null>(null);
-  const [customInstitution, setCustomInstitution] = useState('');
-  const [initialBalance, setInitialBalance] = useState('');
+  const initialBank = getInitialBank(account);
+  const [accountName, setAccountName] = useState(account?.name ?? '');
+  const [bank, setBank] = useState<(typeof BANK_OPTIONS)[number] | null>(initialBank);
+  const [customInstitution, setCustomInstitution] = useState(
+    initialBank === 'Outra instituição' ? account?.institutionName ?? '' : '',
+  );
+  const [initialBalance, setInitialBalance] = useState(
+    currentBalanceCents === undefined ? '' : formatBrazilianMoneyInput(currentBalanceCents),
+  );
   const [openingBalanceDate, setOpeningBalanceDate] = useState(getLocalCivilDate());
-  const [iconValue, setIconValue] = useState('bank');
-  const [colorValue, setColorValue] = useState(tokens.primary);
-  const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(2);
+  const [iconValue, setIconValue] = useState(account?.iconValue ?? 'bank');
+  const [colorValue, setColorValue] = useState(account?.colorValue ?? tokens.primary);
+  const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(
+    account ? account.themeColorIndex : 2,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -74,18 +84,28 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
     setError(null);
     setIsSubmitting(true);
     try {
-      const account = await createAccount(database, {
+      const visualInput = {
         name: name.value,
         institutionName: institution.value,
         iconValue,
         colorValue: resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary),
         themeColorIndex,
-        initialBalanceCents: amount.value,
-        openingBalanceDate: date.value,
-      });
-      onAccountCreated(account);
+      };
+      const savedAccount = account
+        ? await updateAccountWithBalance(database, account.id, {
+            ...visualInput,
+            currentBalanceCents: amount.value,
+            adjustmentDate: getLocalCivilDate(),
+          })
+        : await createAccount(database, {
+            ...visualInput,
+            initialBalanceCents: amount.value,
+            openingBalanceDate: date.value,
+          });
+      if (!savedAccount) throw new Error('Account was not found.');
+      onSaved(savedAccount);
     } catch {
-      setError('Não foi possível criar a conta. Tente novamente.');
+      setError(`Não foi possível ${account ? 'salvar' : 'criar'} a conta. Tente novamente.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -128,19 +148,22 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
 
       <MoneyField
         allowNegative
-        label="Saldo inicial"
+        helperText={account ? 'Se o valor mudar, a diferença será registrada como “Retífica de saldo”.' : undefined}
+        label={account ? 'Saldo atual' : 'Saldo inicial'}
         onChangeText={setInitialBalance}
         placeholder="0,00"
         value={initialBalance}
       />
 
-      <Field
-        keyboardType="numbers-and-punctuation"
-        label="Data do saldo inicial"
-        onChangeText={setOpeningBalanceDate}
-        placeholder="AAAA-MM-DD"
-        value={openingBalanceDate}
-      />
+      {!account ? (
+        <Field
+          keyboardType="numbers-and-punctuation"
+          label="Data do saldo inicial"
+          onChangeText={setOpeningBalanceDate}
+          placeholder="AAAA-MM-DD"
+          value={openingBalanceDate}
+        />
+      ) : null}
 
       <VisualPicker
         iconOptions={ACCOUNT_ICON_OPTIONS}
@@ -154,7 +177,7 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
 
       <Button
         disabled={isSubmitting}
-        label={isSubmitting ? 'Criando conta…' : submitLabel}
+        label={isSubmitting ? 'Salvando…' : submitLabel ?? (account ? 'Salvar conta' : 'Criar conta')}
         onPress={() => void submit()}
         style={styles.submit}
       />
@@ -184,9 +207,11 @@ function Choice({ accessibilityLabel, label, onPress, selected }: { accessibilit
   );
 }
 
-function getLocalCivilDate(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+function getInitialBank(account?: Account): (typeof BANK_OPTIONS)[number] | null {
+  if (!account) return null;
+  return BANK_OPTIONS.find((option) => (
+    option !== 'Outra instituição' && option === account.institutionName
+  )) ?? 'Outra instituição';
 }
 
 const styles = StyleSheet.create({

@@ -44,7 +44,7 @@ export function FirstAccessScreen({ onFinish }: FirstAccessScreenProps) {
             O saldo inicial é registrado como um lançamento e compõe seu saldo atual.
           </Text>
           <View style={{ marginTop: tokens.spacing.lg }}>
-            <AccountForm onAccountCreated={() => setStage('theme')} submitLabel="Criar primeira conta" />
+            <AccountForm onSaved={() => setStage('theme')} submitLabel="Criar primeira conta" />
           </View>
         </Card>
       </ScrollView>
