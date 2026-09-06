@@ -10,12 +10,13 @@ import { Text } from './Text';
 
 type DatePickerFieldProps = {
   allowClear?: boolean;
+  error?: string;
   label: string;
   onChange: (value: string) => void;
   value: string;
 };
 
-export function DatePickerField({ allowClear = false, label, onChange, value }: DatePickerFieldProps) {
+export function DatePickerField({ allowClear = false, error, label, onChange, value }: DatePickerFieldProps) {
   const { tokens } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const selectedDate = toDate(value);
@@ -38,7 +39,7 @@ export function DatePickerField({ allowClear = false, label, onChange, value }: 
           styles.trigger,
           {
             backgroundColor: tokens.surfaceElevated,
-            borderColor: tokens.border,
+            borderColor: error ? tokens.negative : tokens.border,
             borderRadius: tokens.radius.md,
             opacity: pressed ? 0.76 : 1,
           },
@@ -47,6 +48,7 @@ export function DatePickerField({ allowClear = false, label, onChange, value }: 
         <Text>{value || 'Selecionar data'}</Text>
         <Text tone="muted">⌄</Text>
       </Pressable>
+      {error ? <Text tone="negative" variant="caption" style={{ marginTop: tokens.spacing.xs }}>{error}</Text> : null}
 
       {Platform.OS === 'android' && isOpen ? (
         <DateTimePicker mode="date" onChange={handleChange} value={selectedDate} />

@@ -10,11 +10,10 @@ import { useTheme } from '@/theme/ThemeProvider';
 
 type AccountsHomeScreenProps = {
   onCreateAccount: () => void;
-  onManageCategories: () => void;
   onNoAccounts: () => void;
 };
 
-export function AccountsHomeScreen({ onCreateAccount, onManageCategories, onNoAccounts }: AccountsHomeScreenProps) {
+export function AccountsHomeScreen({ onCreateAccount, onNoAccounts }: AccountsHomeScreenProps) {
   const database = useSQLiteContext();
   const { tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[] | null>(null);
@@ -64,7 +63,6 @@ export function AccountsHomeScreen({ onCreateAccount, onManageCategories, onNoAc
           {accounts.map((account) => <AccountCard account={account} key={account.id} />)}
         </View>
         <Button label="Adicionar conta" onPress={onCreateAccount} />
-        <Button label="Gerenciar categorias" onPress={onManageCategories} variant="secondary" />
       </View>
     </Screen>
   );

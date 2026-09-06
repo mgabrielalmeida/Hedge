@@ -60,6 +60,7 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
   const [date, setDate] = useState(initialDate);
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showRequiredErrors, setShowRequiredErrors] = useState(false);
   const [saving, setSaving] = useState(false);
   const [existingTransaction, setExistingTransaction] = useState<Transaction | null>(null);
   const [existingRule, setExistingRule] = useState<RecurringRule | null>(null);
@@ -117,16 +118,24 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
     const money = parseMoneyInput(amount.replace(/\./g, ''));
     const civil = parseCivilDate(date);
     const validName = validateRequiredText(name);
-    const commonIsInvalid = !validName.ok || !money.ok || money.value <= 0 || !civil.ok ||
+    const hasMissingRequiredField = !validName.ok || amount.trim() === '' || !civil.ok ||
       accountId === null || (kind === 'expense' && categoryId === null);
 
-    if (commonIsInvalid) {
-      setError(`Preencha nome, valor, data, conta${kind === 'expense' ? ' e categoria' : ''}.`);
+    if (hasMissingRequiredField) {
+      setShowRequiredErrors(true);
+      setError(`Preencha os campos obrigatórios: nome, valor, data, conta${kind === 'expense' ? ' e categoria' : ''}.`);
+      return;
+    }
+
+    if (!money.ok || money.value <= 0) {
+      setShowRequiredErrors(false);
+      setError('Informe um valor maior que zero.');
       return;
     }
 
     if (!recurrenceEnabled && !validateNotFuture(civil.value, getLocalCivilDate()).ok) {
-      setError('A data de um lançamento pontual não pode ser futura.');
+      setShowRequiredErrors(false);
+      setError('A data selecionada não pode ser futura.');
       return;
     }
 
@@ -146,6 +155,8 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
     }
 
     setSaving(true);
+    setShowRequiredErrors(false);
+    setError(null);
     try {
       const amountCents = kind === 'expense' ? -money.value : money.value;
       if (recurrenceEnabled) {
@@ -197,6 +208,12 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
   const isEditing = existingTransaction !== null || existingRule !== null;
   const noun = kind === 'expense' ? 'despesa' : 'renda';
   const title = `${isEditing ? 'Editar' : 'Nova'} ${noun}${recurrenceEnabled ? ' recorrente' : ''}`;
+  const nameIsMissing = !validateRequiredText(name).ok;
+  const amountIsMissing = amount.trim() === '';
+  const dateIsMissing = !parseCivilDate(date).ok;
+  const accountIsMissing = accountId === null;
+  const categoryIsMissing = categoryId === null;
+  const { tokens } = useTheme();
 
   return (
     <Screen>
@@ -208,12 +225,13 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
         <Text variant="heading">{title}</Text>
         <Card elevated>
           <View style={styles.form}>
-            <Field error={error ?? undefined} label="Nome" onChangeText={setName} value={name} placeholder={kind === 'expense' ? 'Ex.: Mercado' : 'Ex.: Salário'} />
-            <MoneyField label="Valor" onChangeText={setAmount} value={amount} placeholder="0,00" />
-            <DatePickerField label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChange={setDate} value={date} />
-            <Text tone="muted" variant="caption">Conta</Text>
-            <View style={styles.choices}>{accounts.map((account) => <Choice key={account.id} label={account.name} onPress={() => setAccountId(account.id)} selected={accountId === account.id} />)}</View>
-            {kind === 'expense' ? <><Text tone="muted" variant="caption">Categoria</Text><View style={styles.choices}>{categories.map((category) => <Choice key={category.id} label={`${category.iconValue} ${category.name}`} onPress={() => setCategoryId(category.id)} selected={categoryId === category.id} />)}</View></> : null}
+            {error ? <Text tone="negative" variant="caption">{error}</Text> : null}
+            <Field error={showRequiredErrors && nameIsMissing ? 'Obrigatório' : undefined} label="Nome" onChangeText={setName} value={name} placeholder={kind === 'expense' ? 'Ex.: Mercado' : 'Ex.: Salário'} />
+            <MoneyField error={showRequiredErrors && amountIsMissing ? 'Obrigatório' : undefined} label="Valor" onChangeText={setAmount} value={amount} placeholder="0,00" />
+            <DatePickerField error={showRequiredErrors && dateIsMissing ? 'Obrigatório' : undefined} label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChange={setDate} value={date} />
+            <Text tone={showRequiredErrors && accountIsMissing ? 'negative' : 'muted'} variant="caption">Conta</Text>
+            <View style={[styles.choices, showRequiredErrors && accountIsMissing ? [styles.requiredChoices, { borderColor: tokens.negative }] : null]}>{accounts.map((account) => <Choice key={account.id} label={account.name} onPress={() => setAccountId(account.id)} selected={accountId === account.id} />)}</View>
+            {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><View style={[styles.choices, showRequiredErrors && categoryIsMissing ? [styles.requiredChoices, { borderColor: tokens.negative }] : null]}>{categories.map((category) => <Choice key={category.id} label={`${category.iconValue} ${category.name}`} onPress={() => setCategoryId(category.id)} selected={categoryId === category.id} />)}</View></> : null}
             <Field label="Descrição (opcional)" onChangeText={setDescription} value={description} placeholder="Adicionar observação" multiline />
             {transactionId === undefined && recurringRuleId === undefined ? <><Text tone="muted" variant="caption">Regra recorrente (opcional)</Text><View style={styles.choices}><Choice label="Não se repete" onPress={() => setRecurrenceEnabled(false)} selected={!recurrenceEnabled} /><Choice label="Configurar recorrência" onPress={() => setRecurrenceEnabled(true)} selected={recurrenceEnabled} /></View></> : null}
             {recurrenceEnabled ? <RecurrenceFields chargeDay={chargeDay} chargeMonth={chargeMonth} endDate={endDate} frequency={frequency} onChargeDayChange={setChargeDay} onChargeMonthChange={setChargeMonth} onEndDateChange={setEndDate} onFrequencyChange={(nextFrequency) => {
@@ -280,4 +298,5 @@ const styles = StyleSheet.create({
   content: { gap: 20, paddingVertical: 24 },
   form: { gap: 16 },
   recurrence: { gap: 14 },
+  requiredChoices: { borderRadius: 8, borderWidth: 1, padding: 8 },
 });
