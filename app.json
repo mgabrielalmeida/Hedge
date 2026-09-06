@@ -7,8 +7,7 @@
     "scheme": "hedge",
     "platforms": [
       "ios",
-      "android",
-      "web"
+      "android"
     ],
     "experiments": {
       "typedRoutes": true
