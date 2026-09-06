@@ -9,10 +9,11 @@ import {
   MoneyField,
   Text,
   VisualPicker,
+  VISUAL_COLOR_OPTIONS,
 } from '@/components';
 import { createAccount } from '@/db/repositories';
 import { parseCivilDate, parseMoneyInput, validateRequiredText } from '@/domain';
-import type { Account, AccountVisualType } from '@/domain';
+import type { Account } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 const BANK_OPTIONS = [
@@ -39,8 +40,8 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
   const [customInstitution, setCustomInstitution] = useState('');
   const [initialBalance, setInitialBalance] = useState('');
   const [openingBalanceDate, setOpeningBalanceDate] = useState(getLocalCivilDate());
-  const [visualType, setVisualType] = useState<AccountVisualType>('icon');
-  const [visualValue, setVisualValue] = useState('bank');
+  const [iconValue, setIconValue] = useState('bank');
+  const [colorValue, setColorValue] = useState(VISUAL_COLOR_OPTIONS[0].value);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -75,8 +76,8 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
       const account = await createAccount(database, {
         name: name.value,
         institutionName: institution.value,
-        visualType,
-        visualValue,
+        iconValue,
+        colorValue,
         initialBalanceCents: amount.value,
         openingBalanceDate: date.value,
       });
@@ -141,10 +142,10 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
 
       <VisualPicker
         iconOptions={ACCOUNT_ICON_OPTIONS}
-        onChange={setVisualValue}
-        onTypeChange={setVisualType}
-        value={visualValue}
-        visualType={visualType}
+        iconValue={iconValue}
+        colorValue={colorValue}
+        onIconChange={setIconValue}
+        onColorChange={setColorValue}
       />
 
       <Button

@@ -66,8 +66,8 @@ export function validateAccount(account: Account): ValidationResult<Account, Dom
     !validateEntityId(account.id).ok ||
     !isNormalizedRequiredText(account.name) ||
     !isNormalizedRequiredText(account.institutionName) ||
-    !isNormalizedRequiredText(account.visualValue) ||
-    (account.visualType !== 'icon' && account.visualType !== 'color') ||
+    !isNormalizedRequiredText(account.iconValue) ||
+    !isNormalizedRequiredText(account.colorValue) ||
     !isUtcTimestamp(account.createdAt) ||
     !isUtcTimestamp(account.updatedAt)
   ) {
@@ -82,8 +82,8 @@ export function validateCategory(category: Category): ValidationResult<Category,
     !validateEntityId(category.id).ok ||
     !isNormalizedRequiredText(category.name) ||
     !validateCategoryBudget(category.monthlyBudgetCents).ok ||
-    !isNormalizedRequiredText(category.visualValue) ||
-    (category.visualType !== 'icon' && category.visualType !== 'color') ||
+    !isNormalizedRequiredText(category.iconValue) ||
+    !isNormalizedRequiredText(category.colorValue) ||
     !isUtcTimestamp(category.createdAt) ||
     !isUtcTimestamp(category.updatedAt)
   ) {

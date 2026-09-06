@@ -264,8 +264,8 @@ function CategoryBudgetCard({
   const hasBudget = percentage !== null;
   const percentageLabel = hasBudget ? `${Math.round(percentage)}%` : '—';
   const progressColor = getProgressColor(percentage, tokens);
-  const visualColor = category.visualType === 'color' ? category.visualValue : tokens.primary;
-  const visualSymbol = category.visualType === 'icon' ? category.visualValue : null;
+  const visualColor = category.colorValue;
+  const visualSymbol = category.iconValue;
   const description = hasBudget
     ? `${formatBrazilianCurrency(spendingCents)} de ${formatBrazilianCurrency(category.monthlyBudgetCents)} gastos`
     : `${formatBrazilianCurrency(spendingCents)} gastos · sem orçamento definido`;
@@ -279,7 +279,7 @@ function CategoryBudgetCard({
             { backgroundColor: visualColor, borderRadius: tokens.radius.md },
           ]}
         >
-          {visualSymbol ? <Text style={{ color: tokens.onPrimary }}>{visualSymbol}</Text> : null}
+          <Text style={{ color: tokens.onPrimary }}>{visualSymbol}</Text>
         </View>
         <View style={styles.categoryHeading}>
           <Text variant="title">{category.name}</Text>

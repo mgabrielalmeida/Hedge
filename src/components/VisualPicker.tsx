@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import type { AccountVisualType, CategoryVisualType } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 import { Text } from './Text';
@@ -12,15 +11,13 @@ import {
   type IconOption,
 } from './visualOptions';
 
-type VisualType = AccountVisualType | CategoryVisualType;
-
 type VisualPickerProps = {
+  colorValue: string;
   iconOptions: readonly IconOption[];
+  iconValue: string;
   label?: string;
-  onChange: (value: string) => void;
-  onTypeChange: (visualType: VisualType) => void;
-  value: string;
-  visualType: VisualType;
+  onColorChange: (value: string) => void;
+  onIconChange: (value: string) => void;
 };
 
 const HUE_OPTIONS = [
@@ -51,46 +48,28 @@ const LIGHTNESS_OPTIONS = [
 ] as const;
 
 export function VisualPicker({
+  colorValue,
   iconOptions,
+  iconValue,
   label = 'Indicador visual',
-  onChange,
-  onTypeChange,
-  value,
-  visualType,
+  onColorChange,
+  onIconChange,
 }: VisualPickerProps) {
   const { tokens } = useTheme();
-  const options = visualType === 'icon' ? iconOptions : VISUAL_COLOR_OPTIONS;
-
-  function selectType(nextType: VisualType) {
-    onTypeChange(nextType);
-
-    const nextOptions = nextType === 'icon' ? iconOptions : VISUAL_COLOR_OPTIONS;
-    if (!nextOptions.some((option) => option.value === value)) {
-      onChange(nextOptions[0].value);
-    }
-  }
 
   return (
     <View style={styles.container}>
       <View>
         <Text variant="caption" style={{ color: tokens.textMuted }}>{label}</Text>
         <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.xs }}>
-          Escolha um ícone ou uma cor para encontrar este item rapidamente.
+          Combine um ícone e uma cor para encontrar este item rapidamente.
         </Text>
       </View>
 
-      <View
-        accessibilityLabel="Tipo do indicador visual"
-        accessibilityRole="radiogroup"
-        style={[styles.segmentedControl, { backgroundColor: tokens.surfaceSubtle, borderRadius: tokens.radius.md }]}
-      >
-        <TypeButton label="Ícone" onPress={() => selectType('icon')} selected={visualType === 'icon'} />
-        <TypeButton label="Cor" onPress={() => selectType('color')} selected={visualType === 'color'} />
-      </View>
-
+      <Text variant="caption" style={{ color: tokens.textMuted }}>Ícone</Text>
       <View style={styles.grid}>
-        {options.map((option) => {
-          const selected = value === option.value;
+        {iconOptions.map((option) => {
+          const selected = iconValue === option.value;
 
           return (
             <Pressable
@@ -98,11 +77,11 @@ export function VisualPicker({
               accessibilityRole="radio"
               accessibilityState={{ selected }}
               key={option.value}
-              onPress={() => onChange(option.value)}
+              onPress={() => onIconChange(option.value)}
               style={({ pressed }) => [
                 styles.option,
                 {
-                  backgroundColor: visualType === 'color' ? option.value : selected ? tokens.primaryContainer : tokens.surfaceSubtle,
+                  backgroundColor: selected ? tokens.primaryContainer : tokens.surfaceSubtle,
                   borderColor: selected ? tokens.focusRing : tokens.border,
                   borderRadius: tokens.radius.md,
                   borderWidth: selected ? 3 : 1,
@@ -110,7 +89,7 @@ export function VisualPicker({
                 },
               ]}
             >
-              {visualType === 'icon' && 'symbol' in option && typeof option.symbol === 'string' ? (
+              {'symbol' in option && typeof option.symbol === 'string' ? (
                 <Text style={styles.icon}>{option.symbol}</Text>
               ) : null}
               {selected ? <SelectionBadge /> : null}
@@ -119,7 +98,35 @@ export function VisualPicker({
         })}
       </View>
 
-      {visualType === 'color' ? <ColorMixer onChange={onChange} value={value} /> : null}
+      <Text variant="caption" style={{ color: tokens.textMuted }}>Cor</Text>
+      <View accessibilityLabel="Cor do indicador visual" accessibilityRole="radiogroup" style={styles.grid}>
+        {VISUAL_COLOR_OPTIONS.map((option) => {
+          const selected = colorValue === option.value;
+          return (
+            <Pressable
+              accessibilityLabel={option.label}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              key={option.value}
+              onPress={() => onColorChange(option.value)}
+              style={({ pressed }) => [
+                styles.option,
+                {
+                  backgroundColor: option.value,
+                  borderColor: selected ? tokens.focusRing : tokens.border,
+                  borderRadius: tokens.radius.md,
+                  borderWidth: selected ? 3 : 1,
+                  opacity: pressed ? 0.74 : 1,
+                },
+              ]}
+            >
+              {selected ? <SelectionBadge /> : null}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <ColorMixer onChange={onColorChange} value={colorValue} />
     </View>
   );
 }
@@ -295,30 +302,6 @@ function SelectionBadge() {
   );
 }
 
-function TypeButton({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
-  const { tokens } = useTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.typeButton,
-        {
-          backgroundColor: selected ? tokens.primary : 'transparent',
-          borderRadius: tokens.radius.sm,
-          opacity: pressed ? 0.8 : 1,
-        },
-      ]}
-    >
-      <Text variant="caption" style={{ color: selected ? tokens.onPrimary : tokens.text }}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function findClosestHue(hue: number): number {
   return HUE_OPTIONS.reduce((closest, option) => {
     const closestDistance = Math.min(Math.abs(closest - hue), 360 - Math.abs(closest - hue));
@@ -374,8 +357,6 @@ const styles = StyleSheet.create({
     width: 72,
   },
   option: { alignItems: 'center', height: 48, justifyContent: 'center', width: 48 },
-  segmentedControl: { flexDirection: 'row', gap: 4, padding: 4 },
   selectedHueLabel: { textAlign: 'center' },
-  typeButton: { alignItems: 'center', flex: 1, minHeight: 40, justifyContent: 'center' },
   wheel: { alignSelf: 'center', borderWidth: 1, height: 220, position: 'relative', width: 220 },
 });

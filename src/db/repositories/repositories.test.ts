@@ -37,18 +37,18 @@ describe('SQLite repositories', () => {
 
   it('creates an account and its opening balance atomically, and maps the domain model', async () => {
     const account = await createAccount(database, {
-      name: '  Main account  ', institutionName: '  Banco A ', visualType: 'color', visualValue: ' #123456 ',
+      name: '  Main account  ', institutionName: '  Banco A ', iconValue: ' bank ', colorValue: ' #123456 ',
       initialBalanceCents: -1_250, openingBalanceDate: '2026-09-02', openingBalanceDescription: '  Overdraft  ',
     }, () => createdAt);
 
     expect(account).toMatchObject({
-      id: 1, name: 'Main account', institutionName: 'Banco A', visualType: 'color', visualValue: '#123456', createdAt, updatedAt: createdAt,
+      id: 1, name: 'Main account', institutionName: 'Banco A', iconValue: 'bank', colorValue: '#123456', createdAt, updatedAt: createdAt,
     });
     await expect(listTransactions(database)).resolves.toEqual([
       expect.objectContaining({ kind: 'opening_balance', accountId: account.id, amountCents: -1_250, description: 'Overdraft' }),
     ]);
     await expect(updateAccount(database, account.id, {
-      name: 'New main', institutionName: 'Banco B', visualType: 'icon', visualValue: 'bank',
+      name: 'New main', institutionName: 'Banco B', iconValue: 'bank', colorValue: '#276749',
     }, () => updatedAt)).resolves.toEqual(expect.objectContaining({ name: 'New main', updatedAt }));
     await expect(listAccounts(database)).resolves.toHaveLength(1);
   });
@@ -63,7 +63,7 @@ describe('SQLite repositories', () => {
       END;
     `);
     await expect(createAccount(database, {
-      name: 'Main', institutionName: 'Bank', visualType: 'icon', visualValue: 'bank', initialBalanceCents: 0, openingBalanceDate: '2026-09-02',
+      name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02',
     }, () => createdAt)).rejects.toThrow('opening balance rejected');
 
     await expect(listAccounts(database)).resolves.toEqual([]);
@@ -72,7 +72,7 @@ describe('SQLite repositories', () => {
 
   it('updates categories and deactivates affected rules before deleting a category', async () => {
     const account = await createAccount(database, {
-      name: 'Main', institutionName: 'Bank', visualType: 'icon', visualValue: 'bank', initialBalanceCents: 0, openingBalanceDate: '2026-09-02',
+      name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02',
     }, () => createdAt);
     const category = await createCategory(database, { name: "  O'Reilly Travel ", monthlyBudgetCents: 25_000 }, () => createdAt);
     expect(category.name).toBe("O'Reilly Travel");
@@ -93,8 +93,8 @@ describe('SQLite repositories', () => {
   });
 
   it('persists, maps, edits and permanently deletes each point transaction kind', async () => {
-    const source = await createAccount(database, { name: 'Source', institutionName: 'A', visualType: 'icon', visualValue: 'bank', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
-    const destination = await createAccount(database, { name: 'Destination', institutionName: 'B', visualType: 'icon', visualValue: 'wallet', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const source = await createAccount(database, { name: 'Source', institutionName: 'A', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const destination = await createAccount(database, { name: 'Destination', institutionName: 'B', iconValue: 'wallet', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
     const category = await createCategory(database, { name: 'Food', monthlyBudgetCents: 0 }, () => createdAt);
     const expense = await createTransaction(database, { kind: 'expense', accountId: source.id, categoryId: category.id, name: ' Lunch ', description: ' ', amountCents: -1_250, transactionDate: '2026-09-02' }, () => createdAt);
     const income = await createTransaction(database, { kind: 'income', accountId: source.id, name: 'Salary', amountCents: 10_000, transactionDate: '2026-09-02' }, () => createdAt);
@@ -113,7 +113,7 @@ describe('SQLite repositories', () => {
   });
 
   it('handles recurring rule lifecycle and rolls back a duplicate occurrence with its generated transaction', async () => {
-    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', visualType: 'icon', visualValue: 'bank', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
     const category = await createCategory(database, { name: 'Bills', monthlyBudgetCents: 0 }, () => createdAt);
     const rule = await createRecurringRule(database, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Internet', amountCents: -150, frequency: 'monthly', chargeDay: 31, startDate: '2026-01-01' }, () => createdAt);
     await expect(updateRecurringRule(database, rule.id, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Internet plus', amountCents: -200, frequency: 'yearly', chargeDay: 29, chargeMonth: 2, startDate: '2026-01-01', endDate: '2028-02-29' }, () => updatedAt)).resolves.toEqual(expect.objectContaining({ name: 'Internet plus', updatedAt, schedule: { frequency: 'yearly', chargeDay: 29, chargeMonth: 2 } }));
@@ -130,7 +130,7 @@ describe('SQLite repositories', () => {
   });
 
   it('processes every rule due today once and preserves occurrence tombstones', async () => {
-    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', visualType: 'icon', visualValue: 'bank', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
     const category = await createCategory(database, { name: 'Recurring bills', monthlyBudgetCents: 0 }, () => createdAt);
     await createRecurringRule(database, { kind: 'income', accountId: account.id, name: 'Weekly income', amountCents: 1_000, frequency: 'weekly', chargeDay: 3, startDate: '2026-09-01' }, () => createdAt);
     await createRecurringRule(database, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Yearly fee', amountCents: -250, frequency: 'yearly', chargeDay: 2, chargeMonth: 9, startDate: '2025-01-01' }, () => createdAt);

@@ -5,7 +5,7 @@ describe('initialSchemaMigration', () => {
   it('is registered as the immutable first migration', () => {
     expect(initialSchemaMigration.version).toBe(1);
     expect(migrations[0]).toBe(initialSchemaMigration);
-    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3]);
+    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4]);
   });
 
   it('creates the complete v1 schema as strict tables', () => {
@@ -39,14 +39,14 @@ describe('initialSchemaMigration', () => {
   });
 
   it('seeds the five categories defined by the MVP', () => {
-    for (const category of [
-      'Compras',
-      'Assinatura',
-      'Entretenimento',
-      'Alimentação',
-      'Outros',
+    for (const [category, budget] of [
+      ['Compras', 100_000],
+      ['Assinatura', 10_000],
+      ['Entretenimento', 100_000],
+      ['Alimentação', 100_000],
+      ['Outros', 100_000],
     ]) {
-      expect(INITIAL_SCHEMA_SQL).toContain(`('${category}', 0)`);
+      expect(INITIAL_SCHEMA_SQL).toContain(`('${category}', ${budget})`);
     }
   });
 

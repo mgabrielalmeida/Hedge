@@ -23,7 +23,7 @@ describe('initializeDatabase', () => {
     ).resolves.toEqual({ journal_mode: 'wal' });
     await expect(
       database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;'),
-    ).resolves.toEqual({ user_version: 3 });
+    ).resolves.toEqual({ user_version: 4 });
     await expect(
       database.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name;",
@@ -57,6 +57,9 @@ describe('initializeDatabase', () => {
       { name: 'Alimentação' },
       { name: 'Outros' },
     ]);
+    await expect(
+      database.getAllAsync<{ name: string }>('SELECT name FROM pragma_table_info(\'accounts\') WHERE name IN (\'icon_value\', \'color_value\') ORDER BY name;'),
+    ).resolves.toEqual([{ name: 'color_value' }, { name: 'icon_value' }]);
   });
 
   it('is idempotent after the first initialization', async () => {
@@ -70,7 +73,7 @@ describe('initializeDatabase', () => {
     ).resolves.toEqual({ count: 5 });
     await expect(
       database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;'),
-    ).resolves.toEqual({ user_version: 3 });
+    ).resolves.toEqual({ user_version: 4 });
   });
 
   it('enforces the financial, referential, and recurring invariants of schema v1', async () => {

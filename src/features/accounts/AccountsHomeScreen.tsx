@@ -72,7 +72,7 @@ export function AccountsHomeScreen({ onCreateAccount, onManageCategories, onNoAc
 
 function AccountCard({ account }: { account: Account }) {
   const { tokens } = useTheme();
-  const symbol = account.visualType === 'icon' ? getAccountIconSymbol(account.visualValue) : '';
+  const symbol = getAccountIconSymbol(account.iconValue);
 
   return (
     <Card>
@@ -80,11 +80,11 @@ function AccountCard({ account }: { account: Account }) {
         <View style={[
           styles.indicator,
           {
-            backgroundColor: account.visualType === 'color' ? account.visualValue : tokens.primary,
+            backgroundColor: account.colorValue,
             borderRadius: tokens.radius.md,
           },
         ]}>
-          {symbol ? <Text style={{ color: tokens.onPrimary }}>{symbol}</Text> : null}
+          <Text style={{ color: tokens.onPrimary }}>{symbol}</Text>
         </View>
         <View style={styles.accountText}>
           <Text variant="title">{account.name}</Text>

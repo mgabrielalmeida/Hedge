@@ -7,7 +7,6 @@ import {
 } from '@/domain';
 import type {
   Account,
-  AccountVisualType,
   Category,
   EntityId,
   RecurringOccurrence,
@@ -19,8 +18,8 @@ export type AccountRow = {
   id: number;
   name: string;
   institution_name: string;
-  visual_type: string;
-  visual_value: string;
+  icon_value: string;
+  color_value: string;
   created_at: string;
   updated_at: string;
 };
@@ -29,8 +28,8 @@ export type CategoryRow = {
   id: number;
   name: string;
   monthly_budget_cents: number;
-  visual_type: string;
-  visual_value: string;
+  icon_value: string;
+  color_value: string;
   created_at: string;
   updated_at: string;
 };
@@ -81,8 +80,8 @@ export function mapAccount(row: AccountRow): Account {
     id: row.id,
     name: row.name,
     institutionName: row.institution_name,
-    visualType: row.visual_type as AccountVisualType,
-    visualValue: row.visual_value,
+    iconValue: row.icon_value,
+    colorValue: row.color_value,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -94,8 +93,8 @@ export function mapCategory(row: CategoryRow): Category {
     id: row.id,
     name: row.name,
     monthlyBudgetCents: row.monthly_budget_cents,
-    visualType: row.visual_type as import('@/domain').CategoryVisualType,
-    visualValue: row.visual_value,
+    iconValue: row.icon_value,
+    colorValue: row.color_value,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }), 'category row');

@@ -102,8 +102,8 @@ Instantes técnicos não são datas civis: usam ISO 8601 em UTC e terminam em
 ## Contas e saldos
 
 O usuário pode cadastrar diferentes contas bancárias. Uma conta possui nome,
-banco relacionado, saldo e um indicador visual único e customizável, escolhido
-como um ícone de uma seleção ou uma cor.
+banco relacionado, saldo e um indicador visual customizável composto por um
+ícone de uma seleção e uma cor.
 
 Na criação, o usuário informa obrigatoriamente o saldo inicial. Esse valor é
 registrado como um lançamento comum, sujeito às mesmas regras de edição e
@@ -243,8 +243,8 @@ recebem seus dados e referências temporais por argumento e permanecem puras.
 Após criar a primeira conta, o usuário pode trocar o tema durante o onboarding
 ou pela área Aparência da navegação principal. Tema e aparência continuam sendo
 preferências separadas, conforme definido na [arquitetura](architecture.md).
-Contas e categorias podem usar uma cor predefinida ou criar uma cor com uma
-roda de tons e controles simples de vivacidade e luminosidade.
+Contas e categorias combinam um ícone com uma cor predefinida ou criada em uma
+roda de tons com controles simples de vivacidade e luminosidade.
 
 ## Fora do escopo por enquanto
 

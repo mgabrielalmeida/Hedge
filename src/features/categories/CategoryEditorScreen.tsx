@@ -11,10 +11,11 @@ import {
   Screen,
   Text,
   VisualPicker,
+  VISUAL_COLOR_OPTIONS,
 } from '@/components';
 import { createCategory, findCategoryById, updateCategory } from '@/db/repositories';
 import { parseMoneyInput, validateRequiredText } from '@/domain';
-import type { Category, CategoryVisualType } from '@/domain';
+import type { Category } from '@/domain';
 
 type CategoryEditorScreenProps = {
   categoryId?: number;
@@ -26,8 +27,8 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
   const [category, setCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState('');
-  const [visualType, setVisualType] = useState<CategoryVisualType>('icon');
-  const [visualValue, setVisualValue] = useState<string>(CATEGORY_ICON_OPTIONS[0].value);
+  const [iconValue, setIconValue] = useState<string>(CATEGORY_ICON_OPTIONS[0].value);
+  const [colorValue, setColorValue] = useState(VISUAL_COLOR_OPTIONS[0].value);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(categoryId !== undefined);
   const [saving, setSaving] = useState(false);
@@ -42,8 +43,8 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
         setCategory(found);
         setName(found.name);
         setBudget(formatBudget(found.monthlyBudgetCents));
-        setVisualType(found.visualType);
-        setVisualValue(found.visualValue);
+        setIconValue(found.iconValue);
+        setColorValue(found.colorValue);
       }
       setLoading(false);
     })();
@@ -59,7 +60,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
     setSaving(true);
     setError(null);
     try {
-      const input = { name: validName.value, monthlyBudgetCents: validBudget.value, visualType, visualValue };
+      const input = { name: validName.value, monthlyBudgetCents: validBudget.value, iconValue, colorValue };
       if (category) await updateCategory(database, category.id, input);
       else await createCategory(database, input);
       onDone();
@@ -86,10 +87,10 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
             <MoneyField label="Orçamento mensal" onChangeText={setBudget} placeholder="0,00" value={budget} />
             <VisualPicker
               iconOptions={CATEGORY_ICON_OPTIONS}
-              onChange={setVisualValue}
-              onTypeChange={setVisualType}
-              value={visualValue}
-              visualType={visualType}
+              iconValue={iconValue}
+              colorValue={colorValue}
+              onIconChange={setIconValue}
+              onColorChange={setColorValue}
             />
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar categoria'} onPress={() => void save()} />
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
