@@ -3,6 +3,7 @@ export type EntityId = number;
 export type CivilDate = string;
 export type YearMonth = string;
 export type UtcTimestamp = string;
+export type ThemeColorIndex = 0 | 1 | 2 | 3 | 4;
 
 export interface Account {
   readonly id: EntityId;
@@ -10,6 +11,7 @@ export interface Account {
   readonly institutionName: string;
   readonly iconValue: string;
   readonly colorValue: string;
+  readonly themeColorIndex: ThemeColorIndex | null;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
 }
@@ -20,6 +22,7 @@ export interface Category {
   readonly monthlyBudgetCents: Cents;
   readonly iconValue: string;
   readonly colorValue: string;
+  readonly themeColorIndex: ThemeColorIndex | null;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
 }

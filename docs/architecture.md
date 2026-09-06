@@ -215,10 +215,13 @@ Os componentes compartilhados mínimos são `Screen`, `Text`, `Card`, `Field` e
 `Button`. Eles ficam em `src/components`, recebem suas decisões visuais do
 tema e não têm conhecimento de funcionalidades ou do banco de dados.
 Seletores visuais reutilizados por contas e categorias também permanecem nessa
-área, com opções locais de ícones e cores e sem dependência de recursos remotos.
+área, com opções locais de ícones e cinco tons derivados do tema ativo, sem
+dependência de recursos remotos.
 Cada conta e categoria persiste os dois valores e os exibe em conjunto: o ícone
-sobre a cor escolhida.
-Além das cores predefinidas, esses seletores oferecem uma roda de tons e
+sobre a cor escolhida. A escolha de um dos cinco tons predefinidos também
+persiste seu índice, para que seja resolvida novamente ao tema ativo mudar;
+cores da roda não recebem índice e permanecem imutáveis.
+As demais cores ficam disponíveis exclusivamente em uma roda de tons e
 controles de vivacidade e luminosidade. A escolha visual é convertida para uma
 cor hexadecimal antes da persistência, sem expor esse formato técnico na
 interface.

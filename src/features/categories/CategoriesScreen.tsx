@@ -3,7 +3,7 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Button, Card, Screen, Text } from '@/components';
+import { Button, Card, resolveThemeColorValue, Screen, Text } from '@/components';
 import { deleteCategory, listCategories } from '@/db/repositories';
 import type { Category } from '@/domain';
 import { formatBrazilianCurrency } from '@/domain';
@@ -67,7 +67,7 @@ export function CategoriesScreen({
 
 function CategoryCard({ category, onDelete, onEdit }: { category: Category; onDelete: () => void; onEdit: () => void }) {
   const { tokens } = useTheme();
-  return <Card><View style={styles.row}><View style={[styles.visual, { backgroundColor: category.colorValue }]}><Text style={{ color: tokens.onPrimary }}>{category.iconValue}</Text></View><View style={styles.details}><Text variant="title">{category.name}</Text><Text tone="muted" variant="caption">Orçamento: {formatBrazilianCurrency(category.monthlyBudgetCents)}</Text></View></View><View style={styles.actions}><Button label="Editar" onPress={onEdit} style={styles.action} variant="secondary" /><Button label="Excluir" onPress={onDelete} style={styles.action} variant="ghost" /></View></Card>;
+  return <Card><View style={styles.row}><View style={[styles.visual, { backgroundColor: resolveThemeColorValue(category.colorValue, category.themeColorIndex, tokens.primary) }]}><Text style={{ color: tokens.onPrimary }}>{category.iconValue}</Text></View><View style={styles.details}><Text variant="title">{category.name}</Text><Text tone="muted" variant="caption">Orçamento: {formatBrazilianCurrency(category.monthlyBudgetCents)}</Text></View></View><View style={styles.actions}><Button label="Editar" onPress={onEdit} style={styles.action} variant="secondary" /><Button label="Excluir" onPress={onDelete} style={styles.action} variant="ghost" /></View></Card>;
 }
 
 const styles = StyleSheet.create({ action: { flex: 1 }, actions: { flexDirection: 'row', gap: 8, marginTop: 14 }, content: { gap: 18, paddingVertical: 24 }, details: { flex: 1 }, list: { gap: 12 }, row: { alignItems: 'center', flexDirection: 'row', gap: 12 }, visual: { alignItems: 'center', borderRadius: 12, height: 44, justifyContent: 'center', width: 44 } });

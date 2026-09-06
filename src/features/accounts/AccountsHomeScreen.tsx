@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Button, Card, getAccountIconSymbol, Screen, Text } from '@/components';
+import { Button, Card, getAccountIconSymbol, resolveThemeColorValue, Screen, Text } from '@/components';
 import { listAccounts } from '@/db/repositories';
 import type { Account } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -80,7 +80,7 @@ function AccountCard({ account }: { account: Account }) {
         <View style={[
           styles.indicator,
           {
-            backgroundColor: account.colorValue,
+            backgroundColor: resolveThemeColorValue(account.colorValue, account.themeColorIndex, tokens.primary),
             borderRadius: tokens.radius.md,
           },
         ]}>

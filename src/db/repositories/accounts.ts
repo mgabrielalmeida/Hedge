@@ -1,16 +1,17 @@
 import { normalizeOptionalText, parseCivilDate, validateRequiredText } from '@/domain';
-import type { Account, Cents, CivilDate } from '@/domain';
+import type { Account, Cents, CivilDate, ThemeColorIndex } from '@/domain';
 
 import { type Clock, type RepositoryDatabase, systemClock } from './database';
 import { mapAccount, type AccountRow } from './rows';
 
-const accountColumns = 'id, name, institution_name, icon_value, color_value, created_at, updated_at';
+const accountColumns = 'id, name, institution_name, icon_value, color_value, theme_color_index, created_at, updated_at';
 
 export type CreateAccountInput = {
   readonly name: string;
   readonly institutionName: string;
   readonly iconValue: string;
   readonly colorValue: string;
+  readonly themeColorIndex?: ThemeColorIndex | null;
   readonly initialBalanceCents: Cents;
   readonly openingBalanceDate: CivilDate;
   readonly openingBalanceDescription?: string | null;
@@ -23,6 +24,8 @@ export async function createAccount(db: RepositoryDatabase, input: CreateAccount
   const institutionName = required(input.institutionName, 'institution name');
   const iconValue = required(input.iconValue, 'account icon value');
   const colorValue = required(input.colorValue, 'account color value');
+  const themeColorIndex = input.themeColorIndex ?? null;
+  validateThemeColorIndex(themeColorIndex);
   if (!Number.isSafeInteger(input.initialBalanceCents)) throw new Error('Invalid opening balance.');
   if (!parseCivilDate(input.openingBalanceDate).ok) throw new Error('Invalid opening balance date.');
   const description = normalizeOptionalText(input.openingBalanceDescription);
@@ -30,8 +33,8 @@ export async function createAccount(db: RepositoryDatabase, input: CreateAccount
   let account: Account | null = null;
   await db.withExclusiveTransactionAsync(async (transaction) => {
     await transaction.runAsync(
-      'INSERT INTO accounts (name, institution_name, visual_type, visual_value, icon_value, color_value, created_at, updated_at) VALUES (?, ?, \'icon\', ?, ?, ?, ?, ?);',
-      name, institutionName, iconValue, iconValue, colorValue, timestamp, timestamp,
+      'INSERT INTO accounts (name, institution_name, visual_type, visual_value, icon_value, color_value, theme_color_index, created_at, updated_at) VALUES (?, ?, \'icon\', ?, ?, ?, ?, ?, ?);',
+      name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, timestamp, timestamp,
     );
     const row = await transaction.getFirstAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE id = last_insert_rowid();`);
     if (!row) throw new Error('Created account was not found.');
@@ -61,7 +64,9 @@ export async function updateAccount(db: RepositoryDatabase, id: number, input: U
   const institutionName = required(input.institutionName, 'institution name');
   const iconValue = required(input.iconValue, 'account icon value');
   const colorValue = required(input.colorValue, 'account color value');
-  await db.runAsync('UPDATE accounts SET name = ?, institution_name = ?, visual_type = \'icon\', visual_value = ?, icon_value = ?, color_value = ?, updated_at = ? WHERE id = ?;', name, institutionName, iconValue, iconValue, colorValue, clock(), id);
+  const themeColorIndex = input.themeColorIndex ?? null;
+  validateThemeColorIndex(themeColorIndex);
+  await db.runAsync('UPDATE accounts SET name = ?, institution_name = ?, visual_type = \'icon\', visual_value = ?, icon_value = ?, color_value = ?, theme_color_index = ?, updated_at = ? WHERE id = ?;', name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, clock(), id);
   return findAccountById(db, id);
 }
 
@@ -69,4 +74,8 @@ function required(value: string, label: string): string {
   const result = validateRequiredText(value);
   if (!result.ok) throw new Error(`Invalid ${label}.`);
   return result.value;
+}
+
+function validateThemeColorIndex(value: ThemeColorIndex | null): void {
+  if (value !== null && (!Number.isInteger(value) || value < 0 || value > 4)) throw new Error('Invalid account theme color index.');
 }

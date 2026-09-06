@@ -1,13 +1,15 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeProvider';
+import type { ThemeColorIndex } from '@/domain';
 
 import { Text } from './Text';
 import {
   hexToHsl,
   hslToHex,
+  getThemeColorOptions,
   normalizeHexColor,
-  VISUAL_COLOR_OPTIONS,
+  resolveThemeColorValue,
   type IconOption,
 } from './visualOptions';
 
@@ -16,8 +18,10 @@ type VisualPickerProps = {
   iconOptions: readonly IconOption[];
   iconValue: string;
   label?: string;
-  onColorChange: (value: string) => void;
+  onCustomColorChange: (value: string) => void;
   onIconChange: (value: string) => void;
+  onThemeColorChange: (index: ThemeColorIndex, value: string) => void;
+  themeColorIndex: number | null;
 };
 
 const HUE_OPTIONS = [
@@ -52,10 +56,14 @@ export function VisualPicker({
   iconOptions,
   iconValue,
   label = 'Indicador visual',
-  onColorChange,
+  onCustomColorChange,
   onIconChange,
+  onThemeColorChange,
+  themeColorIndex,
 }: VisualPickerProps) {
   const { tokens } = useTheme();
+  const themeColorOptions = getThemeColorOptions(tokens.primary);
+  const resolvedColorValue = resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary);
 
   return (
     <View style={styles.container}>
@@ -100,15 +108,15 @@ export function VisualPicker({
 
       <Text variant="caption" style={{ color: tokens.textMuted }}>Cor</Text>
       <View accessibilityLabel="Cor do indicador visual" accessibilityRole="radiogroup" style={styles.grid}>
-        {VISUAL_COLOR_OPTIONS.map((option) => {
-          const selected = colorValue === option.value;
+        {themeColorOptions.map((option, index) => {
+          const selected = themeColorIndex === index;
           return (
             <Pressable
               accessibilityLabel={option.label}
               accessibilityRole="radio"
               accessibilityState={{ selected }}
               key={option.value}
-              onPress={() => onColorChange(option.value)}
+              onPress={() => onThemeColorChange(index as ThemeColorIndex, option.value)}
               style={({ pressed }) => [
                 styles.option,
                 {
@@ -126,14 +134,14 @@ export function VisualPicker({
         })}
       </View>
 
-      <ColorMixer onChange={onColorChange} value={colorValue} />
+      <ColorMixer onChange={onCustomColorChange} value={resolvedColorValue} />
     </View>
   );
 }
 
 function ColorMixer({ onChange, value }: { onChange: (value: string) => void; value: string }) {
   const { tokens } = useTheme();
-  const selectedColor = normalizeHexColor(value) ?? VISUAL_COLOR_OPTIONS[0].value;
+  const selectedColor = normalizeHexColor(value) ?? tokens.primary;
   const color = hexToHsl(selectedColor) ?? { hue: 125, saturation: 65, lightness: 50 };
   const selectedHue = findClosestHue(color.hue);
   const selectedHueLabel = HUE_OPTIONS.find((option) => option.value === selectedHue)?.label;

@@ -12,6 +12,7 @@ import type {
   RecurringOccurrence,
   RecurringRule,
   Transaction,
+  ThemeColorIndex,
 } from '@/domain';
 
 export type AccountRow = {
@@ -20,6 +21,7 @@ export type AccountRow = {
   institution_name: string;
   icon_value: string;
   color_value: string;
+  theme_color_index: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -30,6 +32,7 @@ export type CategoryRow = {
   monthly_budget_cents: number;
   icon_value: string;
   color_value: string;
+  theme_color_index: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -82,6 +85,7 @@ export function mapAccount(row: AccountRow): Account {
     institutionName: row.institution_name,
     iconValue: row.icon_value,
     colorValue: row.color_value,
+    themeColorIndex: row.theme_color_index as ThemeColorIndex | null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -95,6 +99,7 @@ export function mapCategory(row: CategoryRow): Category {
     monthlyBudgetCents: row.monthly_budget_cents,
     iconValue: row.icon_value,
     colorValue: row.color_value,
+    themeColorIndex: row.theme_color_index as ThemeColorIndex | null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }), 'category row');

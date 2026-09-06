@@ -11,11 +11,12 @@ import {
   Screen,
   Text,
   VisualPicker,
-  VISUAL_COLOR_OPTIONS,
+  resolveThemeColorValue,
 } from '@/components';
 import { createCategory, findCategoryById, updateCategory } from '@/db/repositories';
 import { parseMoneyInput, validateRequiredText } from '@/domain';
-import type { Category } from '@/domain';
+import type { Category, ThemeColorIndex } from '@/domain';
+import { useTheme } from '@/theme/ThemeProvider';
 
 type CategoryEditorScreenProps = {
   categoryId?: number;
@@ -24,11 +25,13 @@ type CategoryEditorScreenProps = {
 
 export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScreenProps) {
   const database = useSQLiteContext();
+  const { tokens } = useTheme();
   const [category, setCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState('');
   const [iconValue, setIconValue] = useState<string>(CATEGORY_ICON_OPTIONS[0].value);
-  const [colorValue, setColorValue] = useState(VISUAL_COLOR_OPTIONS[0].value);
+  const [colorValue, setColorValue] = useState(tokens.primary);
+  const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(2);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(categoryId !== undefined);
   const [saving, setSaving] = useState(false);
@@ -45,6 +48,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
         setBudget(formatBudget(found.monthlyBudgetCents));
         setIconValue(found.iconValue);
         setColorValue(found.colorValue);
+        setThemeColorIndex(found.themeColorIndex);
       }
       setLoading(false);
     })();
@@ -60,7 +64,13 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
     setSaving(true);
     setError(null);
     try {
-      const input = { name: validName.value, monthlyBudgetCents: validBudget.value, iconValue, colorValue };
+      const input = {
+        name: validName.value,
+        monthlyBudgetCents: validBudget.value,
+        iconValue,
+        colorValue: resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary),
+        themeColorIndex,
+      };
       if (category) await updateCategory(database, category.id, input);
       else await createCategory(database, input);
       onDone();
@@ -90,7 +100,9 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
               iconValue={iconValue}
               colorValue={colorValue}
               onIconChange={setIconValue}
-              onColorChange={setColorValue}
+              onThemeColorChange={(index, value) => { setThemeColorIndex(index); setColorValue(value); }}
+              onCustomColorChange={(value) => { setThemeColorIndex(null); setColorValue(value); }}
+              themeColorIndex={themeColorIndex}
             />
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar categoria'} onPress={() => void save()} />
             <Button label="Cancelar" onPress={onDone} variant="ghost" />

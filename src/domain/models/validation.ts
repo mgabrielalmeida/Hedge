@@ -68,6 +68,7 @@ export function validateAccount(account: Account): ValidationResult<Account, Dom
     !isNormalizedRequiredText(account.institutionName) ||
     !isNormalizedRequiredText(account.iconValue) ||
     !isNormalizedRequiredText(account.colorValue) ||
+    !isThemeColorIndex(account.themeColorIndex) ||
     !isUtcTimestamp(account.createdAt) ||
     !isUtcTimestamp(account.updatedAt)
   ) {
@@ -84,6 +85,7 @@ export function validateCategory(category: Category): ValidationResult<Category,
     !validateCategoryBudget(category.monthlyBudgetCents).ok ||
     !isNormalizedRequiredText(category.iconValue) ||
     !isNormalizedRequiredText(category.colorValue) ||
+    !isThemeColorIndex(category.themeColorIndex) ||
     !isUtcTimestamp(category.createdAt) ||
     !isUtcTimestamp(category.updatedAt)
   ) {
@@ -240,6 +242,10 @@ function isNormalizedRequiredText(value: string): boolean {
 
 function isNormalizedOptionalText(value: string | null): boolean {
   return normalizeOptionalText(value) === value;
+}
+
+function isThemeColorIndex(value: number | null): boolean {
+  return value === null || (Number.isInteger(value) && value >= 0 && value <= 4);
 }
 
 function hasValidSchedule(rule: RecurringRule): boolean {

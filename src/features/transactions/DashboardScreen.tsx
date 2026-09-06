@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Button, Card, Screen, Text } from '@/components';
+import { Button, Card, resolveThemeColorValue, Screen, Text } from '@/components';
 import { listAccounts, listCategories, listTransactions } from '@/db/repositories';
 import {
   calculateAccountBalance,
@@ -264,7 +264,7 @@ function CategoryBudgetCard({
   const hasBudget = percentage !== null;
   const percentageLabel = hasBudget ? `${Math.round(percentage)}%` : '—';
   const progressColor = getProgressColor(percentage, tokens);
-  const visualColor = category.colorValue;
+  const visualColor = resolveThemeColorValue(category.colorValue, category.themeColorIndex, tokens.primary);
   const visualSymbol = category.iconValue;
   const description = hasBudget
     ? `${formatBrazilianCurrency(spendingCents)} de ${formatBrazilianCurrency(category.monthlyBudgetCents)} gastos`

@@ -9,11 +9,11 @@ import {
   MoneyField,
   Text,
   VisualPicker,
-  VISUAL_COLOR_OPTIONS,
+  resolveThemeColorValue,
 } from '@/components';
 import { createAccount } from '@/db/repositories';
 import { parseCivilDate, parseMoneyInput, validateRequiredText } from '@/domain';
-import type { Account } from '@/domain';
+import type { Account, ThemeColorIndex } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 const BANK_OPTIONS = [
@@ -41,7 +41,8 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
   const [initialBalance, setInitialBalance] = useState('');
   const [openingBalanceDate, setOpeningBalanceDate] = useState(getLocalCivilDate());
   const [iconValue, setIconValue] = useState('bank');
-  const [colorValue, setColorValue] = useState(VISUAL_COLOR_OPTIONS[0].value);
+  const [colorValue, setColorValue] = useState(tokens.primary);
+  const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(2);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -77,7 +78,8 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
         name: name.value,
         institutionName: institution.value,
         iconValue,
-        colorValue,
+        colorValue: resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary),
+        themeColorIndex,
         initialBalanceCents: amount.value,
         openingBalanceDate: date.value,
       });
@@ -145,7 +147,9 @@ export function AccountForm({ onAccountCreated, submitLabel = 'Criar conta' }: A
         iconValue={iconValue}
         colorValue={colorValue}
         onIconChange={setIconValue}
-        onColorChange={setColorValue}
+        onThemeColorChange={(index, value) => { setThemeColorIndex(index); setColorValue(value); }}
+        onCustomColorChange={(value) => { setThemeColorIndex(null); setColorValue(value); }}
+        themeColorIndex={themeColorIndex}
       />
 
       <Button

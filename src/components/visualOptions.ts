@@ -71,32 +71,26 @@ export const CATEGORY_ICON_OPTIONS: readonly IconOption[] = [
   { label: 'Favorita', value: '★', symbol: '★' },
 ] as const;
 
-export const VISUAL_COLOR_OPTIONS: readonly ColorOption[] = [
-  { label: 'Floresta', value: '#276749' },
-  { label: 'Verde', value: '#15803D' },
-  { label: 'Lima', value: '#4D7C0F' },
-  { label: 'Menta', value: '#0F8A72' },
-  { label: 'Petróleo', value: '#0F766E' },
-  { label: 'Ciano', value: '#0E7490' },
-  { label: 'Oceano', value: '#176B9C' },
-  { label: 'Azul', value: '#1D4ED8' },
-  { label: 'Índigo', value: '#4338CA' },
-  { label: 'Violeta', value: '#7C3AED' },
-  { label: 'Roxo', value: '#9333EA' },
-  { label: 'Ameixa', value: '#7E3A8A' },
-  { label: 'Magenta', value: '#A21CAF' },
-  { label: 'Rosa', value: '#BE123C' },
-  { label: 'Vermelho', value: '#B42318' },
-  { label: 'Coral', value: '#C2410C' },
-  { label: 'Laranja', value: '#B45309' },
-  { label: 'Âmbar', value: '#A16207' },
-  { label: 'Dourado', value: '#CA8A04' },
-  { label: 'Marrom', value: '#795548' },
-  { label: 'Taupe', value: '#75625B' },
-  { label: 'Ardósia', value: '#475569' },
-  { label: 'Grafite', value: '#334155' },
-  { label: 'Carvão', value: '#3F3F46' },
-] as const;
+export function getThemeColorOptions(themeColor: string): readonly ColorOption[] {
+  const base = hexToHsl(themeColor) ?? { hue: 125, saturation: 65, lightness: 50 };
+  const saturation = Math.max(base.saturation, 45);
+
+  return [
+    { label: 'Profunda', value: hslToHex(base.hue, saturation, 32) },
+    { label: 'Intensa', value: hslToHex(base.hue, saturation, 43) },
+    { label: 'Do tema', value: normalizeHexColor(themeColor) ?? hslToHex(base.hue, saturation, 54) },
+    { label: 'Suave', value: hslToHex(base.hue, saturation, 65) },
+    { label: 'Clara', value: hslToHex(base.hue, saturation, 76) },
+  ];
+}
+
+export function resolveThemeColorValue(
+  colorValue: string,
+  themeColorIndex: number | null,
+  themeColor: string,
+): string {
+  return themeColorIndex === null ? colorValue : getThemeColorOptions(themeColor)[themeColorIndex]?.value ?? colorValue;
+}
 
 export function getAccountIconSymbol(value: string): string {
   return ACCOUNT_ICON_OPTIONS.find((option) => option.value === value)?.symbol ?? '•';

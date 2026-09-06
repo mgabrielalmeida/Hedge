@@ -37,18 +37,18 @@ describe('SQLite repositories', () => {
 
   it('creates an account and its opening balance atomically, and maps the domain model', async () => {
     const account = await createAccount(database, {
-      name: '  Main account  ', institutionName: '  Banco A ', iconValue: ' bank ', colorValue: ' #123456 ',
+      name: '  Main account  ', institutionName: '  Banco A ', iconValue: ' bank ', colorValue: ' #123456 ', themeColorIndex: 0,
       initialBalanceCents: -1_250, openingBalanceDate: '2026-09-02', openingBalanceDescription: '  Overdraft  ',
     }, () => createdAt);
 
     expect(account).toMatchObject({
-      id: 1, name: 'Main account', institutionName: 'Banco A', iconValue: 'bank', colorValue: '#123456', createdAt, updatedAt: createdAt,
+      id: 1, name: 'Main account', institutionName: 'Banco A', iconValue: 'bank', colorValue: '#123456', themeColorIndex: 0, createdAt, updatedAt: createdAt,
     });
     await expect(listTransactions(database)).resolves.toEqual([
       expect.objectContaining({ kind: 'opening_balance', accountId: account.id, amountCents: -1_250, description: 'Overdraft' }),
     ]);
     await expect(updateAccount(database, account.id, {
-      name: 'New main', institutionName: 'Banco B', iconValue: 'bank', colorValue: '#276749',
+      name: 'New main', institutionName: 'Banco B', iconValue: 'bank', colorValue: '#276749', themeColorIndex: 3,
     }, () => updatedAt)).resolves.toEqual(expect.objectContaining({ name: 'New main', updatedAt }));
     await expect(listAccounts(database)).resolves.toHaveLength(1);
   });
