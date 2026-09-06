@@ -55,7 +55,6 @@ export function VisualPicker({
   colorValue,
   iconOptions,
   iconValue,
-  label = 'Indicador visual',
   onCustomColorChange,
   onIconChange,
   onThemeColorChange,
@@ -67,13 +66,6 @@ export function VisualPicker({
 
   return (
     <View style={styles.container}>
-      <View>
-        <Text variant="caption" style={{ color: tokens.textMuted }}>{label}</Text>
-        <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.xs }}>
-          Combine um ícone e uma cor para encontrar este item rapidamente.
-        </Text>
-      </View>
-
       <Text variant="caption" style={{ color: tokens.textMuted }}>Ícone</Text>
       <View style={styles.grid}>
         {iconOptions.map((option) => {

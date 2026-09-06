@@ -33,6 +33,7 @@ distribuída.
 | Estado local | `useState` e `useReducer` |
 | Estado global | React Context apenas para tema e configurações pequenas |
 | Preferências | `expo-sqlite/kv-store` |
+| Entrada de datas | `@react-native-community/datetimepicker`, usando o controle nativo do sistema |
 | Interface do sistema | `expo-status-bar` e `expo-navigation-bar`, acompanhando a aparência resolvida do tema |
 | Testes | Jest com `jest-expo` |
 | Lint | ESLint com `eslint-config-expo` |
@@ -214,6 +215,9 @@ interface sem remover os controles do sistema.
 Os componentes compartilhados mínimos são `Screen`, `Text`, `Card`, `Field` e
 `Button`. Eles ficam em `src/components`, recebem suas decisões visuais do
 tema e não têm conhecimento de funcionalidades ou do banco de dados.
+O `DatePickerField` também fica nessa área e converte escolhas do controle
+nativo para datas civis no formato `YYYY-MM-DD` antes de devolvê-las ao
+formulário.
 Seletores visuais reutilizados por contas e categorias também permanecem nessa
 área, com opções locais de ícones e cinco tons derivados do tema ativo, sem
 dependência de recursos remotos.

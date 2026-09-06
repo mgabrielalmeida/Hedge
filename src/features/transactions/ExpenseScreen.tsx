@@ -2,7 +2,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Field, MoneyField, Screen, Text } from '@/components';
+import { Button, Card, DatePickerField, Field, MoneyField, Screen, Text } from '@/components';
 import {
   createRecurringRule,
   createTransaction,
@@ -210,7 +210,7 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
           <View style={styles.form}>
             <Field error={error ?? undefined} label="Nome" onChangeText={setName} value={name} placeholder={kind === 'expense' ? 'Ex.: Mercado' : 'Ex.: Salário'} />
             <MoneyField label="Valor" onChangeText={setAmount} value={amount} placeholder="0,00" />
-            <Field label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChangeText={setDate} value={date} placeholder="AAAA-MM-DD" keyboardType="numbers-and-punctuation" />
+            <DatePickerField label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChange={setDate} value={date} />
             <Text tone="muted" variant="caption">Conta</Text>
             <View style={styles.choices}>{accounts.map((account) => <Choice key={account.id} label={account.name} onPress={() => setAccountId(account.id)} selected={accountId === account.id} />)}</View>
             {kind === 'expense' ? <><Text tone="muted" variant="caption">Categoria</Text><View style={styles.choices}>{categories.map((category) => <Choice key={category.id} label={`${category.iconValue} ${category.name}`} onPress={() => setCategoryId(category.id)} selected={categoryId === category.id} />)}</View></> : null}
@@ -253,7 +253,7 @@ function RecurrenceFields({ chargeDay, chargeMonth, endDate, frequency, onCharge
       <View style={styles.choices}><Choice label="Semanal" onPress={() => onFrequencyChange('weekly')} selected={frequency === 'weekly'} /><Choice label="Mensal" onPress={() => onFrequencyChange('monthly')} selected={frequency === 'monthly'} /><Choice label="Anual" onPress={() => onFrequencyChange('yearly')} selected={frequency === 'yearly'} /></View>
       {frequency === 'weekly' ? <><Text tone="muted" variant="caption">Dia da semana</Text><View style={styles.choices}>{weekdays.map(([label, value]) => <Choice key={value} label={label} onPress={() => onChargeDayChange(String(value))} selected={chargeDay === String(value)} />)}</View></> : <Field helperText="Dias inexistentes serão ajustados para o último dia do mês." keyboardType="number-pad" label="Dia da cobrança" maxLength={2} onChangeText={onChargeDayChange} placeholder="1 a 31" value={chargeDay} />}
       {frequency === 'yearly' ? <Field keyboardType="number-pad" label="Mês da cobrança" maxLength={2} onChangeText={onChargeMonthChange} placeholder="1 a 12" value={chargeMonth} /> : null}
-      <Field helperText="Deixe vazio para repetir sem data final." keyboardType="numbers-and-punctuation" label="Data final (opcional)" onChangeText={onEndDateChange} placeholder="AAAA-MM-DD" value={endDate} />
+      <DatePickerField allowClear label="Data final" onChange={onEndDateChange} value={endDate} />
     </View>
   );
 }

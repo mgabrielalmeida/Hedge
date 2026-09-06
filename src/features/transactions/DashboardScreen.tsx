@@ -318,7 +318,7 @@ function CategoryBudgetCard({
             style={[
               styles.progressBar,
               {
-                backgroundColor: progressColor,
+                backgroundColor: visualColor,
                 borderRadius: tokens.radius.pill,
                 width: `${progress}%`,
               },
