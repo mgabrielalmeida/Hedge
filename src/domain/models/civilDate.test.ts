@@ -1,4 +1,5 @@
 import {
+  formatCivilDate,
   getMondayBasedWeekday,
   parseCivilDate,
   parseYearMonth,
@@ -37,5 +38,9 @@ describe('civil dates', () => {
   it('validates a calendar month separately', () => {
     expect(parseYearMonth('2026-09')).toEqual({ ok: true, value: '2026-09' });
     expect(parseYearMonth('2026-13')).toEqual({ ok: false, error: 'invalid_year_month' });
+  });
+
+  it('formats civil dates for display in DD/MM/YYYY form', () => {
+    expect(formatCivilDate('2026-09-08')).toBe('08/09/2026');
   });
 });

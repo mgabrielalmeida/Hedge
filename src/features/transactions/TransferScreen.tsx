@@ -5,8 +5,8 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
   Card,
+  DatePickerField,
   FadeSelection,
-  Field,
   MoneyField,
   scheduleAfterSecondaryTransition,
   Screen,
@@ -28,6 +28,7 @@ import {
 } from '@/domain';
 import type { Account, TransferTransaction } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
+import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 type TransferScreenProps = {
   deferInitialLoad?: boolean;
@@ -42,7 +43,7 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
   const [sourceAccountId, setSourceAccountId] = useState<number | null>(null);
   const [destinationAccountId, setDestinationAccountId] = useState<number | null>(null);
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(getLocalCivilDate());
   const [existing, setExisting] = useState<TransferTransaction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -96,7 +97,7 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
   async function save() {
     const money = parseMoneyInput(amount.replace(/\./g, ''));
     const civil = parseCivilDate(date);
-    const dateIsAllowed = civil.ok && validateNotFuture(civil.value, today()).ok;
+    const dateIsAllowed = civil.ok && validateNotFuture(civil.value, getLocalCivilDate()).ok;
 
     if (
       !money.ok ||
@@ -190,11 +191,9 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
               selectedId={destinationAccountId}
             />
             <MoneyField label="Valor" onChangeText={setAmount} value={amount} placeholder="0,00" />
-            <Field
-              keyboardType="numbers-and-punctuation"
+            <DatePickerField
               label="Data"
-              onChangeText={setDate}
-              placeholder="AAAA-MM-DD"
+              onChange={setDate}
               value={date}
             />
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} onPress={() => void save()} />
@@ -263,11 +262,6 @@ function AccountChoices({
       </FadeSelection>
     </View>
   );
-}
-
-function today() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({

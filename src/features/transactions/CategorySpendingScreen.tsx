@@ -15,7 +15,7 @@ import {
   useReducedMotion,
 } from '@/components';
 import { findCategoryById, listAccounts, listTransactions } from '@/db/repositories';
-import { calculateCategoryMonthlySpending, formatBrazilianCurrency } from '@/domain';
+import { calculateCategoryMonthlySpending, formatBrazilianCurrency, formatCivilDate } from '@/domain';
 import type { Account, Category, ExpenseTransaction, Transaction, YearMonth } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -533,11 +533,6 @@ function formatCompactCurrency(cents: number): string {
 function formatMonthTick(yearMonth: YearMonth): string {
   const [year, month] = yearMonth.split('-');
   return `${month}/${year.slice(2)}`;
-}
-
-function formatCivilDate(civilDate: string): string {
-  const [year, month, day] = civilDate.split('-');
-  return `${day}/${month}/${year}`;
 }
 
 const styles = StyleSheet.create({

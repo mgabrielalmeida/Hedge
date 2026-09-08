@@ -6,6 +6,7 @@ import {
   ACCOUNT_ICON_OPTIONS,
   getIconDisplayValue,
   Button,
+  DatePickerField,
   FadeSelection,
   Field,
   MoneyField,
@@ -14,7 +15,7 @@ import {
   resolveThemeColorValue,
 } from '@/components';
 import { createAccount, updateAccountWithBalance } from '@/db/repositories';
-import { formatBrazilianMoneyInput, parseCivilDate, parseMoneyInput, validateRequiredText } from '@/domain';
+import { formatBrazilianMoneyInput, parseMoneyInput, validateRequiredText } from '@/domain';
 import type { Account, Cents, ThemeColorIndex } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
@@ -64,7 +65,6 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
     const name = validateRequiredText(accountName);
     const institution = validateRequiredText(institutionName);
     const amount = parseMoneyInput(initialBalance.replace(/\./g, ''), { allowNegative: true });
-    const date = parseCivilDate(openingBalanceDate);
 
     if (!name.ok) {
       setError('Informe um nome para a conta.');
@@ -78,11 +78,6 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
       setError('Informe um saldo inicial válido, como 0,00 ou -125,50.');
       return;
     }
-    if (!date.ok) {
-      setError('Informe uma data válida no formato AAAA-MM-DD.');
-      return;
-    }
-
     setError(null);
     setIsSubmitting(true);
     try {
@@ -102,7 +97,7 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
         : await createAccount(database, {
             ...visualInput,
             initialBalanceCents: amount.value,
-            openingBalanceDate: date.value,
+            openingBalanceDate,
           });
       if (!savedAccount) throw new Error('Account was not found.');
       onSaved(savedAccount);
@@ -160,11 +155,9 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
       />
 
       {!account ? (
-        <Field
-          keyboardType="numbers-and-punctuation"
+        <DatePickerField
           label="Data do saldo inicial"
-          onChangeText={setOpeningBalanceDate}
-          placeholder="AAAA-MM-DD"
+          onChange={setOpeningBalanceDate}
           value={openingBalanceDate}
         />
       ) : null}

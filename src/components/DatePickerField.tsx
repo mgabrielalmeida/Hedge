@@ -2,7 +2,7 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
-import { parseCivilDate } from '@/domain';
+import { formatCivilDate, parseCivilDate } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 import { Button } from './Button';
@@ -45,7 +45,7 @@ export function DatePickerField({ allowClear = false, error, label, onChange, va
           },
         ]}
       >
-        <Text>{value || 'Selecionar data'}</Text>
+        <Text>{formatDateValue(value)}</Text>
         <Text tone="muted">⌄</Text>
       </Pressable>
       {error ? <Text tone="negative" variant="caption" style={{ marginTop: tokens.spacing.xs }}>{error}</Text> : null}
@@ -74,6 +74,11 @@ function toDate(value: string): Date {
   if (!parsed.ok) return new Date();
   const [year, month, day] = parsed.value.split('-').map(Number);
   return new Date(year, month - 1, day);
+}
+
+function formatDateValue(value: string): string {
+  const parsed = parseCivilDate(value);
+  return parsed.ok ? formatCivilDate(parsed.value) : 'Selecionar data';
 }
 
 function toCivilDate(value: Date): string {

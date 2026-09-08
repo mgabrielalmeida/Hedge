@@ -13,7 +13,7 @@ import {
   useReducedMotion,
 } from '@/components';
 import { listAccounts, listCategories, listRecurringRules, listTransactions } from '@/db/repositories';
-import { calculateAccountBalance, calculateConsolidatedBalance, formatBrazilianCurrency } from '@/domain';
+import { calculateAccountBalance, calculateConsolidatedBalance, formatBrazilianCurrency, formatCivilDate } from '@/domain';
 import type { Account, Category, RecurringRule, Transaction, TransferTransaction } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -173,7 +173,7 @@ function TransactionCard({ category, transaction }: { category: Category | null;
       <Text variant="title">{transaction.name}</Text>
       <Text tone={income ? 'positive' : 'negative'}>{formatBrazilianCurrency(transaction.amountCents)}</Text>
       <Text tone="muted" variant="caption">
-        {transaction.transactionDate}
+        {formatCivilDate(transaction.transactionDate)}
         {transaction.kind === 'expense' ? ` · ${category ? category.name : 'Sem categoria'}` : ''}
       </Text>
     </Card>
@@ -187,7 +187,7 @@ function TransferCard({ accounts, transaction }: { accounts: readonly Account[];
     <Card>
       <Text variant="title">{source} → {destination}</Text>
       <Text tone="info">{formatBrazilianCurrency(Math.abs(transaction.amountCents))}</Text>
-      <Text tone="muted" variant="caption">{transaction.transactionDate}</Text>
+      <Text tone="muted" variant="caption">{formatCivilDate(transaction.transactionDate)}</Text>
     </Card>
   );
 }
@@ -211,7 +211,7 @@ function RecurringRuleCard({ accounts, categories, rule }: {
         {formatRecurringSchedule(rule)} · {account}{category ? ` · ${category}` : ''}
       </Text>
       <Text tone="muted" variant="caption">
-        Desde {rule.startDate}{rule.endDate ? ` até ${rule.endDate}` : ''}
+        Desde {formatCivilDate(rule.startDate)}{rule.endDate ? ` até ${formatCivilDate(rule.endDate)}` : ''}
       </Text>
     </Card>
   );

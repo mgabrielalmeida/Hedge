@@ -35,6 +35,11 @@ export function compareCivilDates(left: CivilDate, right: CivilDate): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+export function formatCivilDate(date: CivilDate): string {
+  const { day, month, year } = getCivilDateParts(date);
+  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${String(year).padStart(4, '0')}`;
+}
+
 export function validateDateRange(
   startDate: CivilDate,
   endDate: CivilDate | null,
