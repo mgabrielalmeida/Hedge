@@ -167,7 +167,8 @@ dos saldos das duas contas.
 ## Categorias e orçamento mensal
 
 O MVP cria inicialmente as seguintes categorias genéricas: **Compras**,
-**Assinatura**, **Entretenimento**, **Alimentação** e **Outros**.
+**Assinatura**, **Entretenimento**, **Alimentação** e **Outros**. Elas recebem,
+nessa ordem, as cinco cores predefinidas do sistema.
 
 O usuário pode criar, editar e excluir categorias. Ao criar uma categoria,
 deve definir seu orçamento mensal, que pode ser zero. Alterar o orçamento não

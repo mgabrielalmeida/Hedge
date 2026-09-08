@@ -88,6 +88,10 @@ A migração cria como registros comuns, editáveis e excluíveis:
 - Alimentação;
 - Outros.
 
+A migração 7 associa essas categorias, nessa mesma ordem, aos índices de 0 a 4
+das cinco cores predefinidas. A associação só é preenchida quando o índice está
+nulo, preservando uma personalização já feita pelo usuário.
+
 Ao excluir uma categoria, `transactions.category_id` recebe `NULL`. A despesa
 permanece no histórico e a interface deve exibir **Categoria excluída**.
 
