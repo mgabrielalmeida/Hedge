@@ -1,15 +1,19 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import {
   Button,
   Card,
+  ChipGroup,
   DatePickerField,
   FadeSelection,
   MoneyField,
   scheduleAfterSecondaryTransition,
-  Screen,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
+  SelectableChip,
   Text,
   useReducedMotion,
 } from '@/components';
@@ -145,36 +149,31 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
   }
 
   if (isLoading) {
-    return <Screen style={styles.center}><Text tone="muted">Carregando transferência…</Text></Screen>;
+    return <ScreenState message="Buscando as contas da transferência…" status="loading" title="Carregando transferência" />;
   }
 
   if (loadFailed) {
-    return <Screen style={styles.center}><Text tone="negative">Não foi possível carregar as contas.</Text></Screen>;
+    return <ScreenState actionLabel="Voltar" message="Não foi possível carregar as contas." onAction={onDone} status="error" />;
   }
 
   if (accounts.length < 2) {
     return (
-      <Screen>
+      <ScrollableScreen>
         <View style={styles.unavailable}>
-          <Text variant="heading">Nova transferência</Text>
+          <ScreenHeader onBack={onDone} title="Nova transferência" />
           <Card>
             <Text variant="title">São necessárias duas contas</Text>
             <Text tone="muted">Cadastre outra conta antes de transferir dinheiro.</Text>
           </Card>
           <Button label="Voltar" onPress={onDone} />
         </View>
-      </Screen>
+      </ScrollableScreen>
     );
   }
 
   return (
-    <Screen>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Text variant="heading">{existing ? 'Editar' : 'Nova'} transferência</Text>
+    <ScrollableScreen>
+        <ScreenHeader onBack={onDone} title={`${existing ? 'Editar' : 'Nova'} transferência`} />
         <Card elevated>
           <View style={styles.form}>
             {error ? <Text tone="negative">{error}</Text> : null}
@@ -214,8 +213,7 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>
         </Card>
-      </ScrollView>
-    </Screen>
+    </ScrollableScreen>
   );
 }
 
@@ -235,40 +233,25 @@ function AccountChoices({
     <View>
       <Text tone="muted" variant="caption" style={{ marginBottom: tokens.spacing.sm }}>{label}</Text>
       <FadeSelection selectionKey={selectedId}>
-        <View style={styles.choices}>
+        <ChipGroup accessibilityLabel={label}>
           {accounts.map((account) => {
             const selected = selectedId === account.id;
             return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
+              <SelectableChip
                 key={account.id}
+                label={account.name}
                 onPress={() => onSelect(account.id)}
-                style={[
-                  styles.choice,
-                  {
-                    backgroundColor: selected ? tokens.primary : tokens.surface,
-                    borderColor: selected ? tokens.primary : tokens.border,
-                  },
-                ]}
-              >
-                <Text variant="caption" style={{ color: selected ? tokens.onPrimary : tokens.text }}>
-                  {account.name}
-                </Text>
-              </Pressable>
+                selected={selected}
+              />
             );
           })}
-        </View>
+        </ChipGroup>
       </FadeSelection>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { alignItems: 'center', justifyContent: 'center' },
-  choice: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  content: { gap: 20, paddingVertical: 24 },
   form: { gap: 16 },
   unavailable: { gap: 20, paddingVertical: 24 },
 });

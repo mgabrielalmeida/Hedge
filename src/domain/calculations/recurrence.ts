@@ -58,10 +58,12 @@ function monthlyDates(rule: RecurringRule, endDate: CivilDate): readonly CivilDa
 }
 
 function yearlyDates(rule: RecurringRule, endDate: CivilDate): readonly CivilDate[] {
+  const schedule = rule.schedule;
+  if (schedule.frequency !== 'yearly') return [];
   const start = getCivilDateParts(rule.startDate); const end = getCivilDateParts(endDate); const dates: CivilDate[] = [];
   for (let year = start.year; year <= end.year; year += 1) {
-    const month = rule.schedule.chargeMonth;
-    const date = civilDate(year, month, Math.min(rule.schedule.chargeDay, daysInMonth(year, month)));
+    const month = schedule.chargeMonth;
+    const date = civilDate(year, month, Math.min(schedule.chargeDay, daysInMonth(year, month)));
     if (compareCivilDates(date, rule.startDate) >= 0 && compareCivilDates(date, endDate) <= 0) dates.push(date);
   }
   return dates;

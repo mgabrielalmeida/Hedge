@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Button,
   Card,
+  ChipGroup,
+  EntityVisual,
   FadeSelection,
   getIconDisplayValue,
-  IconGlyph,
+  MoneyText,
+  MonthNavigator,
+  PressableCard,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
-  Screen,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
+  SelectableChip,
   Text,
   useReducedMotion,
 } from '@/components';
@@ -53,23 +60,32 @@ export function DashboardScreen({
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(() => getLocalCivilDate().slice(0, 7));
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [loadedAccounts, loadedCategories, loadedTransactions] = await Promise.all([
-      listAccounts(database),
-      listCategories(database),
-      listTransactions(database),
-    ]);
+    try {
+      const [loadedAccounts, loadedCategories, loadedTransactions] = await Promise.all([
+        listAccounts(database),
+        listCategories(database),
+        listTransactions(database),
+      ]);
 
-    if (loadedAccounts.length === 0) {
-      onNoAccounts();
-      return;
+      if (loadedAccounts.length === 0) {
+        onNoAccounts();
+        return;
+      }
+
+      setAccounts(loadedAccounts);
+      setCategories(loadedCategories);
+      setTransactions(loadedTransactions);
+      setSelectedAccountId((accountId) => accountId ?? loadedAccounts[0].id);
+      setError(null);
+    } catch {
+      setError('Não foi possível carregar sua visão financeira.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setAccounts(loadedAccounts);
-    setCategories(loadedCategories);
-    setTransactions(loadedTransactions);
-    setSelectedAccountId((accountId) => accountId ?? loadedAccounts[0].id);
   }, [database, onNoAccounts]);
 
   useFocusEffect(useCallback(() => (
@@ -84,16 +100,16 @@ export function DashboardScreen({
   const previousMonth = shiftYearMonth(selectedMonth, -1);
   const nextMonth = selectedMonth === currentMonth ? null : shiftYearMonth(selectedMonth, 1);
 
+  if (isLoading) return <ScreenState message="Atualizando seus saldos e orçamentos…" status="loading" title="Carregando visão financeira" />;
+  if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
+
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View>
-          <Text variant="heading">Visão financeira</Text>
-        </View>
+    <ScrollableScreen>
+        <ScreenHeader title="Visão financeira" />
 
         <Card elevated>
           <Text tone="muted" variant="caption">Saldo consolidado</Text>
-          <Text variant="display">{formatBrazilianCurrency(consolidatedBalance)}</Text>
+           <MoneyText cents={consolidatedBalance} variant="display" />
 
           {selectedAccount ? (
             <>
@@ -101,40 +117,22 @@ export function DashboardScreen({
                 <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.md }}>
                   Conta selecionada: {selectedAccount.name}
                 </Text>
-                <Text variant="title">
-                  {formatBrazilianCurrency(
-                    calculateAccountBalance(transactions, selectedAccount.id),
-                  )}
-                </Text>
+                 <MoneyText cents={calculateAccountBalance(transactions, selectedAccount.id)} variant="title" />
               </FadeSelection>
-              <View style={styles.accountChips}>
-                {accounts.map((account) => {
+               <ChipGroup accessibilityLabel="Conta selecionada">
+                 {accounts.map((account) => {
                   const selected = account.id === selectedAccountId;
 
                   return (
-                    <Pressable
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected }}
+                    <SelectableChip
                       key={account.id}
+                      label={account.name}
                       onPress={() => setSelectedAccountId(account.id)}
-                      style={[
-                        styles.accountChip,
-                        {
-                          backgroundColor: selected ? tokens.primaryContainer : tokens.surface,
-                          borderColor: selected ? tokens.primary : tokens.border,
-                        },
-                      ]}
-                    >
-                      <Text
-                        variant="caption"
-                        style={{ color: selected ? tokens.onPrimaryContainer : tokens.text }}
-                      >
-                        {account.name}
-                      </Text>
-                    </Pressable>
+                      selected={selected}
+                    />
                   );
                 })}
-              </View>
+               </ChipGroup>
             </>
           ) : null}
         </Card>
@@ -143,17 +141,11 @@ export function DashboardScreen({
           <Text variant="title">Orçamentos por categoria</Text>
         </View>
 
-        <MonthSelector
-          nextMonth={nextMonth}
-          onNextMonth={() => nextMonth && setSelectedMonth(nextMonth)}
-          onPreviousMonth={() => previousMonth && setSelectedMonth(previousMonth)}
-          previousMonth={previousMonth}
-          selectedMonth={selectedMonth}
-        />
+         <MonthNavigator accessibilityLabel={`Mês selecionado: ${formatYearMonth(selectedMonth)}`} label={formatYearMonth(selectedMonth)} nextDisabled={nextMonth === null} onNext={() => nextMonth && setSelectedMonth(nextMonth)} onPrevious={() => previousMonth && setSelectedMonth(previousMonth)} previousDisabled={previousMonth === null} />
 
         <View style={styles.categoryList}>
           {categories.map((category) => (
-            <Pressable
+            <PressableCard
               accessibilityLabel={`Abrir despesas de ${category.name} em ${formatYearMonth(selectedMonth)}`}
               accessibilityRole="button"
               key={category.id}
@@ -167,7 +159,7 @@ export function DashboardScreen({
                   selectedMonth,
                 )}
               />
-            </Pressable>
+            </PressableCard>
           ))}
         </View>
 
@@ -184,90 +176,7 @@ export function DashboardScreen({
             Cadastre outra conta para fazer transferências.
           </Text>
         ) : null}
-      </ScrollView>
-    </Screen>
-  );
-}
-
-function MonthSelector({
-  nextMonth,
-  onNextMonth,
-  onPreviousMonth,
-  previousMonth,
-  selectedMonth,
-}: {
-  nextMonth: string | null;
-  onNextMonth: () => void;
-  onPreviousMonth: () => void;
-  previousMonth: string | null;
-  selectedMonth: string;
-}) {
-  const { tokens } = useTheme();
-
-  return (
-    <View
-      accessibilityLabel={`Mês selecionado: ${formatYearMonth(selectedMonth)}`}
-      style={[
-        styles.monthSelector,
-        {
-          backgroundColor: tokens.surfaceSubtle,
-          borderColor: tokens.border,
-          borderRadius: tokens.radius.lg,
-        },
-      ]}
-    >
-      <MonthButton
-        accessibilityLabel="Mês anterior"
-        disabled={previousMonth === null}
-        onPress={onPreviousMonth}
-        symbol="‹"
-      />
-      <View style={styles.monthLabel}>
-        <Text variant="body" style={{ fontWeight: '700' }}>
-          {formatYearMonth(selectedMonth)}
-        </Text>
-      </View>
-      <MonthButton
-        accessibilityLabel="Próximo mês"
-        disabled={nextMonth === null}
-        onPress={onNextMonth}
-        symbol="›"
-      />
-    </View>
-  );
-}
-
-function MonthButton({
-  accessibilityLabel,
-  disabled,
-  onPress,
-  symbol,
-}: {
-  accessibilityLabel: string;
-  disabled: boolean;
-  onPress: () => void;
-  symbol: string;
-}) {
-  const { tokens } = useTheme();
-
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.monthButton,
-        {
-          backgroundColor: tokens.surface,
-          borderColor: tokens.border,
-          borderRadius: tokens.radius.pill,
-          opacity: disabled ? 0.42 : pressed ? 0.76 : 1,
-        },
-      ]}
-    >
-      <Text style={{ color: tokens.primary, fontSize: 28, lineHeight: 28 }}>{symbol}</Text>
-    </Pressable>
+    </ScrollableScreen>
   );
 }
 
@@ -292,22 +201,13 @@ function CategoryBudgetCard({
     : `${formatBrazilianCurrency(spendingCents)} gastos · sem orçamento definido`;
 
   return (
-    <Card>
+    <View>
       <View style={styles.categoryHeader}>
-        <View
-          style={[
-            styles.categoryVisual,
-            { backgroundColor: visualColor, borderRadius: tokens.radius.md },
-          ]}
-        >
-          <IconGlyph value={getIconDisplayValue(category.iconValue)} />
-        </View>
+        <EntityVisual color={visualColor} iconValue={getIconDisplayValue(category.iconValue)} size="small" />
         <View style={styles.categoryHeading}>
           <Text variant="title">{category.name}</Text>
         </View>
-        <Text tone="negative" variant="title">
-          {formatBrazilianCurrency(spendingCents)}
-        </Text>
+        <MoneyText cents={spendingCents} tone="negative" variant="title" />
       </View>
 
       <View style={styles.budgetSummary}>
@@ -351,7 +251,7 @@ function CategoryBudgetCard({
       <Text tone="muted" variant="caption" style={styles.budgetDescription}>
         {description}
       </Text>
-    </Card>
+    </View>
   );
 }
 
@@ -366,18 +266,6 @@ function getProgressColor(
 }
 
 const styles = StyleSheet.create({
-  accountChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  accountChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
   budgetDescription: {
     marginTop: 8,
   },
@@ -397,35 +285,6 @@ const styles = StyleSheet.create({
   },
   categoryList: {
     gap: 12,
-  },
-  categoryVisual: {
-    alignItems: 'center',
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  content: {
-    gap: 20,
-    paddingVertical: 24,
-  },
-  monthButton: {
-    alignItems: 'center',
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  monthLabel: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 2,
-  },
-  monthSelector: {
-    alignItems: 'center',
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 8,
   },
   progressBar: {
     height: '100%',

@@ -1,11 +1,8 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
-
 import {
   scheduleAfterSecondaryTransition,
-  Screen,
-  Text,
+  ScreenState,
   useReducedMotion,
 } from '@/components';
 import { findRecurringRuleById } from '@/db/repositories';
@@ -40,11 +37,9 @@ export function RecurringRuleEditorScreen({ onDone, recurringRuleId }: { onDone:
     };
   }, [db, recurringRuleId, reduceMotion]);
 
-  if (isLoading) return <Screen style={styles.center}><Text tone="muted">Carregando recorrência…</Text></Screen>;
-  if (loadFailed) return <Screen style={styles.center}><Text tone="negative">Não foi possível carregar a recorrência.</Text></Screen>;
-  if (!rule?.isActive) return <Screen style={styles.center}><Text tone="negative">Regra recorrente não encontrada.</Text></Screen>;
+  if (isLoading) return <ScreenState message="Buscando os dados da recorrência…" status="loading" title="Carregando recorrência" />;
+  if (loadFailed) return <ScreenState actionLabel="Voltar" message="Não foi possível carregar a recorrência." onAction={onDone} status="error" />;
+  if (!rule?.isActive) return <ScreenState actionLabel="Voltar" message="Regra recorrente não encontrada." onAction={onDone} status="notFound" />;
 
   return <ExpenseScreen deferInitialLoad={false} kind={rule.kind} onDone={onDone} recurringRuleId={recurringRuleId} />;
 }
-
-const styles = StyleSheet.create({ center: { alignItems: 'center', justifyContent: 'center' } });

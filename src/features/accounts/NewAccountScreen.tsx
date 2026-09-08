@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import {
   Button,
   Card,
   scheduleAfterSecondaryTransition,
-  Screen,
-  Text,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
   useReducedMotion,
 } from '@/components';
 import type { Account } from '@/domain';
@@ -27,30 +28,20 @@ export function NewAccountScreen({ onAccountCreated, onCancel }: NewAccountScree
   ), [reduceMotion]);
 
   if (!isReady) {
-    return <Screen style={styles.centered}><Text tone="muted">Carregando formulário…</Text></Screen>;
+    return <ScreenState message="Preparando o formulário da conta…" status="loading" title="Carregando formulário" />;
   }
 
   return (
-    <Screen>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View>
-          <Text variant="heading">Nova conta</Text>
-        </View>
+    <ScrollableScreen>
+        <ScreenHeader onBack={onCancel} title="Nova conta" />
         <Card elevated>
           <AccountForm onSaved={onAccountCreated} />
           <Button label="Cancelar" onPress={onCancel} style={styles.cancel} variant="ghost" />
         </Card>
-      </ScrollView>
-    </Screen>
+    </ScrollableScreen>
   );
 }
 
 const styles = StyleSheet.create({
   cancel: { marginTop: 8 },
-  centered: { alignItems: 'center', justifyContent: 'center' },
-  content: { gap: 24, paddingVertical: 24 },
 });

@@ -1,13 +1,21 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Card,
+  ChipGroup,
+  EmptyStateCard,
   FadeSelection,
+  MoneyText,
+  MonthNavigator,
+  PressableCard,
   scheduleAfterSecondaryTransition,
-  Screen,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
+  SelectableChip,
   SegmentedControl,
   Text,
   useReducedMotion,
@@ -15,7 +23,6 @@ import {
 import { listAccounts, listCategories, listRecurringRules, listTransactions } from '@/db/repositories';
 import { calculateAccountBalance, calculateConsolidatedBalance, formatBrazilianCurrency, formatCivilDate } from '@/domain';
 import type { Account, Category, RecurringRule, Transaction, TransferTransaction, YearMonth } from '@/domain';
-import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 import { formatYearMonth, shiftYearMonth } from './monthNavigation';
@@ -60,6 +67,7 @@ export function TransactionsHomeScreen({
   const [historyType, setHistoryType] = useState<HistoryType>('transactions');
   const [selectedMonth, setSelectedMonth] = useState<YearMonth>(() => getLocalCivilDate().slice(0, 7));
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -81,6 +89,8 @@ export function TransactionsHomeScreen({
       setError(null);
     } catch {
       setError('Não foi possível carregar o histórico.');
+    } finally {
+      setIsLoading(false);
     }
   }, [db, onNoAccounts]);
 
@@ -102,7 +112,8 @@ export function TransactionsHomeScreen({
   });
   const visibleRecurringRules = recurringRules.filter((rule) => (
     (selectedAccountId === null || rule.accountId === selectedAccountId) &&
-    rule.startDate.slice(0, 7) === selectedMonth
+    rule.startDate.slice(0, 7) <= selectedMonth &&
+    (rule.endDate === null || rule.endDate.slice(0, 7) >= selectedMonth)
   ));
   const transactionGroups = groupByDate(visibleTransactions.map((item) => ({ date: item.transactionDate, item })));
   const recurringRuleGroups = groupByDate(visibleRecurringRules.map((item) => ({ date: item.startDate, item })));
@@ -110,24 +121,24 @@ export function TransactionsHomeScreen({
     ? calculateAccountBalance(transactions, selectedAccount.id)
     : calculateConsolidatedBalance(transactions);
 
+  if (isLoading) return <ScreenState message="Buscando lançamentos e recorrências…" status="loading" title="Carregando histórico" />;
+  if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
+
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View>
-          <Text variant="heading">Histórico</Text>
-        </View>
+    <ScrollableScreen>
+        <ScreenHeader title="Histórico" />
         <Card>
           <FadeSelection selectionKey={selectedAccountId ?? 'all'}>
             <Text tone="muted" variant="caption">{selectedAccount ? 'Saldo atual' : 'Saldo consolidado'}</Text>
             <Text variant="title">{selectedAccount?.name ?? 'Todas as contas'}</Text>
-            <Text variant="heading">{formatBrazilianCurrency(displayedBalance)}</Text>
+            <MoneyText cents={displayedBalance} variant="heading" />
           </FadeSelection>
-          <View style={styles.accounts}>
-            <AccountChoice label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
+          <ChipGroup accessibilityLabel="Conta do histórico">
+            <SelectableChip label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
             {accounts.map((account) => (
-              <AccountChoice key={account.id} label={account.name} onPress={() => setSelectedAccountId(account.id)} selected={account.id === selectedAccountId} />
+              <SelectableChip key={account.id} label={account.name} onPress={() => setSelectedAccountId(account.id)} selected={account.id === selectedAccountId} />
             ))}
-          </View>
+          </ChipGroup>
         </Card>
         <SegmentedControl
           accessibilityLabel="Tipo de histórico"
@@ -136,30 +147,23 @@ export function TransactionsHomeScreen({
           value={historyType}
         />
         <MonthFilter month={selectedMonth} onChange={setSelectedMonth} />
-        {error ? <Text tone="negative">{error}</Text> : null}
         <View style={styles.list}>
           {historyType === 'recurring' ? recurringRuleGroups.length === 0 ? (
-            <Card><Text tone="muted">Nenhuma regra recorrente neste mês.</Text></Card>
+            <EmptyStateCard message="Nenhuma regra recorrente está ativa neste mês." />
           ) : recurringRuleGroups.map((group) => (
             <HistoryDateGroup date={group.date} key={group.date}>
               {group.items.map((rule) => (
-                <Pressable key={rule.id} onPress={() => onEditRecurringRule(rule.id)}>
+                <PressableCard accessibilityLabel={`Editar recorrência ${rule.name}`} key={rule.id} onPress={() => onEditRecurringRule(rule.id)}>
                   <RecurringRuleCard accounts={accounts} categories={categories} rule={rule} />
-                </Pressable>
+                </PressableCard>
               ))}
             </HistoryDateGroup>
           )) : visibleTransactions.length === 0 ? (
-            <Card>
-              <Text tone="muted">
-                {historyType === 'transfers'
-                  ? 'Nenhuma transferência registrada neste mês.'
-                  : 'Nenhum lançamento registrado neste mês.'}
-              </Text>
-            </Card>
+            <EmptyStateCard message={historyType === 'transfers' ? 'Nenhuma transferência registrada neste mês.' : 'Nenhum lançamento registrado neste mês.'} />
           ) : transactionGroups.map((group) => (
             <HistoryDateGroup date={group.date} key={group.date}>
               {group.items.map((transaction) => (
-                <Pressable key={transaction.id} onPress={() => onEditTransaction(transaction.id)}>
+                <PressableCard accessibilityLabel={`Editar lançamento ${transaction.name}`} key={transaction.id} onPress={() => onEditTransaction(transaction.id)}>
                   {transaction.kind === 'transfer' ? (
                     <TransferCard accounts={accounts} transaction={transaction} />
                   ) : transaction.kind === 'expense' || transaction.kind === 'income' ? (
@@ -168,48 +172,21 @@ export function TransactionsHomeScreen({
                       transaction={transaction}
                     />
                   ) : null}
-                </Pressable>
+                </PressableCard>
               ))}
             </HistoryDateGroup>
           ))}
         </View>
-      </ScrollView>
-    </Screen>
+    </ScrollableScreen>
   );
 }
 
 function MonthFilter({ month, onChange }: { month: YearMonth; onChange: (month: YearMonth) => void }) {
-  const { tokens } = useTheme();
   const previousMonth = shiftYearMonth(month, -1);
   const currentMonth = getLocalCivilDate().slice(0, 7);
   const nextMonth = month === currentMonth ? null : shiftYearMonth(month, 1);
 
-  return (
-    <View accessibilityLabel={`Mês selecionado: ${formatYearMonth(month)}`} style={[styles.monthFilter, { borderColor: tokens.border }]}>
-      <Pressable
-        accessibilityLabel="Mês anterior"
-        accessibilityRole="button"
-        disabled={previousMonth === null}
-        onPress={() => previousMonth && onChange(previousMonth)}
-        style={({ pressed }) => [styles.monthButton, { opacity: pressed ? 0.7 : previousMonth === null ? 0.4 : 1 }]}
-      >
-        <Text style={{ color: tokens.primary, fontSize: 22 }}>‹</Text>
-      </Pressable>
-      <View style={styles.monthLabel}>
-        <Text tone="muted" variant="caption">Mês</Text>
-        <Text variant="title">{formatYearMonth(month)}</Text>
-      </View>
-      <Pressable
-        accessibilityLabel="Próximo mês"
-        accessibilityRole="button"
-        disabled={nextMonth === null}
-        onPress={() => nextMonth && onChange(nextMonth)}
-        style={({ pressed }) => [styles.monthButton, { opacity: pressed ? 0.7 : nextMonth === null ? 0.4 : 1 }]}
-      >
-        <Text style={{ color: tokens.primary, fontSize: 22 }}>›</Text>
-      </Pressable>
-    </View>
-  );
+  return <MonthNavigator accessibilityLabel={`Mês selecionado: ${formatYearMonth(month)}`} label={formatYearMonth(month)} nextDisabled={nextMonth === null} onNext={() => nextMonth && onChange(nextMonth)} onPrevious={() => previousMonth && onChange(previousMonth)} previousDisabled={previousMonth === null} />;
 }
 
 function HistoryDateGroup({ children, date }: { children: ReactNode; date: string }) {
@@ -235,31 +212,17 @@ function groupByDate<T>(items: readonly DatedItem<T>[]): readonly DateGroup<T>[]
     .map(([date, groupedItems]) => ({ date, items: groupedItems }));
 }
 
-function AccountChoice({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
-  const { tokens } = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.account, { borderColor: selected ? tokens.primary : tokens.border }]}
-    >
-      <Text variant="caption">{label}</Text>
-    </Pressable>
-  );
-}
-
 function TransactionCard({ category, transaction }: { category: Category | null; transaction: Transaction }) {
   const income = transaction.kind === 'income';
   return (
-    <Card>
+    <View>
       <Text variant="title">{transaction.name}</Text>
       <Text tone={income ? 'positive' : 'negative'}>{formatBrazilianCurrency(transaction.amountCents)}</Text>
       <Text tone="muted" variant="caption">
-        {formatCivilDate(transaction.transactionDate)}
-        {transaction.kind === 'expense' ? ` · ${category ? category.name : 'Sem categoria'}` : ''}
+       {formatCivilDate(transaction.transactionDate)}
+        {transaction.kind === 'expense' ? ` · ${category ? category.name : 'Categoria excluída'}` : ''}
       </Text>
-    </Card>
+    </View>
   );
 }
 
@@ -267,11 +230,11 @@ function TransferCard({ accounts, transaction }: { accounts: readonly Account[];
   const source = accounts.find((item) => item.id === transaction.accountId)?.name ?? 'Conta indisponível';
   const destination = accounts.find((item) => item.id === transaction.destinationAccountId)?.name ?? 'Conta indisponível';
   return (
-    <Card>
+    <View>
       <Text variant="title">{source} → {destination}</Text>
       <Text tone="info">{formatBrazilianCurrency(Math.abs(transaction.amountCents))}</Text>
       <Text tone="muted" variant="caption">{formatCivilDate(transaction.transactionDate)}</Text>
-    </Card>
+    </View>
   );
 }
 
@@ -285,7 +248,7 @@ function RecurringRuleCard({ accounts, categories, rule }: {
     ? null
     : categories.find((item) => item.id === rule.categoryId)?.name ?? 'Categoria excluída';
   return (
-    <Card>
+    <View>
       <Text variant="title">{rule.name}</Text>
       <Text tone={rule.kind === 'income' ? 'positive' : 'negative'}>
         {formatBrazilianCurrency(rule.amountCents)}
@@ -296,7 +259,7 @@ function RecurringRuleCard({ accounts, categories, rule }: {
       <Text tone="muted" variant="caption">
         Desde {formatCivilDate(rule.startDate)}{rule.endDate ? ` até ${formatCivilDate(rule.endDate)}` : ''}
       </Text>
-    </Card>
+    </View>
   );
 }
 
@@ -310,14 +273,8 @@ function formatRecurringSchedule(rule: RecurringRule): string {
 }
 
 const styles = StyleSheet.create({
-  account: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
-  accounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  content: { gap: 18, paddingVertical: 24 },
   dateGroup: { gap: 8 },
   dateGroupItems: { gap: 10 },
   dateHeading: { fontWeight: '600', paddingHorizontal: 4 },
   list: { gap: 10 },
-  monthButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, width: 48 },
-  monthFilter: { alignItems: 'center', borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between' },
-  monthLabel: { alignItems: 'center', flex: 1, gap: 2, paddingVertical: 8 },
 });

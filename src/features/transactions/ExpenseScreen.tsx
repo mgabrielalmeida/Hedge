@@ -1,16 +1,22 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import {
   Button,
+  ChipGroup,
   Card,
   DatePickerField,
   FadeSelection,
   Field,
+  getIconDisplayValue,
+  IconGlyph,
   MoneyField,
   scheduleAfterSecondaryTransition,
-  Screen,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
+  SelectableChip,
   Text,
   useReducedMotion,
 } from '@/components';
@@ -37,7 +43,6 @@ import {
   validateRequiredText,
 } from '@/domain';
 import type { Account, Category, RecurringFrequency, RecurringRule, Transaction } from '@/domain';
-import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 type ExpenseScreenProps = {
@@ -67,7 +72,6 @@ export function ExpenseScreen({
 }: ExpenseScreenProps) {
   const db = useSQLiteContext();
   const reduceMotion = useReducedMotion();
-  const { tokens } = useTheme();
   const initialDate = getLocalCivilDate();
   const initialDateParts = getCivilDateParts(initialDate);
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
@@ -226,7 +230,7 @@ export function ExpenseScreen({
   }
 
   if (isLoading) {
-    return <Screen style={styles.center}><Text tone="muted">Carregando formulário…</Text></Screen>;
+    return <ScreenState message="Preparando o formulário do lançamento…" status="loading" title="Carregando formulário" />;
   }
 
   const isEditing = existingTransaction !== null || existingRule !== null;
@@ -238,13 +242,8 @@ export function ExpenseScreen({
   const accountIsMissing = accountId === null;
   const categoryIsMissing = categoryId === null;
   return (
-    <Screen>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Text variant="heading">{title}</Text>
+    <ScrollableScreen>
+        <ScreenHeader onBack={onDone} title={title} />
         <Card elevated>
           <View style={styles.form}>
             {error ? <Text tone="negative" variant="caption">{error}</Text> : null}
@@ -253,11 +252,11 @@ export function ExpenseScreen({
             <DatePickerField error={showRequiredErrors && dateIsMissing ? 'Obrigatório' : undefined} label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChange={setDate} value={date} />
             <Text tone={showRequiredErrors && accountIsMissing ? 'negative' : 'muted'} variant="caption">Conta</Text>
             <FadeSelection selectionKey={accountId}>
-              <View style={[styles.choices, showRequiredErrors && accountIsMissing ? [styles.requiredChoices, { borderColor: tokens.negative }] : null]}>{accounts.map((account) => <Choice key={account.id} label={account.name} onPress={() => setAccountId(account.id)} selected={accountId === account.id} />)}</View>
+              <ChipGroup accessibilityLabel="Conta" error={showRequiredErrors && accountIsMissing}>{accounts.map((account) => <SelectableChip key={account.id} label={account.name} onPress={() => setAccountId(account.id)} selected={accountId === account.id} />)}</ChipGroup>
             </FadeSelection>
-            {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><View style={[styles.choices, showRequiredErrors && categoryIsMissing ? [styles.requiredChoices, { borderColor: tokens.negative }] : null]}>{categories.map((category) => <Choice key={category.id} label={`${category.iconValue} ${category.name}`} onPress={() => setCategoryId(category.id)} selected={categoryId === category.id} />)}</View></> : null}
+            {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><ChipGroup accessibilityLabel="Categoria" error={showRequiredErrors && categoryIsMissing}>{categories.map((category) => <SelectableChip icon={<IconGlyph size={16} value={getIconDisplayValue(category.iconValue)} />} key={category.id} label={category.name} onPress={() => setCategoryId(category.id)} selected={categoryId === category.id} />)}</ChipGroup></> : null}
             <Field label="Descrição (opcional)" onChangeText={setDescription} value={description} placeholder="Adicionar observação" multiline />
-            {transactionId === undefined && recurringRuleId === undefined ? <><Text tone="muted" variant="caption">Regra recorrente (opcional)</Text><View style={styles.choices}><Choice label="Não se repete" onPress={() => setRecurrenceEnabled(false)} selected={!recurrenceEnabled} /><Choice label="Configurar recorrência" onPress={() => setRecurrenceEnabled(true)} selected={recurrenceEnabled} /></View></> : null}
+            {transactionId === undefined && recurringRuleId === undefined ? <><Text tone="muted" variant="caption">Regra recorrente (opcional)</Text><ChipGroup accessibilityLabel="Regra recorrente"><SelectableChip label="Não se repete" onPress={() => setRecurrenceEnabled(false)} selected={!recurrenceEnabled} /><SelectableChip label="Configurar recorrência" onPress={() => setRecurrenceEnabled(true)} selected={recurrenceEnabled} /></ChipGroup></> : null}
             {recurrenceEnabled ? <RecurrenceFields chargeDay={chargeDay} chargeMonth={chargeMonth} endDate={endDate} frequency={frequency} onChargeDayChange={setChargeDay} onChargeMonthChange={setChargeMonth} onEndDateChange={setEndDate} onFrequencyChange={(nextFrequency) => {
               setFrequency(nextFrequency);
               if (nextFrequency === 'weekly') setChargeDay(String(getMondayBasedWeekday(civilDateOrToday(date))));
@@ -273,8 +272,7 @@ export function ExpenseScreen({
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>
         </Card>
-      </ScrollView>
-    </Screen>
+    </ScrollableScreen>
   );
 }
 
@@ -292,17 +290,12 @@ function RecurrenceFields({ chargeDay, chargeMonth, endDate, frequency, onCharge
     <View style={styles.recurrence}>
       <Text variant="title">Configuração da recorrência</Text>
       <Text tone="muted" variant="caption">Frequência</Text>
-      <View style={styles.choices}><Choice label="Semanal" onPress={() => onFrequencyChange('weekly')} selected={frequency === 'weekly'} /><Choice label="Mensal" onPress={() => onFrequencyChange('monthly')} selected={frequency === 'monthly'} /><Choice label="Anual" onPress={() => onFrequencyChange('yearly')} selected={frequency === 'yearly'} /></View>
-      {frequency === 'weekly' ? <><Text tone="muted" variant="caption">Dia da semana</Text><View style={styles.choices}>{weekdays.map(([label, value]) => <Choice key={value} label={label} onPress={() => onChargeDayChange(String(value))} selected={chargeDay === String(value)} />)}</View></> : <Field helperText="Dias inexistentes serão ajustados para o último dia do mês." keyboardType="number-pad" label="Dia da cobrança" maxLength={2} onChangeText={onChargeDayChange} placeholder="1 a 31" value={chargeDay} />}
+      <ChipGroup accessibilityLabel="Frequência"><SelectableChip label="Semanal" onPress={() => onFrequencyChange('weekly')} selected={frequency === 'weekly'} /><SelectableChip label="Mensal" onPress={() => onFrequencyChange('monthly')} selected={frequency === 'monthly'} /><SelectableChip label="Anual" onPress={() => onFrequencyChange('yearly')} selected={frequency === 'yearly'} /></ChipGroup>
+      {frequency === 'weekly' ? <><Text tone="muted" variant="caption">Dia da semana</Text><ChipGroup accessibilityLabel="Dia da semana">{weekdays.map(([label, value]) => <SelectableChip key={value} label={label} onPress={() => onChargeDayChange(String(value))} selected={chargeDay === String(value)} />)}</ChipGroup></> : <Field helperText="Dias inexistentes serão ajustados para o último dia do mês." keyboardType="number-pad" label="Dia da cobrança" maxLength={2} onChangeText={onChargeDayChange} placeholder="1 a 31" value={chargeDay} />}
       {frequency === 'yearly' ? <Field keyboardType="number-pad" label="Mês da cobrança" maxLength={2} onChangeText={onChargeMonthChange} placeholder="1 a 12" value={chargeMonth} /> : null}
       <DatePickerField allowClear label="Data final" onChange={onEndDateChange} value={endDate} />
     </View>
   );
-}
-
-function Choice({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
-  const { tokens } = useTheme();
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.choice, { backgroundColor: selected ? tokens.primary : tokens.surface, borderColor: selected ? tokens.primary : tokens.border }]}><Text variant="caption" style={{ color: selected ? tokens.onPrimary : tokens.text }}>{label}</Text></Pressable>;
 }
 
 function parsePositiveInteger(value: string): number | null {
@@ -317,11 +310,6 @@ function civilDateOrToday(value: string) {
 }
 
 const styles = StyleSheet.create({
-  center: { alignItems: 'center', justifyContent: 'center' },
-  choice: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  content: { gap: 20, paddingVertical: 24 },
   form: { gap: 16 },
   recurrence: { gap: 14 },
-  requiredChoices: { borderRadius: 8, borderWidth: 1, padding: 8 },
 });

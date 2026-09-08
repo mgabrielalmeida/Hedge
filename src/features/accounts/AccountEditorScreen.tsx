@@ -1,13 +1,14 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import {
   Button,
   Card,
   scheduleAfterSecondaryTransition,
-  Screen,
-  Text,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
   useReducedMotion,
 } from '@/components';
 import { archiveAccount, findAccountById, getAccountBalance } from '@/db/repositories';
@@ -56,25 +57,17 @@ export function AccountEditorScreen({ accountId, onDone }: AccountEditorScreenPr
 
   if (error) {
     return (
-      <Screen style={styles.centered}>
-        <Text tone="negative">{error}</Text>
-        <Button label="Voltar" onPress={onDone} style={styles.back} variant="ghost" />
-      </Screen>
+      <ScreenState actionLabel="Voltar" message={error} onAction={onDone} status="error" />
     );
   }
 
   if (!data) {
-    return <Screen style={styles.centered}><Text tone="muted">Carregando conta…</Text></Screen>;
+    return <ScreenState message="Buscando os dados da conta…" status="loading" title="Carregando conta" />;
   }
 
   return (
-    <Screen>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Text variant="heading">Editar conta</Text>
+    <ScrollableScreen>
+        <ScreenHeader onBack={onDone} title="Editar conta" />
         <Card elevated>
           <View style={styles.form}>
             <AccountForm
@@ -97,14 +90,10 @@ export function AccountEditorScreen({ accountId, onDone }: AccountEditorScreenPr
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>
         </Card>
-      </ScrollView>
-    </Screen>
+    </ScrollableScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { marginTop: 8 },
-  centered: { alignItems: 'center', justifyContent: 'center' },
-  content: { gap: 20, paddingVertical: 24 },
   form: { gap: 8 },
 });

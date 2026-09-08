@@ -1,11 +1,12 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   ACCOUNT_ICON_OPTIONS,
   getIconDisplayValue,
   Button,
+  ChipGroup,
   DatePickerField,
   FadeSelection,
   Field,
@@ -13,6 +14,7 @@ import {
   Text,
   VisualPicker,
   resolveThemeColorValue,
+  SelectableChip,
 } from '@/components';
 import { createAccount, updateAccountWithBalance } from '@/db/repositories';
 import { formatBrazilianMoneyInput, parseMoneyInput, validateRequiredText } from '@/domain';
@@ -122,16 +124,16 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
       <View>
         <Text variant="caption" style={[styles.label, { color: tokens.textMuted }]}>Banco ou instituição</Text>
         <FadeSelection selectionKey={bank}>
-          <View style={styles.options}>
+          <ChipGroup accessibilityLabel="Banco ou instituição">
             {BANK_OPTIONS.map((option) => (
-              <Choice
+              <SelectableChip
                 key={option}
                 label={option}
                 onPress={() => setBank(option)}
                 selected={bank === option}
               />
             ))}
-          </View>
+          </ChipGroup>
         </FadeSelection>
       </View>
 
@@ -183,28 +185,6 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
   );
 }
 
-function Choice({ accessibilityLabel, label, onPress, selected }: { accessibilityLabel?: string; label: string; onPress: () => void; selected: boolean }) {
-  const { tokens } = useTheme();
-
-  return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[
-        styles.choice,
-        {
-          backgroundColor: selected ? tokens.primary : tokens.surface,
-          borderColor: selected ? tokens.primary : tokens.border,
-          borderRadius: tokens.radius.pill,
-        },
-      ]}
-    >
-      <Text variant="caption" style={{ color: selected ? tokens.onPrimary : tokens.text }}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function getInitialBank(account?: Account): (typeof BANK_OPTIONS)[number] | null {
   if (!account) return null;
   return BANK_OPTIONS.find((option) => (
@@ -213,9 +193,7 @@ function getInitialBank(account?: Account): (typeof BANK_OPTIONS)[number] | null
 }
 
 const styles = StyleSheet.create({
-  choice: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   form: { gap: 18 },
   label: { marginBottom: 8 },
-  options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   submit: { marginTop: 6 },
 });

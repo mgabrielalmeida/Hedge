@@ -1,16 +1,18 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Button,
-  Card,
+  EntityVisual,
   getIconDisplayValue,
-  IconGlyph,
+  PressableCard,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
-  Screen,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
   Text,
   useReducedMotion,
 } from '@/components';
@@ -27,7 +29,6 @@ type AccountsHomeScreenProps = {
 export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccounts }: AccountsHomeScreenProps) {
   const database = useSQLiteContext();
   const reduceMotion = useReducedMotion();
-  const { tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[] | null>(null);
   const [error, setError] = useState(false);
 
@@ -48,75 +49,53 @@ export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccount
     scheduleAfterSecondaryTransition(() => void loadAccounts(), reduceMotion === false)
   ), [loadAccounts, reduceMotion]));
 
-  if (accounts === null) {
-    return (
-      <Screen style={styles.centered}>
-        <ActivityIndicator color={tokens.primary} size="large" />
-      </Screen>
-    );
-  }
-
   if (error) {
     return (
-      <Screen style={styles.centered}>
-        <Text variant="title">Não foi possível carregar suas contas</Text>
-        <Button label="Tentar novamente" onPress={() => void loadAccounts()} style={{ marginTop: tokens.spacing.lg }} />
-      </Screen>
+      <ScreenState actionLabel="Tentar novamente" message="Não foi possível carregar suas contas." onAction={() => void loadAccounts()} status="error" />
     );
   }
 
+  if (accounts === null) return <ScreenState message="Buscando suas contas…" status="loading" title="Carregando contas" />;
+
   return (
-    <Screen>
+    <ScrollableScreen>
       <View style={styles.content}>
-        <View>
-          <Text variant="heading">Suas contas</Text>
-        </View>
+        <ScreenHeader title="Suas contas" />
         <View style={styles.list}>
           {accounts.map((account) => (
-            <Pressable
+            <PressableCard
               accessibilityLabel={`Editar conta ${account.name}`}
-              accessibilityRole="button"
               key={account.id}
               onPress={() => onEditAccount(account.id)}
             >
               <AccountCard account={account} />
-            </Pressable>
+            </PressableCard>
           ))}
         </View>
         <Button label="Adicionar conta" onPress={onCreateAccount} />
       </View>
-    </Screen>
+    </ScrollableScreen>
   );
 }
 
 function AccountCard({ account }: { account: Account }) {
   const { tokens } = useTheme();
   return (
-    <Card>
+    <View>
       <View style={styles.accountRow}>
-        <View style={[
-          styles.indicator,
-          {
-            backgroundColor: resolveThemeColorValue(account.colorValue, account.themeColorIndex, tokens.primary),
-            borderRadius: tokens.radius.md,
-          },
-        ]}>
-          <IconGlyph value={getIconDisplayValue(account.iconValue)} />
-        </View>
+        <EntityVisual color={resolveThemeColorValue(account.colorValue, account.themeColorIndex, tokens.primary)} iconValue={getIconDisplayValue(account.iconValue)} />
         <View style={styles.accountText}>
           <Text variant="title">{account.name}</Text>
           <Text tone="muted" variant="caption">{account.institutionName}</Text>
         </View>
       </View>
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   accountRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   accountText: { flex: 1 },
-  centered: { alignItems: 'center', justifyContent: 'center' },
-  content: { flex: 1, gap: 24, justifyContent: 'center' },
-  indicator: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
+  content: { gap: 24 },
   list: { gap: 12 },
 });

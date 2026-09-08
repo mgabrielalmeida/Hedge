@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Svg, { Circle, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 
 import {
   Card,
+  EmptyStateCard,
+  EntityVisual,
   getIconDisplayValue,
-  IconGlyph,
+  MoneyText,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
-  Screen,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
   Text,
   useReducedMotion,
 } from '@/components';
@@ -40,7 +44,6 @@ type LoadedData = {
 
 const chartMonthCount = 6;
 const CHART_DRAW_DURATION = 900;
-const BACK_BUTTON_HIT_SLOP = { bottom: 8, left: 8, right: 8, top: 8 } as const;
 
 export function CategorySpendingScreen({
   categoryId,
@@ -109,84 +112,33 @@ export function CategorySpendingScreen({
     ? calculateCategoryMonthlySpending(data.transactions, data.category.id, selectedMonth)
     : 0;
 
-  return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <BackButton onPress={onBack} />
-
-        {data && selectedMonth ? (
-          <>
-            <View style={styles.titleRow}>
-              <View
-                style={[
-                  styles.categoryVisual,
-                  { backgroundColor: categoryColor, borderRadius: tokens.radius.md },
-                ]}
-              >
-                <IconGlyph value={getIconDisplayValue(data.category.iconValue)} />
-              </View>
-              <View style={styles.titleText}>
-                <Text variant="heading">{data.category.name}</Text>
-                <Text tone="muted">{formatYearMonth(selectedMonth)}</Text>
-              </View>
-            </View>
-
-            <Card elevated>
-              <Text tone="muted" variant="caption">Total no mês</Text>
-              <Text variant="display">{formatBrazilianCurrency(selectedMonthSpending)}</Text>
-            </Card>
-
-            {history ? (
-              <CategorySpendingChart
-                accounts={data.accounts}
-                categoryColor={categoryColor}
-                history={history}
-              />
-            ) : null}
-
-            <View style={styles.sectionHeading}>
-              <Text variant="title">Despesas do mês</Text>
-              <Text tone="muted" variant="caption">
-                {expenses.length === 1 ? '1 lançamento' : `${expenses.length} lançamentos`}
-              </Text>
-            </View>
-
-            <View style={styles.expenseList}>
-              {expenses.length === 0 ? (
-                <Card>
-                  <Text tone="muted">Nenhuma despesa nesta categoria durante o mês.</Text>
-                </Card>
-              ) : expenses.map((expense) => (
-                <ExpenseCard accounts={data.accounts} expense={expense} key={expense.id} />
-              ))}
-            </View>
-          </>
-        ) : error ? (
-          <Card>
-            <Text tone="negative">{error}</Text>
-          </Card>
-        ) : (
-          <Text tone="muted">Carregando despesas…</Text>
-        )}
-      </ScrollView>
-    </Screen>
-  );
-}
-
-function BackButton({ onPress }: { onPress: () => void }) {
-  const { tokens } = useTheme();
+  if (error) return <ScreenState actionLabel="Voltar" message={error} onAction={onBack} status="error" />;
+  if (!data || !selectedMonth) return <ScreenState message="Buscando as despesas da categoria…" status="loading" title="Carregando despesas" />;
 
   return (
-    <Pressable
-      accessibilityLabel="Voltar para a tela inicial"
-      accessibilityRole="button"
-      hitSlop={BACK_BUTTON_HIT_SLOP}
-      onPress={onPress}
-      style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.68 : 1 }]}
-    >
-      <Text style={{ color: tokens.primary, fontSize: 28, lineHeight: 28 }}>‹</Text>
-      <Text style={{ color: tokens.primary, fontWeight: '600' }}>Voltar</Text>
-    </Pressable>
+    <ScrollableScreen contentContainerStyle={styles.content}>
+      <ScreenHeader
+        description={formatYearMonth(selectedMonth)}
+        onBack={onBack}
+        title={data.category.name}
+        trailing={<EntityVisual color={categoryColor} iconValue={getIconDisplayValue(data.category.iconValue)} size="large" />}
+      />
+      <Card elevated>
+        <Text tone="muted" variant="caption">Total no mês</Text>
+        <MoneyText cents={selectedMonthSpending} variant="display" />
+      </Card>
+
+      {history ? <CategorySpendingChart accounts={data.accounts} categoryColor={categoryColor} history={history} /> : null}
+
+      <View style={styles.sectionHeading}>
+        <Text variant="title">Despesas do mês</Text>
+        <Text tone="muted" variant="caption">{expenses.length === 1 ? '1 lançamento' : `${expenses.length} lançamentos`}</Text>
+      </View>
+
+      <View style={styles.expenseList}>
+        {expenses.length === 0 ? <EmptyStateCard message="Nenhuma despesa nesta categoria durante o mês." /> : expenses.map((expense) => <ExpenseCard accounts={data.accounts} expense={expense} key={expense.id} />)}
+      </View>
+    </ScrollableScreen>
   );
 }
 
@@ -416,18 +368,7 @@ function CategorySpendingChart({
               )}
             </Svg>
             <View style={styles.legendAccount}>
-              <View
-                style={[
-                  styles.legendIcon,
-                  {
-                    backgroundColor: item.accountColor,
-                    borderColor: tokens.border,
-                    borderRadius: tokens.radius.sm,
-                  },
-                ]}
-              >
-                <IconGlyph size={15} value={getIconDisplayValue(item.account.iconValue)} />
-              </View>
+              <EntityVisual color={item.accountColor} iconValue={getIconDisplayValue(item.account.iconValue)} size="small" />
               <Text variant="caption">{item.account.name}</Text>
             </View>
           </View>
@@ -536,19 +477,6 @@ function formatMonthTick(yearMonth: YearMonth): string {
 }
 
 const styles = StyleSheet.create({
-  backButton: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    gap: 6,
-    minHeight: 44,
-  },
-  categoryVisual: {
-    alignItems: 'center',
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
   chartContainer: {
     minHeight: 228,
     marginTop: 12,
@@ -560,11 +488,7 @@ const styles = StyleSheet.create({
   chartSubtitle: {
     marginTop: 2,
   },
-  content: {
-    gap: 20,
-    paddingBottom: 32,
-    paddingTop: 8,
-  },
+  content: { paddingBottom: 32 },
   expenseAmount: {
     fontWeight: '600',
   },
@@ -595,7 +519,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   legendAccount: { alignItems: 'center', flexDirection: 'row', gap: 4 },
-  legendIcon: { alignItems: 'center', borderWidth: 1, height: 24, justifyContent: 'center', width: 24 },
   sectionHeading: {
     alignItems: 'flex-end',
     flexDirection: 'row',
@@ -606,13 +529,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'absolute',
     top: 0,
-  },
-  titleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-  },
-  titleText: {
-    flex: 1,
   },
 });

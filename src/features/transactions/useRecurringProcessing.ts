@@ -40,14 +40,17 @@ export function useRecurringProcessing(): RecurringProcessingState {
 
   useEffect(() => {
     let active = true;
-    void processToday().finally(() => {
-      if (active) setIsInitialProcessingComplete(true);
-    });
+    const initialProcessing = setTimeout(() => {
+      void processToday().finally(() => {
+        if (active) setIsInitialProcessingComplete(true);
+      });
+    }, 0);
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void processToday();
     });
     return () => {
       active = false;
+      clearTimeout(initialProcessing);
       subscription.remove();
     };
   }, [processToday]);

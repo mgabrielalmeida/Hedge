@@ -1,11 +1,8 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
-
 import {
   scheduleAfterSecondaryTransition,
-  Screen,
-  Text,
+  ScreenState,
   useReducedMotion,
 } from '@/components';
 import { findTransactionById } from '@/db/repositories';
@@ -42,13 +39,13 @@ export function TransactionEditorScreen({ onDone, transactionId }: { onDone: () 
   }, [db, reduceMotion, transactionId]);
 
   if (isLoading) {
-    return <Screen style={styles.center}><Text tone="muted">Carregando lançamento…</Text></Screen>;
+    return <ScreenState message="Buscando os dados do lançamento…" status="loading" title="Carregando lançamento" />;
   }
   if (loadFailed) {
-    return <Screen style={styles.center}><Text tone="negative">Não foi possível carregar o lançamento.</Text></Screen>;
+    return <ScreenState actionLabel="Voltar" message="Não foi possível carregar o lançamento." onAction={onDone} status="error" />;
   }
   if (!transaction) {
-    return <Screen style={styles.center}><Text tone="negative">Lançamento não encontrado.</Text></Screen>;
+    return <ScreenState actionLabel="Voltar" message="Lançamento não encontrado." onAction={onDone} status="notFound" />;
   }
   if (transaction.kind === 'transfer') {
     return <TransferScreen deferInitialLoad={false} onDone={onDone} transactionId={transactionId} />;
@@ -56,7 +53,5 @@ export function TransactionEditorScreen({ onDone, transactionId }: { onDone: () 
   if (transaction.kind === 'expense' || transaction.kind === 'income') {
     return <ExpenseScreen deferInitialLoad={false} kind={transaction.kind} onDone={onDone} transactionId={transactionId} />;
   }
-  return <Screen style={styles.center}><Text tone="muted">Este lançamento não pode ser editado por esta tela.</Text></Screen>;
+  return <ScreenState actionLabel="Voltar" message="Este lançamento não pode ser editado por esta tela." onAction={onDone} status="empty" />;
 }
-
-const styles = StyleSheet.create({ center: { alignItems: 'center', justifyContent: 'center' } });

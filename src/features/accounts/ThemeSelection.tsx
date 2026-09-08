@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@/components';
+import { Button, Card, ScreenHeader, ScrollableScreen, Text } from '@/components';
 import {
   getThemeTokens,
   THEME_OPTIONS,
@@ -64,16 +64,8 @@ export function ThemeSelection({
   }
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View>
-          <Text variant="heading">{title}</Text>
-          {showDescription ? (
-            <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
-              Personalize as cores e escolha como o Hedge acompanha a aparência do aparelho.
-            </Text>
-          ) : null}
-        </View>
+    <ScrollableScreen contentContainerStyle={styles.content}>
+        <ScreenHeader description={showDescription ? 'Personalize as cores e escolha como o Hedge acompanha a aparência do aparelho.' : undefined} title={title} />
 
         <View style={styles.section}>
           <Text variant="title">Paleta</Text>
@@ -157,8 +149,7 @@ export function ThemeSelection({
 
         {error ? <Text tone="warning">{error}</Text> : null}
         <Button disabled={isSaving} label={isSaving ? 'Salvando…' : actionLabel} onPress={onFinish} />
-      </ScrollView>
-    </Screen>
+    </ScrollableScreen>
   );
 }
 

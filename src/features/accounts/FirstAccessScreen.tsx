@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { Card, Screen, Text } from '@/components';
+import { Card, ScreenHeader, ScrollableScreen, Text } from '@/components';
 import { useTheme } from '@/theme/ThemeProvider';
 
 import { AccountForm } from './AccountForm';
@@ -26,18 +26,8 @@ export function FirstAccessScreen({ onFinish }: FirstAccessScreenProps) {
   }
 
   return (
-    <Screen>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View>
-          <Text variant="heading">Vamos começar</Text>
-          <Text tone="muted" style={{ marginTop: tokens.spacing.sm }}>
-            Crie sua primeira conta para acompanhar seu dinheiro localmente.
-          </Text>
-        </View>
+    <ScrollableScreen>
+        <ScreenHeader description="Crie sua primeira conta para acompanhar seu dinheiro localmente." title="Vamos começar" />
         <Card elevated>
           <Text variant="title">Sua primeira conta</Text>
           <Text tone="muted" style={{ marginTop: tokens.spacing.xs }}>
@@ -47,9 +37,6 @@ export function FirstAccessScreen({ onFinish }: FirstAccessScreenProps) {
             <AccountForm onSaved={() => setStage('theme')} submitLabel="Criar primeira conta" />
           </View>
         </Card>
-      </ScrollView>
-    </Screen>
+    </ScrollableScreen>
   );
 }
-
-const styles = StyleSheet.create({ content: { flexGrow: 1, gap: 24, paddingVertical: 24 } });

@@ -1,6 +1,6 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   Button,
@@ -10,7 +10,9 @@ import {
   Field,
   MoneyField,
   scheduleAfterSecondaryTransition,
-  Screen,
+  ScreenHeader,
+  ScreenState,
+  ScrollableScreen,
   Text,
   useReducedMotion,
   VisualPicker,
@@ -97,19 +99,17 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
     }
   }
 
-  if (loading) return <Screen style={styles.center}><Text>Carregando categoria…</Text></Screen>;
+  if (loading) return <ScreenState message="Buscando os dados da categoria…" status="loading" title="Carregando categoria" />;
+
+  if (error === 'Categoria não encontrada.') return <ScreenState actionLabel="Voltar" message={error} onAction={onDone} status="notFound" />;
 
   return (
-    <Screen>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Text variant="heading">{category ? 'Editar categoria' : 'Nova categoria'}</Text>
+    <ScrollableScreen>
+        <ScreenHeader onBack={onDone} title={category ? 'Editar categoria' : 'Nova categoria'} />
         <Card elevated>
           <View style={styles.form}>
-            <Field error={error ?? undefined} label="Nome" onChangeText={setName} placeholder="Ex.: Moradia" value={name} />
+            {error ? <Text tone="negative" variant="caption">{error}</Text> : null}
+            <Field label="Nome" onChangeText={setName} placeholder="Ex.: Moradia" value={name} />
             <MoneyField label="Orçamento mensal" onChangeText={setBudget} placeholder="0,00" value={budget} />
             <VisualPicker
               key={iconValue}
@@ -125,8 +125,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>
         </Card>
-      </ScrollView>
-    </Screen>
+    </ScrollableScreen>
   );
 }
 
@@ -135,4 +134,4 @@ function formatBudget(cents: number): string {
   return `${String(Math.trunc(absolute / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${String(absolute % 100).padStart(2, '0')}`;
 }
 
-const styles = StyleSheet.create({ center: { alignItems: 'center', justifyContent: 'center' }, content: { gap: 20, paddingVertical: 24 }, form: { gap: 16 } });
+const styles = StyleSheet.create({ form: { gap: 16 } });
