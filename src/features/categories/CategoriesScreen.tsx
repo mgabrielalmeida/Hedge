@@ -8,6 +8,7 @@ import {
   EmptyStateCard,
   EntityVisual,
   getIconDisplayValue,
+  OnboardingProgress,
   PressableCard,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
@@ -26,6 +27,7 @@ type CategoriesScreenProps = {
   onCreate: () => void;
   onEdit: (id: number) => void;
   onFinish?: () => void;
+  onboardingProgress?: { currentStep: number; totalSteps: number };
   showDescription?: boolean;
 };
 
@@ -33,6 +35,7 @@ export function CategoriesScreen({
   onCreate,
   onEdit,
   onFinish,
+  onboardingProgress,
   showDescription = true,
 }: CategoriesScreenProps) {
   const database = useSQLiteContext();
@@ -50,6 +53,7 @@ export function CategoriesScreen({
   return (
     <ScrollableScreen>
         <ScreenHeader description={showDescription ? 'Defina seus limites mensais e indicadores.' : undefined} title="Categorias" />
+        {onboardingProgress ? <OnboardingProgress {...onboardingProgress} /> : null}
         {error ? <ScreenState actionLabel="Tentar novamente" fullScreen={false} message={error} onAction={() => void load()} status="error" /> : categories === null ? <ScreenState fullScreen={false} message="Buscando suas categorias…" status="loading" title="Carregando categorias" /> : <>
           <View style={styles.list}>
             {categories.map((category) => <CategoryCard category={category} key={category.id} onEdit={() => onEdit(category.id)} />)}
@@ -57,7 +61,7 @@ export function CategoriesScreen({
           {categories.length === 0 ? <EmptyStateCard actionLabel="Nova categoria" message="Crie uma categoria para organizar suas despesas." onAction={onCreate} /> : null}
         </>}
         <Button label="Nova categoria" onPress={onCreate} />
-        {onFinish ? <Button disabled={categories === null || categories.length === 0} label="Concluir configuração" onPress={onFinish} variant="secondary" /> : null}
+        {onFinish ? <Button disabled={categories === null || categories.length === 0} label="Ver minha visão financeira" onPress={onFinish} variant="secondary" /> : null}
     </ScrollableScreen>
   );
 }

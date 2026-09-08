@@ -10,6 +10,7 @@ export { FadeSelection } from './FadeSelection';
 export { MoneyField } from './MoneyField';
 export { MoneyText } from './MoneyText';
 export { MonthNavigator } from './MonthNavigator';
+export { OnboardingProgress } from './OnboardingProgress';
 export { PressableCard } from './PressableCard';
 export { Screen } from './Screen';
 export { ScreenHeader } from './ScreenHeader';
