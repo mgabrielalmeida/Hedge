@@ -2,7 +2,16 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Field, MoneyField, Screen, Text } from '@/components';
+import {
+  Button,
+  Card,
+  Field,
+  MoneyField,
+  scheduleAfterSecondaryTransition,
+  Screen,
+  Text,
+  useReducedMotion,
+} from '@/components';
 import {
   createTransaction,
   deleteTransaction,
@@ -20,12 +29,14 @@ import type { Account, TransferTransaction } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 type TransferScreenProps = {
+  deferInitialLoad?: boolean;
   onDone: () => void;
   transactionId?: number;
 };
 
-export function TransferScreen({ onDone, transactionId }: TransferScreenProps) {
+export function TransferScreen({ deferInitialLoad = true, onDone, transactionId }: TransferScreenProps) {
   const db = useSQLiteContext();
+  const reduceMotion = useReducedMotion();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [sourceAccountId, setSourceAccountId] = useState<number | null>(null);
   const [destinationAccountId, setDestinationAccountId] = useState<number | null>(null);
@@ -39,34 +50,37 @@ export function TransferScreen({ onDone, transactionId }: TransferScreenProps) {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      listAccounts(db),
-      transactionId ? findTransactionById(db, transactionId) : Promise.resolve(null),
-    ])
-      .then(([loadedAccounts, item]) => {
-        if (!active) return;
-        setAccounts(loadedAccounts);
-        if (item?.kind === 'transfer') {
-          setExisting(item);
-          setSourceAccountId(item.accountId);
-          setDestinationAccountId(item.destinationAccountId);
-          setAmount(formatBrazilianMoneyInput(Math.abs(item.amountCents)));
-          setDate(item.transactionDate);
-        } else if (!transactionId && loadedAccounts.length >= 2) {
-          setSourceAccountId(loadedAccounts[0].id);
-          setDestinationAccountId(loadedAccounts[1].id);
-        }
-      })
-      .catch(() => {
-        if (active) setLoadFailed(true);
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
+    const cancel = scheduleAfterSecondaryTransition(() => {
+      void Promise.all([
+        listAccounts(db),
+        transactionId ? findTransactionById(db, transactionId) : Promise.resolve(null),
+      ])
+        .then(([loadedAccounts, item]) => {
+          if (!active) return;
+          setAccounts(loadedAccounts);
+          if (item?.kind === 'transfer') {
+            setExisting(item);
+            setSourceAccountId(item.accountId);
+            setDestinationAccountId(item.destinationAccountId);
+            setAmount(formatBrazilianMoneyInput(Math.abs(item.amountCents)));
+            setDate(item.transactionDate);
+          } else if (!transactionId && loadedAccounts.length >= 2) {
+            setSourceAccountId(loadedAccounts[0].id);
+            setDestinationAccountId(loadedAccounts[1].id);
+          }
+        })
+        .catch(() => {
+          if (active) setLoadFailed(true);
+        })
+        .finally(() => {
+          if (active) setIsLoading(false);
+        });
+    }, deferInitialLoad && reduceMotion === false);
     return () => {
       active = false;
+      cancel();
     };
-  }, [db, transactionId]);
+  }, [db, deferInitialLoad, reduceMotion, transactionId]);
 
   function selectSource(id: number) {
     setSourceAccountId(id);

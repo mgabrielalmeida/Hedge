@@ -27,7 +27,7 @@ distribuída.
 | Plataformas | Android e iOS |
 | Aplicativo | Expo no fluxo gerenciado e React Native |
 | Linguagem | TypeScript com modo estrito |
-| Navegação | Expo Router |
+| Navegação | Expo Router; pilha JavaScript com `react-native-gesture-handler` compatível com o SDK para transições temporizadas entre telas secundárias |
 | Persistência | `expo-sqlite`, usando sua API diretamente |
 | Estilos | `StyleSheet` do React Native |
 | Estado local | `useState` e `useReducer` |

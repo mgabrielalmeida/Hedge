@@ -3,7 +3,15 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Button, Card, resolveThemeColorValue, Screen, Text } from '@/components';
+import {
+  Button,
+  Card,
+  resolveThemeColorValue,
+  scheduleAfterSecondaryTransition,
+  Screen,
+  Text,
+  useReducedMotion,
+} from '@/components';
 import { deleteCategory, listCategories } from '@/db/repositories';
 import type { Category } from '@/domain';
 import { formatBrazilianCurrency } from '@/domain';
@@ -23,6 +31,7 @@ export function CategoriesScreen({
   showDescription = true,
 }: CategoriesScreenProps) {
   const database = useSQLiteContext();
+  const reduceMotion = useReducedMotion();
   const { tokens } = useTheme();
   const [categories, setCategories] = useState<readonly Category[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +39,9 @@ export function CategoriesScreen({
   const load = useCallback(async () => {
     try { setCategories(await listCategories(database)); setError(null); } catch { setError('Não foi possível carregar as categorias.'); }
   }, [database]);
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(useCallback(() => (
+    scheduleAfterSecondaryTransition(() => void load(), reduceMotion === false)
+  ), [load, reduceMotion]));
 
   function confirmDelete(category: Category) {
     Alert.alert(

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import Svg, { Circle, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
@@ -8,8 +8,10 @@ import {
   Card,
   getAccountIconSymbol,
   resolveThemeColorValue,
+  scheduleAfterSecondaryTransition,
   Screen,
   Text,
+  useReducedMotion,
 } from '@/components';
 import { findCategoryById, listAccounts, listTransactions } from '@/db/repositories';
 import { calculateCategoryMonthlySpending, formatBrazilianCurrency } from '@/domain';
@@ -36,6 +38,8 @@ type LoadedData = {
 };
 
 const chartMonthCount = 6;
+const CHART_DRAW_DURATION = 900;
+const BACK_BUTTON_HIT_SLOP = { bottom: 8, left: 8, right: 8, top: 8 } as const;
 
 export function CategorySpendingScreen({
   categoryId,
@@ -43,6 +47,7 @@ export function CategorySpendingScreen({
   selectedMonth,
 }: CategorySpendingScreenProps) {
   const database = useSQLiteContext();
+  const screenReduceMotion = useReducedMotion();
   const { tokens } = useTheme();
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,9 +80,9 @@ export function CategorySpendingScreen({
     }
   }, [categoryId, database, selectedMonth]);
 
-  useFocusEffect(useCallback(() => {
-    void load();
-  }, [load]));
+  useFocusEffect(useCallback(() => (
+    scheduleAfterSecondaryTransition(() => void load(), screenReduceMotion === false)
+  ), [load, screenReduceMotion]));
   useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
 
   const categoryColor = data
@@ -174,7 +179,7 @@ function BackButton({ onPress }: { onPress: () => void }) {
     <Pressable
       accessibilityLabel="Voltar para a tela inicial"
       accessibilityRole="button"
-      hitSlop={8}
+      hitSlop={BACK_BUTTON_HIT_SLOP}
       onPress={onPress}
       style={({ pressed }) => [styles.backButton, { opacity: pressed ? 0.68 : 1 }]}
     >
@@ -223,7 +228,9 @@ function CategorySpendingChart({
   history: CategorySpendingHistory;
 }) {
   const { tokens } = useTheme();
+  const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(0);
+  const [revealProgress] = useState(() => new Animated.Value(0));
   const chartHeight = 228;
   const plot = { bottom: 28, left: 58, right: 10, top: 12 };
   const plotWidth = Math.max(width - plot.left - plot.right, 1);
@@ -257,6 +264,32 @@ function CategorySpendingChart({
       points,
     }];
   });
+  const historySignature = history.series
+    .map((item) => `${item.accountId}:${item.spendingByMonth.join(',')}`)
+    .join('|');
+
+  useEffect(() => {
+    revealProgress.stopAnimation();
+    if (reduceMotion === null || width === 0) {
+      revealProgress.setValue(0);
+      return;
+    }
+    if (reduceMotion) {
+      revealProgress.setValue(1);
+      return;
+    }
+
+    revealProgress.setValue(0);
+    const animation = Animated.timing(revealProgress, {
+      duration: CHART_DRAW_DURATION,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: false,
+    });
+
+    animation.start();
+    return () => animation.stop();
+  }, [historySignature, reduceMotion, revealProgress, width]);
 
   return (
     <Card>
@@ -319,25 +352,44 @@ function CategorySpendingChart({
                 {formatMonthTick(month)}
               </SvgText>
             ))}
-            {series.map((item) => (
-              <Path
-                d={item.path}
-                fill="none"
-                key={item.account.id}
-                stroke={categoryColor}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={3}
-              />
-            ))}
-            {series.flatMap((item) => item.points.map((point, pointIndex) => renderMarker(
-              point,
-              item.markerShape,
-              item.accountColor,
-              categoryColor,
-              `${item.account.id}-${pointIndex}`,
-            )))}
           </Svg>
+        ) : null}
+        {width > 0 ? (
+          <Animated.View
+            accessible={false}
+            pointerEvents="none"
+            style={[
+              styles.seriesReveal,
+              {
+                height: chartHeight,
+                width: revealProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, width],
+                }),
+              },
+            ]}
+          >
+            <Svg height={chartHeight} width={width}>
+              {series.map((item) => (
+                <Path
+                  d={item.path}
+                  fill="none"
+                  key={item.account.id}
+                  stroke={categoryColor}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                />
+              ))}
+              {series.flatMap((item) => item.points.map((point, pointIndex) => renderMarker(
+                point,
+                item.markerShape,
+                item.accountColor,
+                categoryColor,
+                `${item.account.id}-${pointIndex}`,
+              )))}
+            </Svg>
+          </Animated.View>
         ) : null}
       </View>
 
@@ -538,6 +590,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  seriesReveal: {
+    left: 0,
+    overflow: 'hidden',
+    position: 'absolute',
+    top: 0,
   },
   titleRow: {
     alignItems: 'center',

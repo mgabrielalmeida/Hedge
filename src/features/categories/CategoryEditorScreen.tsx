@@ -8,8 +8,10 @@ import {
   CATEGORY_ICON_OPTIONS,
   Field,
   MoneyField,
+  scheduleAfterSecondaryTransition,
   Screen,
   Text,
+  useReducedMotion,
   VisualPicker,
   resolveThemeColorValue,
 } from '@/components';
@@ -25,6 +27,7 @@ type CategoryEditorScreenProps = {
 
 export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScreenProps) {
   const database = useSQLiteContext();
+  const reduceMotion = useReducedMotion();
   const { tokens } = useTheme();
   const [category, setCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
@@ -33,26 +36,38 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
   const [colorValue, setColorValue] = useState(tokens.primary);
   const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(2);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(categoryId !== undefined);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (categoryId === undefined) return;
-    void (async () => {
-      const found = await findCategoryById(database, categoryId);
-      if (!found) {
-        setError('Categoria não encontrada.');
-      } else {
-        setCategory(found);
-        setName(found.name);
-        setBudget(formatBudget(found.monthlyBudgetCents));
-        setIconValue(found.iconValue);
-        setColorValue(found.colorValue);
-        setThemeColorIndex(found.themeColorIndex);
+    let active = true;
+    const cancel = scheduleAfterSecondaryTransition(() => {
+      if (categoryId === undefined) {
+        if (active) setLoading(false);
+        return;
       }
-      setLoading(false);
-    })();
-  }, [categoryId, database]);
+      void (async () => {
+        const found = await findCategoryById(database, categoryId);
+        if (!active) return;
+        if (!found) {
+          setError('Categoria não encontrada.');
+        } else {
+          setCategory(found);
+          setName(found.name);
+          setBudget(formatBudget(found.monthlyBudgetCents));
+          setIconValue(found.iconValue);
+          setColorValue(found.colorValue);
+          setThemeColorIndex(found.themeColorIndex);
+        }
+        setLoading(false);
+      })();
+    }, reduceMotion === false);
+
+    return () => {
+      active = false;
+      cancel();
+    };
+  }, [categoryId, database, reduceMotion]);
 
   async function save() {
     const validName = validateRequiredText(name);

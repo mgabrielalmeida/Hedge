@@ -2,7 +2,14 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@/components';
+import {
+  Button,
+  Card,
+  scheduleAfterSecondaryTransition,
+  Screen,
+  Text,
+  useReducedMotion,
+} from '@/components';
 import { findAccountById, getAccountBalance } from '@/db/repositories';
 import type { Account, Cents } from '@/domain';
 
@@ -20,28 +27,32 @@ type AccountEditorData = {
 
 export function AccountEditorScreen({ accountId, onDone }: AccountEditorScreenProps) {
   const database = useSQLiteContext();
+  const reduceMotion = useReducedMotion();
   const [data, setData] = useState<AccountEditorData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      findAccountById(database, accountId),
-      getAccountBalance(database, accountId),
-    ]).then(([account, currentBalanceCents]) => {
-      if (!active) return;
-      if (!account || currentBalanceCents === null) {
-        setError('Conta não encontrada.');
-        return;
-      }
-      setData({ account, currentBalanceCents });
-    }).catch(() => {
-      if (active) setError('Não foi possível carregar a conta.');
-    });
+    const cancel = scheduleAfterSecondaryTransition(() => {
+      void Promise.all([
+        findAccountById(database, accountId),
+        getAccountBalance(database, accountId),
+      ]).then(([account, currentBalanceCents]) => {
+        if (!active) return;
+        if (!account || currentBalanceCents === null) {
+          setError('Conta não encontrada.');
+          return;
+        }
+        setData({ account, currentBalanceCents });
+      }).catch(() => {
+        if (active) setError('Não foi possível carregar a conta.');
+      });
+    }, reduceMotion === false);
     return () => {
       active = false;
+      cancel();
     };
-  }, [accountId, database]);
+  }, [accountId, database, reduceMotion]);
 
   if (error) {
     return (

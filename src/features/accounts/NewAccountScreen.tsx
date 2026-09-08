@@ -1,6 +1,14 @@
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@/components';
+import {
+  Button,
+  Card,
+  scheduleAfterSecondaryTransition,
+  Screen,
+  Text,
+  useReducedMotion,
+} from '@/components';
 import type { Account } from '@/domain';
 
 import { AccountForm } from './AccountForm';
@@ -11,6 +19,16 @@ type NewAccountScreenProps = {
 };
 
 export function NewAccountScreen({ onAccountCreated, onCancel }: NewAccountScreenProps) {
+  const reduceMotion = useReducedMotion();
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => (
+    scheduleAfterSecondaryTransition(() => setIsReady(true), reduceMotion === false)
+  ), [reduceMotion]);
+
+  if (!isReady) {
+    return <Screen style={styles.centered}><Text tone="muted">Carregando formulário…</Text></Screen>;
+  }
 
   return (
     <Screen>
@@ -31,4 +49,8 @@ export function NewAccountScreen({ onAccountCreated, onCancel }: NewAccountScree
   );
 }
 
-const styles = StyleSheet.create({ cancel: { marginTop: 8 }, content: { gap: 24, paddingVertical: 24 } });
+const styles = StyleSheet.create({
+  cancel: { marginTop: 8 },
+  centered: { alignItems: 'center', justifyContent: 'center' },
+  content: { gap: 24, paddingVertical: 24 },
+});

@@ -2,7 +2,17 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Button, Card, DatePickerField, Field, MoneyField, Screen, Text } from '@/components';
+import {
+  Button,
+  Card,
+  DatePickerField,
+  Field,
+  MoneyField,
+  scheduleAfterSecondaryTransition,
+  Screen,
+  Text,
+  useReducedMotion,
+} from '@/components';
 import {
   createRecurringRule,
   createTransaction,
@@ -31,6 +41,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 type ExpenseScreenProps = {
+  deferInitialLoad?: boolean;
   kind?: 'expense' | 'income';
   onDone: () => void;
   recurringRuleId?: number;
@@ -47,8 +58,16 @@ const weekdays = [
   ['Dom', 7],
 ] as const;
 
-export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, transactionId }: ExpenseScreenProps) {
+export function ExpenseScreen({
+  deferInitialLoad = true,
+  kind = 'expense',
+  onDone,
+  recurringRuleId,
+  transactionId,
+}: ExpenseScreenProps) {
   const db = useSQLiteContext();
+  const reduceMotion = useReducedMotion();
+  const { tokens } = useTheme();
   const initialDate = getLocalCivilDate();
   const initialDateParts = getCivilDateParts(initialDate);
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
@@ -60,6 +79,7 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
   const [date, setDate] = useState(initialDate);
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showRequiredErrors, setShowRequiredErrors] = useState(false);
   const [saving, setSaving] = useState(false);
   const [existingTransaction, setExistingTransaction] = useState<Transaction | null>(null);
@@ -72,47 +92,52 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      listAccounts(db),
-      listCategories(db),
-      transactionId ? findTransactionById(db, transactionId) : Promise.resolve(null),
-      recurringRuleId ? findRecurringRuleById(db, recurringRuleId) : Promise.resolve(null),
-    ]).then(([loadedAccounts, loadedCategories, transaction, rule]) => {
-      if (!active) return;
-      setAccounts(loadedAccounts);
-      setCategories(loadedCategories);
+    const cancel = scheduleAfterSecondaryTransition(() => {
+      void Promise.all([
+        listAccounts(db),
+        listCategories(db),
+        transactionId ? findTransactionById(db, transactionId) : Promise.resolve(null),
+        recurringRuleId ? findRecurringRuleById(db, recurringRuleId) : Promise.resolve(null),
+      ]).then(([loadedAccounts, loadedCategories, transaction, rule]) => {
+        if (!active) return;
+        setAccounts(loadedAccounts);
+        setCategories(loadedCategories);
 
-      if (transaction && (transaction.kind === 'expense' || transaction.kind === 'income')) {
-        setExistingTransaction(transaction);
-        setAccountId(transaction.accountId);
-        setCategoryId(transaction.categoryId);
-        setName(transaction.name);
-        setAmount(formatBrazilianMoneyInput(Math.abs(transaction.amountCents)));
-        setDate(transaction.transactionDate);
-        setDescription(transaction.description ?? '');
-      }
+        if (transaction && (transaction.kind === 'expense' || transaction.kind === 'income')) {
+          setExistingTransaction(transaction);
+          setAccountId(transaction.accountId);
+          setCategoryId(transaction.categoryId);
+          setName(transaction.name);
+          setAmount(formatBrazilianMoneyInput(Math.abs(transaction.amountCents)));
+          setDate(transaction.transactionDate);
+          setDescription(transaction.description ?? '');
+        }
 
-      if (rule?.isActive && (rule.kind === 'expense' || rule.kind === 'income')) {
-        setExistingRule(rule);
-        setRecurrenceEnabled(true);
-        setAccountId(rule.accountId);
-        setCategoryId(rule.categoryId);
-        setName(rule.name);
-        setAmount(formatBrazilianMoneyInput(Math.abs(rule.amountCents)));
-        setDate(rule.startDate);
-        setDescription(rule.description ?? '');
-        setFrequency(rule.schedule.frequency);
-        setChargeDay(String(rule.schedule.chargeDay));
-        setChargeMonth(rule.schedule.chargeMonth === null ? '' : String(rule.schedule.chargeMonth));
-        setEndDate(rule.endDate ?? '');
-      }
-    }).catch(() => {
-      if (active) setError('Não foi possível carregar os dados do formulário.');
-    });
+        if (rule?.isActive && (rule.kind === 'expense' || rule.kind === 'income')) {
+          setExistingRule(rule);
+          setRecurrenceEnabled(true);
+          setAccountId(rule.accountId);
+          setCategoryId(rule.categoryId);
+          setName(rule.name);
+          setAmount(formatBrazilianMoneyInput(Math.abs(rule.amountCents)));
+          setDate(rule.startDate);
+          setDescription(rule.description ?? '');
+          setFrequency(rule.schedule.frequency);
+          setChargeDay(String(rule.schedule.chargeDay));
+          setChargeMonth(rule.schedule.chargeMonth === null ? '' : String(rule.schedule.chargeMonth));
+          setEndDate(rule.endDate ?? '');
+        }
+      }).catch(() => {
+        if (active) setError('Não foi possível carregar os dados do formulário.');
+      }).finally(() => {
+        if (active) setIsLoading(false);
+      });
+    }, deferInitialLoad && reduceMotion === false);
     return () => {
       active = false;
+      cancel();
     };
-  }, [db, recurringRuleId, transactionId]);
+  }, [db, deferInitialLoad, recurringRuleId, reduceMotion, transactionId]);
 
   async function save() {
     const money = parseMoneyInput(amount.replace(/\./g, ''));
@@ -205,6 +230,10 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
     }
   }
 
+  if (isLoading) {
+    return <Screen style={styles.center}><Text tone="muted">Carregando formulário…</Text></Screen>;
+  }
+
   const isEditing = existingTransaction !== null || existingRule !== null;
   const noun = kind === 'expense' ? 'despesa' : 'renda';
   const title = `${isEditing ? 'Editar' : 'Nova'} ${noun}${recurrenceEnabled ? ' recorrente' : ''}`;
@@ -213,8 +242,6 @@ export function ExpenseScreen({ kind = 'expense', onDone, recurringRuleId, trans
   const dateIsMissing = !parseCivilDate(date).ok;
   const accountIsMissing = accountId === null;
   const categoryIsMissing = categoryId === null;
-  const { tokens } = useTheme();
-
   return (
     <Screen>
       <ScrollView
@@ -293,6 +320,7 @@ function civilDateOrToday(value: string) {
 }
 
 const styles = StyleSheet.create({
+  center: { alignItems: 'center', justifyContent: 'center' },
   choice: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   content: { gap: 20, paddingVertical: 24 },

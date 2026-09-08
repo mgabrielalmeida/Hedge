@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Card, Screen, Text } from '@/components';
+import {
+  Card,
+  scheduleAfterSecondaryTransition,
+  Screen,
+  Text,
+  useReducedMotion,
+} from '@/components';
 import { listAccounts, listCategories, listRecurringRules, listTransactions } from '@/db/repositories';
 import { calculateAccountBalance, formatBrazilianCurrency } from '@/domain';
 import type { Account, Category, RecurringRule, Transaction, TransferTransaction } from '@/domain';
@@ -12,6 +18,9 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { subscribeToRecurringProcessing } from './useRecurringProcessing';
 
 type HistoryType = 'transactions' | 'transfers' | 'recurring';
+
+const HISTORY_TYPES: readonly HistoryType[] = ['transactions', 'transfers', 'recurring'];
+const HISTORY_TOGGLE_DURATION = 220;
 
 type TransactionsHomeScreenProps = {
   onEditRecurringRule: (id: number) => void;
@@ -25,6 +34,7 @@ export function TransactionsHomeScreen({
   onNoAccounts,
 }: TransactionsHomeScreenProps) {
   const db = useSQLiteContext();
+  const screenReduceMotion = useReducedMotion();
   const { tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
@@ -57,9 +67,9 @@ export function TransactionsHomeScreen({
     }
   }, [db, onNoAccounts]);
 
-  useFocusEffect(useCallback(() => {
-    void load();
-  }, [load]));
+  useFocusEffect(useCallback(() => (
+    scheduleAfterSecondaryTransition(() => void load(), screenReduceMotion === false)
+  ), [load, screenReduceMotion]));
   useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
 
   const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null;
@@ -141,11 +151,58 @@ function HistoryToggle({
   selected: HistoryType;
 }) {
   const { tokens } = useTheme();
+  const reduceMotion = useReducedMotion();
+  const motionEnabled = reduceMotion === false;
+  const selectedIndex = HISTORY_TYPES.indexOf(selected);
+  const [indicatorIndex] = useState(() => new Animated.Value(selectedIndex));
+  const [toggleWidth, setToggleWidth] = useState(0);
+  const optionWidth = Math.max(toggleWidth - 8, 0) / HISTORY_TYPES.length;
+  const inputRange = HISTORY_TYPES.map((_, index) => index);
+  const outputRange = HISTORY_TYPES.map((_, index) => index * optionWidth + 4);
+
+  useEffect(() => {
+    if (!motionEnabled) {
+      indicatorIndex.setValue(selectedIndex);
+      return;
+    }
+
+    const animation = Animated.timing(indicatorIndex, {
+      duration: HISTORY_TOGGLE_DURATION,
+      easing: Easing.out(Easing.cubic),
+      toValue: selectedIndex,
+      useNativeDriver: true,
+    });
+
+    animation.start();
+    return () => animation.stop();
+  }, [indicatorIndex, motionEnabled, selectedIndex]);
+
   return (
     <View
       accessibilityRole="tablist"
+      onLayout={(event) => {
+        const nextWidth = event.nativeEvent.layout.width;
+        setToggleWidth((currentWidth) => currentWidth === nextWidth ? currentWidth : nextWidth);
+      }}
       style={[styles.toggle, { backgroundColor: tokens.surfaceSubtle, borderColor: tokens.border }]}
     >
+      {toggleWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.toggleIndicator,
+            {
+              backgroundColor: tokens.surfaceElevated,
+              borderColor: tokens.borderStrong,
+              borderRadius: tokens.radius.md,
+              transform: [{
+                translateX: indicatorIndex.interpolate({ inputRange, outputRange }),
+              }],
+              width: optionWidth,
+            },
+          ]}
+        />
+      ) : null}
       <ToggleOption
         label="Lançamentos"
         onPress={() => onSelect('transactions')}
@@ -172,12 +229,11 @@ function ToggleOption({ label, onPress, selected }: { label: string; onPress: ()
       accessibilityRole="tab"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[
+      style={({ pressed }) => [
         styles.toggleOption,
         {
-          backgroundColor: selected ? tokens.surfaceElevated : 'transparent',
-          borderColor: selected ? tokens.borderStrong : 'transparent',
           borderRadius: tokens.radius.md,
+          opacity: pressed ? 0.76 : 1,
         },
       ]}
     >
@@ -263,10 +319,10 @@ const styles = StyleSheet.create({
   accounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   content: { gap: 18, paddingVertical: 24 },
   list: { gap: 10 },
-  toggle: { borderWidth: 1, flexDirection: 'row', padding: 4 },
+  toggle: { borderWidth: 1, flexDirection: 'row', padding: 4, position: 'relative' },
+  toggleIndicator: { bottom: 4, borderWidth: 1, position: 'absolute', top: 4 },
   toggleOption: {
     alignItems: 'center',
-    borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
     minHeight: 44,

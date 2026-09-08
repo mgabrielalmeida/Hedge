@@ -1,7 +1,6 @@
 import { Tabs, type BottomTabBarProps } from 'expo-router/tabs';
 import { useEffect, useState } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   Pressable,
@@ -11,6 +10,7 @@ import {
   type ColorValue,
 } from 'react-native';
 
+import { useReducedMotion } from '@/components';
 import { useTheme } from '@/theme/ThemeProvider';
 
 type TabIconProps = {
@@ -22,7 +22,7 @@ type TabIconProps = {
 const TAB_TRANSITION_DURATION = 240;
 
 export default function MainTabsLayout() {
-  const reduceMotion = useReduceMotion();
+  const reduceMotion = useReducedMotion();
   const motionEnabled = reduceMotion === false;
 
   return (
@@ -210,25 +210,6 @@ function SlidingTabBar({ descriptors, insets, motionEnabled, navigation, state }
       </View>
     </View>
   );
-}
-
-function useReduceMotion(): boolean | null {
-  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (active) setReduceMotion(enabled);
-    });
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
-
-    return () => {
-      active = false;
-      subscription.remove();
-    };
-  }, []);
-
-  return reduceMotion;
 }
 
 function TabIcon({ color, focused, symbol }: TabIconProps) {

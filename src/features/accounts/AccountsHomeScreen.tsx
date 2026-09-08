@@ -3,7 +3,16 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Button, Card, getAccountIconSymbol, resolveThemeColorValue, Screen, Text } from '@/components';
+import {
+  Button,
+  Card,
+  getAccountIconSymbol,
+  resolveThemeColorValue,
+  scheduleAfterSecondaryTransition,
+  Screen,
+  Text,
+  useReducedMotion,
+} from '@/components';
 import { listAccounts } from '@/db/repositories';
 import type { Account } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -16,6 +25,7 @@ type AccountsHomeScreenProps = {
 
 export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccounts }: AccountsHomeScreenProps) {
   const database = useSQLiteContext();
+  const reduceMotion = useReducedMotion();
   const { tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[] | null>(null);
   const [error, setError] = useState(false);
@@ -33,9 +43,9 @@ export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccount
     }
   }, [database, onNoAccounts]);
 
-  useFocusEffect(useCallback(() => {
-    void loadAccounts();
-  }, [loadAccounts]));
+  useFocusEffect(useCallback(() => (
+    scheduleAfterSecondaryTransition(() => void loadAccounts(), reduceMotion === false)
+  ), [loadAccounts, reduceMotion]));
 
   if (accounts === null) {
     return (

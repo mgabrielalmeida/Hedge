@@ -3,7 +3,15 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Button, Card, resolveThemeColorValue, Screen, Text } from '@/components';
+import {
+  Button,
+  Card,
+  resolveThemeColorValue,
+  scheduleAfterSecondaryTransition,
+  Screen,
+  Text,
+  useReducedMotion,
+} from '@/components';
 import { listAccounts, listCategories, listTransactions } from '@/db/repositories';
 import {
   calculateAccountBalance,
@@ -35,6 +43,7 @@ export function DashboardScreen({
   onNoAccounts,
 }: DashboardScreenProps) {
   const database = useSQLiteContext();
+  const reduceMotion = useReducedMotion();
   const { tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [categories, setCategories] = useState<readonly Category[]>([]);
@@ -60,9 +69,9 @@ export function DashboardScreen({
     setSelectedAccountId((accountId) => accountId ?? loadedAccounts[0].id);
   }, [database, onNoAccounts]);
 
-  useFocusEffect(useCallback(() => {
-    void load();
-  }, [load]));
+  useFocusEffect(useCallback(() => (
+    scheduleAfterSecondaryTransition(() => void load(), reduceMotion === false)
+  ), [load, reduceMotion]));
 
   useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
 

@@ -1,21 +1,63 @@
 import { SQLiteProvider } from 'expo-sqlite';
 import { NavigationBar } from 'expo-navigation-bar';
-import { Stack } from 'expo-router';
+import { Stack } from 'expo-router/js-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
+import { Easing } from 'react-native';
 
 import { DATABASE_NAME, initializeDatabase } from '@/db/database';
-import { BootstrapScreen } from '@/components/BootstrapScreen';
+import {
+  BootstrapScreen,
+  SECONDARY_SCREEN_TRANSITION_DURATION,
+  useReducedMotion,
+} from '@/components';
+import {
+  completeSecondaryScreenTransition,
+} from '@/components/screenTransition';
 import { useRecurringProcessing } from '@/features/transactions/useRecurringProcessing';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
 function DatabaseContent({ onReady }: { onReady: () => void }) {
   const isRecurringProcessingReady = useRecurringProcessing();
+  const reduceMotion = useReducedMotion();
+  const { tokens } = useTheme();
   useEffect(() => {
     if (isRecurringProcessingReady) onReady();
   }, [isRecurringProcessingReady, onReady]);
 
-  return isRecurringProcessingReady ? <Stack screenOptions={{ headerShown: false }} /> : null;
+  return isRecurringProcessingReady ? (
+    <Stack
+      screenListeners={{
+        transitionEnd: completeSecondaryScreenTransition,
+      }}
+      screenOptions={{
+        animation: reduceMotion === false ? 'slide_from_right' : 'none',
+        cardOverlayEnabled: false,
+        cardShadowEnabled: false,
+        cardStyle: { backgroundColor: tokens.background },
+        detachPreviousScreen: false,
+        headerShown: false,
+        transitionSpec: reduceMotion === false
+          ? {
+            close: {
+              animation: 'timing',
+              config: {
+                duration: SECONDARY_SCREEN_TRANSITION_DURATION,
+                easing: Easing.out(Easing.cubic),
+              },
+            },
+            open: {
+              animation: 'timing',
+              config: {
+                duration: SECONDARY_SCREEN_TRANSITION_DURATION,
+                easing: Easing.out(Easing.cubic),
+              },
+            },
+          }
+          : undefined,
+      }}
+    />
+  ) : null;
 }
 
 function AppBootstrap() {
