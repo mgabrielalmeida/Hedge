@@ -214,7 +214,7 @@ describe('SQLite repositories', () => {
     await expect(createDueOccurrence(database, activeRule.id, '2029-02-28', () => updatedAt)).rejects.toThrow('not due');
   });
 
-  it('processes every rule due today once and preserves occurrence tombstones', async () => {
+  it('processes all overdue occurrences once and preserves occurrence tombstones', async () => {
     const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
     const category = await createCategory(database, { name: 'Recurring bills', monthlyBudgetCents: 0 }, () => createdAt);
     await createRecurringRule(database, { kind: 'income', accountId: account.id, name: 'Weekly income', amountCents: 1_000, frequency: 'weekly', chargeDay: 3, startDate: '2026-09-01' }, () => createdAt);
@@ -222,7 +222,19 @@ describe('SQLite repositories', () => {
     await createRecurringRule(database, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Not today', amountCents: -100, frequency: 'monthly', chargeDay: 3, startDate: '2026-01-01' }, () => createdAt);
 
     const firstProcessing = await processDueRecurringRules(database, '2026-09-02', () => updatedAt);
-    expect(firstProcessing.generated.map((item) => item.transaction.name)).toEqual(['Weekly income', 'Yearly fee']);
+    expect(firstProcessing.generated.map((item) => `${item.transaction.name}:${item.transaction.transactionDate}`)).toEqual([
+      'Weekly income:2026-09-02',
+      'Yearly fee:2025-09-02',
+      'Yearly fee:2026-09-02',
+      'Not today:2026-01-03',
+      'Not today:2026-02-03',
+      'Not today:2026-03-03',
+      'Not today:2026-04-03',
+      'Not today:2026-05-03',
+      'Not today:2026-06-03',
+      'Not today:2026-07-03',
+      'Not today:2026-08-03',
+    ]);
     await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [] });
 
     await deleteTransaction(database, firstProcessing.generated[0].transaction.id);

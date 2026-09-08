@@ -12,10 +12,17 @@ export function subscribeToRecurringProcessing(listener: () => void): () => void
   return () => completionListeners.delete(listener);
 }
 
-export function useRecurringProcessing(): boolean {
+export type RecurringProcessingState = {
+  readonly isInitialProcessingComplete: boolean;
+  readonly retry: () => void;
+  readonly hasFailed: boolean;
+};
+
+export function useRecurringProcessing(): RecurringProcessingState {
   const db = useSQLiteContext();
   const isProcessing = useRef(false);
   const [isInitialProcessingComplete, setIsInitialProcessingComplete] = useState(false);
+  const [hasFailed, setHasFailed] = useState(false);
 
   const processToday = useCallback(async () => {
     if (isProcessing.current) return;
@@ -23,8 +30,9 @@ export function useRecurringProcessing(): boolean {
     try {
       const result = await processDueRecurringRules(db, getLocalCivilDate());
       if (result.generated.length > 0) completionListeners.forEach((listener) => listener());
-    } catch (error) {
-      console.error('Recurring rule processing failed.', error);
+      setHasFailed(false);
+    } catch {
+      setHasFailed(true);
     } finally {
       isProcessing.current = false;
     }
@@ -44,5 +52,5 @@ export function useRecurringProcessing(): boolean {
     };
   }, [processToday]);
 
-  return isInitialProcessingComplete;
+  return { hasFailed, isInitialProcessingComplete, retry: () => void processToday() };
 }

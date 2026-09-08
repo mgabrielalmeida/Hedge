@@ -3,6 +3,7 @@ import {
   calculateCategoryMonthlySpending,
   calculateConsolidatedBalance,
   isRecurringRuleDueOn,
+  listRecurringRuleDatesDueBy,
 } from './index';
 import type { RecurringRule, Transaction } from '../models/financial';
 
@@ -104,5 +105,11 @@ describe('financial calculations', () => {
     expect(isRecurringRuleDueOn({ ...monthlyRule, startDate: '2026-09-03', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(false);
     expect(isRecurringRuleDueOn({ ...monthlyRule, endDate: '2026-09-01', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(false);
     expect(isRecurringRuleDueOn({ ...monthlyRule, schedule: { frequency: 'yearly', chargeDay: 29, chargeMonth: 2 } }, '2027-02-28')).toBe(true);
+  });
+
+  it('lists every overdue occurrence through the processing date', () => {
+    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2026-01-30' }, '2026-03-31')).toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
+    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2026-01-28', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-02-11')).toEqual(['2026-01-28', '2026-02-04', '2026-02-11']);
+    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2024-02-29', schedule: { frequency: 'yearly', chargeDay: 29, chargeMonth: 2 } }, '2026-03-01')).toEqual(['2024-02-29', '2025-02-28', '2026-02-28']);
   });
 });

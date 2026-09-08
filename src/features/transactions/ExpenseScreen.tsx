@@ -23,7 +23,6 @@ import {
   findTransactionById,
   listAccounts,
   listCategories,
-  processDueRecurringRules,
   updateRecurringRule,
   updateTransaction,
 } from '@/db/repositories';
@@ -204,11 +203,6 @@ export function ExpenseScreen({
           if (!updated) throw new Error('Recurring rule is no longer active.');
         } else {
           await createRecurringRule(db, input);
-          try {
-            await processDueRecurringRules(db, getLocalCivilDate());
-          } catch (processingError) {
-            console.error('New recurring rule could not be processed immediately.', processingError);
-          }
         }
       } else {
         const input = {

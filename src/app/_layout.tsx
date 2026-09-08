@@ -18,14 +18,18 @@ import { useRecurringProcessing } from '@/features/transactions/useRecurringProc
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
 function DatabaseContent({ onReady }: { onReady: () => void }) {
-  const isRecurringProcessingReady = useRecurringProcessing();
+  const { hasFailed, isInitialProcessingComplete, retry } = useRecurringProcessing();
   const reduceMotion = useReducedMotion();
-  const { tokens } = useTheme();
+  const { isDark, tokens } = useTheme();
   useEffect(() => {
-    if (isRecurringProcessingReady) onReady();
-  }, [isRecurringProcessingReady, onReady]);
+    if (isInitialProcessingComplete && !hasFailed) onReady();
+  }, [hasFailed, isInitialProcessingComplete, onReady]);
 
-  return isRecurringProcessingReady ? (
+  if (hasFailed) {
+    return <BootstrapScreen isDark={isDark} message="Não foi possível processar as recorrências vencidas. Seus dados não foram alterados; tente novamente." onRetry={retry} tokens={tokens} title="Falha ao atualizar recorrências" />;
+  }
+
+  return isInitialProcessingComplete ? (
     <Stack
       screenListeners={{
         transitionEnd: completeSecondaryScreenTransition,

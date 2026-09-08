@@ -177,7 +177,10 @@ transferências: registros arquivados são excluídos das consultas que alimenta
 telas e não podem receber novas escritas. Arquivar uma conta desativa suas
 regras recorrentes ativas na mesma transação. Regras recorrentes usam exclusão lógica para preservar procedência. Uma tabela
 de ocorrências registra cada data processada mesmo depois da exclusão do
-lançamento gerado, evitando geração duplicada. A migração 1 não deve ser
+lançamento gerado, evitando geração duplicada. Ao inicializar ou retornar ao
+primeiro plano, o repositório gera em uma transação todas as datas vencidas e
+ainda não registradas de regras ativas; a interface bloqueia a abertura até
+essa etapa concluir ou exibe uma recuperação explícita em caso de falha. A migração 1 não deve ser
 alterada depois de aplicada; mudanças futuras exigem novas migrações.
 
 ## Estado da interface

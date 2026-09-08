@@ -1,4 +1,4 @@
-import { isRecurringRuleDueOn, normalizeOptionalText, parseCivilDate, validateRequiredText } from '@/domain';
+import { isRecurringRuleDueOn, listRecurringRuleDatesDueBy, normalizeOptionalText, parseCivilDate, validateRequiredText } from '@/domain';
 import type {
   Cents,
   CivilDate,
@@ -107,9 +107,10 @@ export async function processDueRecurringRules(
 
     for (const row of rows) {
       const rule = mapRecurringRule(row);
-      if (!isRecurringRuleDueOn(rule, scheduledDate)) continue;
-      if (await findOccurrence(session, rule.id, scheduledDate)) continue;
-      generated.push(await insertDueOccurrence(session, rule, scheduledDate, clock()));
+      for (const occurrenceDate of listRecurringRuleDatesDueBy(rule, scheduledDate)) {
+        if (await findOccurrence(session, rule.id, occurrenceDate)) continue;
+        generated.push(await insertDueOccurrence(session, rule, occurrenceDate, clock()));
+      }
     }
   });
 

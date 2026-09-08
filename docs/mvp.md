@@ -203,12 +203,14 @@ O mesmo ajuste para o último dia válido é aplicado à recorrência anual, com
 uma cobrança de 29 de fevereiro durante um ano não bissexto. Na frequência
 semanal, os dias são numerados de 1 a 7, de segunda-feira a domingo.
 
-Se o dia de cobrança da iteração atual já passou, nenhum lançamento pontual é
-criado retroativamente; a cobrança ocorre somente na próxima iteração.
-
-O aplicativo processa as recorrências devidas no dia civil local ao abrir e ao
-retornar ao primeiro plano. O processamento deve ser idempotente: mais de uma
-execução no mesmo dia não pode gerar lançamentos duplicados.
+Ao abrir ou retornar ao primeiro plano, o aplicativo processa todas as
+ocorrências com vencimento entre o início da regra e o dia civil local, limitado
+pela data final quando existir. Assim, uma cobrança não é perdida se o
+aplicativo não for aberto em seu dia exato. O processamento é idempotente: a
+tabela de ocorrências impede lançamentos duplicados, inclusive quando uma
+ocorrência anterior tiver seu lançamento apagado. Se o processamento falhar, o
+aplicativo informa a falha e oferece uma opção para tentar novamente; nenhuma
+geração parcial é confirmada, porque cada execução usa uma transação SQLite.
 
 O usuário pode visualizar, editar e excluir suas regras de despesas e rendas
 recorrentes. Editar ou excluir uma regra não altera lançamentos pontuais já
