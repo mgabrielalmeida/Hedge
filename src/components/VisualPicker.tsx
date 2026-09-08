@@ -4,6 +4,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import type { ThemeColorIndex } from '@/domain';
 
 import { Text } from './Text';
+import { IconGlyph } from './IconGlyph';
 import {
   hexToHsl,
   hslToHex,
@@ -66,9 +67,21 @@ export function VisualPicker({
 
   return (
     <View style={styles.container}>
-      <Text variant="caption" style={{ color: tokens.textMuted }}>Ícone</Text>
-      <View style={styles.grid}>
-        {iconOptions.map((option) => {
+      {(['minimalist', 'emoji'] as const).map((kind) => {
+        const options = iconOptions.filter((option) => option.kind === kind);
+        if (options.length === 0) return null;
+
+        return (
+          <View key={kind} style={styles.iconSection}>
+            <Text variant="caption" style={{ color: tokens.textMuted }}>
+              {kind === 'minimalist' ? 'Minimalistas' : 'Emojis'}
+            </Text>
+            <View
+              accessibilityLabel={kind === 'minimalist' ? 'Ícones minimalistas' : 'Emojis'}
+              accessibilityRole="radiogroup"
+              style={styles.grid}
+            >
+              {options.map((option) => {
           const selected = iconValue === option.value;
 
           return (
@@ -89,14 +102,15 @@ export function VisualPicker({
                 },
               ]}
             >
-              {'symbol' in option && typeof option.symbol === 'string' ? (
-                <Text style={styles.icon}>{option.symbol}</Text>
-              ) : null}
+              <IconGlyph size={22} value={option.value} />
               {selected ? <SelectionBadge /> : null}
             </Pressable>
           );
-        })}
-      </View>
+              })}
+            </View>
+          </View>
+        );
+      })}
 
       <Text variant="caption" style={{ color: tokens.textMuted }}>Cor</Text>
       <View accessibilityLabel="Cor do indicador visual" accessibilityRole="radiogroup" style={styles.grid}>
@@ -346,7 +360,7 @@ const styles = StyleSheet.create({
     width: 44,
   },
   hueSwatch: { borderRadius: 16, height: 32, width: 32 },
-  icon: { fontSize: 22, lineHeight: 28 },
+  iconSection: { gap: 8 },
   mixer: { borderWidth: 1, gap: 16, padding: 14 },
   mixerPreview: {
     borderWidth: 3,

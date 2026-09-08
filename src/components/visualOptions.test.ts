@@ -2,6 +2,7 @@ import {
   ACCOUNT_ICON_OPTIONS,
   CATEGORY_ICON_OPTIONS,
   getAccountIconSymbol,
+  getIconDisplayValue,
   getThemeColorOptions,
   resolveThemeColorValue,
   hexToHsl,
@@ -11,8 +12,10 @@ import {
 
 describe('shared visual options', () => {
   it('offers broad, unique selections for accounts and categories', () => {
-    expect(ACCOUNT_ICON_OPTIONS).toHaveLength(20);
-    expect(CATEGORY_ICON_OPTIONS).toHaveLength(30);
+    expect(ACCOUNT_ICON_OPTIONS.filter((option) => option.kind === 'minimalist')).toHaveLength(108);
+    expect(CATEGORY_ICON_OPTIONS.filter((option) => option.kind === 'minimalist')).toHaveLength(108);
+    expect(ACCOUNT_ICON_OPTIONS.filter((option) => option.kind === 'emoji')).toHaveLength(20);
+    expect(CATEGORY_ICON_OPTIONS.filter((option) => option.kind === 'emoji')).toHaveLength(30);
 
     for (const options of [ACCOUNT_ICON_OPTIONS, CATEGORY_ICON_OPTIONS]) {
       expect(new Set(options.map((option) => option.value)).size).toBe(options.length);
@@ -23,6 +26,9 @@ describe('shared visual options', () => {
   it('resolves persisted account icon identifiers and keeps a safe fallback', () => {
     expect(getAccountIconSymbol('investment')).toBe('📈');
     expect(getAccountIconSymbol('unknown')).toBe('•');
+    expect(getIconDisplayValue('bank')).toBe('emoji:🏦');
+    expect(getIconDisplayValue('🛒')).toBe('emoji:🛒');
+    expect(getIconDisplayValue('lucide:wallet')).toBe('lucide:wallet');
   });
 
   it('normalizes exact hexadecimal colors', () => {

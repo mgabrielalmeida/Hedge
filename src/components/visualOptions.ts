@@ -1,6 +1,6 @@
 export type IconOption = {
+  kind: 'emoji' | 'minimalist';
   label: string;
-  symbol: string;
   value: string;
 };
 
@@ -15,61 +15,148 @@ export type HslColor = {
   saturation: number;
 };
 
-export const ACCOUNT_ICON_OPTIONS: readonly IconOption[] = [
-  { label: 'Banco', value: 'bank', symbol: '🏦' },
-  { label: 'Carteira', value: 'wallet', symbol: '👛' },
-  { label: 'Cartão', value: 'card', symbol: '💳' },
-  { label: 'Dinheiro', value: 'cash', symbol: '💵' },
-  { label: 'Cofrinho', value: 'savings', symbol: '🐷' },
-  { label: 'Moedas', value: 'coins', symbol: '🪙' },
-  { label: 'Celular', value: 'mobile', symbol: '📱' },
-  { label: 'Casa', value: 'home', symbol: '🏠' },
-  { label: 'Trabalho', value: 'work', symbol: '💼' },
-  { label: 'Investimentos', value: 'investment', symbol: '📈' },
-  { label: 'Conta digital', value: 'digital', symbol: '💻' },
-  { label: 'Segurança', value: 'safe', symbol: '🔐' },
-  { label: 'Viagem', value: 'travel', symbol: '✈️' },
-  { label: 'Educação', value: 'education', symbol: '🎓' },
-  { label: 'Saúde', value: 'health', symbol: '🩺' },
-  { label: 'Família', value: 'family', symbol: '👨‍👩‍👧' },
-  { label: 'Veículo', value: 'car', symbol: '🚗' },
-  { label: 'Presente', value: 'gift', symbol: '🎁' },
-  { label: 'Meta', value: 'target', symbol: '🎯' },
-  { label: 'Favorita', value: 'star', symbol: '★' },
+const LUCIDE_ICON_NAMES = [
+  'apple',
+  'archive',
+  'arrow-down',
+  'arrow-left-right',
+  'arrow-up',
+  'badge-dollar-sign',
+  'badge-percent',
+  'banknote',
+  'bell',
+  'bike',
+  'book',
+  'bookmark-check',
+  'bookmark',
+  'box',
+  'briefcase',
+  'building-2',
+  'building',
+  'bus',
+  'calendar-days',
+  'calendar',
+  'camera',
+  'car',
+  'chart-bar',
+  'chart-column',
+  'chart-line',
+  'chart-pie',
+  'check-check',
+  'check',
+  'circle-dollar-sign',
+  'clipboard-check',
+  'clipboard-list',
+  'clock',
+  'cloud',
+  'coffee',
+  'coins',
+  'credit-card',
+  'download',
+  'ellipsis',
+  'factory',
+  'file-text',
+  'file',
+  'flag',
+  'folder',
+  'fuel',
+  'gamepad-2',
+  'gift',
+  'globe',
+  'graduation-cap',
+  'hand-coins',
+  'heart',
+  'hospital',
+  'house',
+  'image',
+  'info',
+  'key-round',
+  'landmark',
+  'laptop',
+  'lock',
+  'mail',
+  'map-pin',
+  'menu',
+  'message-circle',
+  'minus',
+  'monitor',
+  'moon',
+  'move-left',
+  'move-right',
+  'package',
+  'phone',
+  'piggy-bank',
+  'pill',
+  'pizza',
+  'plane',
+  'plus',
+  'receipt-cent',
+  'receipt-text',
+  'receipt',
+  'refresh-cw',
+  'search',
+  'send',
+  'settings',
+  'shield-alert',
+  'shield-check',
+  'shield',
+  'shopping-bag',
+  'shopping-basket',
+  'shopping-cart',
+  'sliders-horizontal',
+  'smartphone',
+  'sparkles',
+  'star',
+  'stethoscope',
+  'sun',
+  'tablet',
+  'target',
+  'timer',
+  'trending-down',
+  'trending-up',
+  'truck',
+  'upload',
+  'user-check',
+  'user-round',
+  'user',
+  'users',
+  'utensils',
+  'wallet-cards',
+  'wallet',
+  'wifi',
 ] as const;
 
-export const CATEGORY_ICON_OPTIONS: readonly IconOption[] = [
-  { label: 'Outros', value: '🏷️', symbol: '🏷️' },
-  { label: 'Compras', value: '🛒', symbol: '🛒' },
-  { label: 'Mercado', value: '🛍️', symbol: '🛍️' },
-  { label: 'Alimentação', value: '🍽️', symbol: '🍽️' },
-  { label: 'Moradia', value: '🏠', symbol: '🏠' },
-  { label: 'Transporte', value: '🚗', symbol: '🚗' },
-  { label: 'Saúde', value: '💊', symbol: '💊' },
-  { label: 'Educação', value: '📚', symbol: '📚' },
-  { label: 'Assinaturas', value: '🔁', symbol: '🔁' },
-  { label: 'Entretenimento', value: '🎬', symbol: '🎬' },
-  { label: 'Presentes', value: '🎁', symbol: '🎁' },
-  { label: 'Viagens', value: '✈️', symbol: '✈️' },
-  { label: 'Animais', value: '🐾', symbol: '🐾' },
-  { label: 'Contas', value: '🧾', symbol: '🧾' },
-  { label: 'Celular', value: '📱', symbol: '📱' },
-  { label: 'Energia', value: '💡', symbol: '💡' },
-  { label: 'Roupas', value: '👕', symbol: '👕' },
-  { label: 'Cuidados pessoais', value: '✨', symbol: '✨' },
-  { label: 'Esportes', value: '🏃', symbol: '🏃' },
-  { label: 'Café', value: '☕', symbol: '☕' },
-  { label: 'Delivery', value: '🛵', symbol: '🛵' },
-  { label: 'Crianças', value: '🧸', symbol: '🧸' },
-  { label: 'Impostos', value: '🏛️', symbol: '🏛️' },
-  { label: 'Manutenção', value: '🔧', symbol: '🔧' },
-  { label: 'Doações', value: '❤️', symbol: '❤️' },
-  { label: 'Beleza', value: '💇', symbol: '💇' },
-  { label: 'Jogos', value: '🎮', symbol: '🎮' },
-  { label: 'Música', value: '🎵', symbol: '🎵' },
-  { label: 'Festa', value: '🎉', symbol: '🎉' },
-  { label: 'Favorita', value: '★', symbol: '★' },
+const minimalistIconOptions: readonly IconOption[] = LUCIDE_ICON_NAMES.map((name) => ({
+  kind: 'minimalist',
+  label: formatLucideLabel(name),
+  value: `lucide:${name}`,
+}));
+
+const accountEmojiOptions = [
+  ['Banco', 'bank', '🏦'], ['Carteira', 'wallet', '👛'], ['Cartão', 'card', '💳'], ['Dinheiro', 'cash', '💵'],
+  ['Cofrinho', 'savings', '🐷'], ['Moedas', 'coins', '🪙'], ['Celular', 'mobile', '📱'], ['Casa', 'home', '🏠'],
+  ['Trabalho', 'work', '💼'], ['Investimentos', 'investment', '📈'], ['Conta digital', 'digital', '💻'],
+  ['Segurança', 'safe', '🔐'], ['Viagem', 'travel', '✈️'], ['Educação', 'education', '🎓'], ['Saúde', 'health', '🩺'],
+  ['Família', 'family', '👨‍👩‍👧'], ['Veículo', 'car', '🚗'], ['Presente', 'gift', '🎁'], ['Meta', 'target', '🎯'], ['Favorita', 'star', '★'],
 ] as const;
+
+const categoryEmojiOptions = [
+  ['Outros', '🏷️'], ['Compras', '🛒'], ['Mercado', '🛍️'], ['Alimentação', '🍽️'], ['Moradia', '🏠'], ['Transporte', '🚗'],
+  ['Saúde', '💊'], ['Educação', '📚'], ['Assinaturas', '🔁'], ['Entretenimento', '🎬'], ['Presentes', '🎁'], ['Viagens', '✈️'],
+  ['Animais', '🐾'], ['Contas', '🧾'], ['Celular', '📱'], ['Energia', '💡'], ['Roupas', '👕'], ['Cuidados pessoais', '✨'],
+  ['Esportes', '🏃'], ['Café', '☕'], ['Delivery', '🛵'], ['Crianças', '🧸'], ['Impostos', '🏛️'], ['Manutenção', '🔧'],
+  ['Doações', '❤️'], ['Beleza', '💇'], ['Jogos', '🎮'], ['Música', '🎵'], ['Festa', '🎉'], ['Favorita', '★'],
+] as const;
+
+export const ACCOUNT_ICON_OPTIONS: readonly IconOption[] = [
+  ...minimalistIconOptions,
+  ...accountEmojiOptions.map(([label, , emoji]) => ({ kind: 'emoji' as const, label, value: `emoji:${emoji}` })),
+];
+
+export const CATEGORY_ICON_OPTIONS: readonly IconOption[] = [
+  ...minimalistIconOptions,
+  ...categoryEmojiOptions.map(([label, emoji]) => ({ kind: 'emoji' as const, label, value: `emoji:${emoji}` })),
+];
 
 export function getThemeColorOptions(themeColor: string): readonly ColorOption[] {
   const base = hexToHsl(themeColor) ?? { hue: 125, saturation: 65, lightness: 50 };
@@ -93,7 +180,18 @@ export function resolveThemeColorValue(
 }
 
 export function getAccountIconSymbol(value: string): string {
-  return ACCOUNT_ICON_OPTIONS.find((option) => option.value === value)?.symbol ?? '•';
+  return accountEmojiOptions.find(([, legacyValue]) => legacyValue === value)?.[2] ?? '•';
+}
+
+export function getIconDisplayValue(value: string): string {
+  if (value.startsWith('lucide:') || value.startsWith('emoji:')) return value;
+  const accountEmoji = accountEmojiOptions.find(([, legacyValue]) => legacyValue === value)?.[2];
+  if (accountEmoji) return `emoji:${accountEmoji}`;
+  return `emoji:${value}`;
+}
+
+function formatLucideLabel(name: string): string {
+  return name.replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function normalizeHexColor(value: string): string | null {

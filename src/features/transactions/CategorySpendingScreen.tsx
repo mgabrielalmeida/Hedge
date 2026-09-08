@@ -6,7 +6,8 @@ import Svg, { Circle, Line, Path, Polygon, Rect, Text as SvgText } from 'react-n
 
 import {
   Card,
-  getAccountIconSymbol,
+  getIconDisplayValue,
+  IconGlyph,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
   Screen,
@@ -122,7 +123,7 @@ export function CategorySpendingScreen({
                   { backgroundColor: categoryColor, borderRadius: tokens.radius.md },
                 ]}
               >
-                <Text style={{ color: tokens.onPrimary }}>{data.category.iconValue}</Text>
+                <IconGlyph value={getIconDisplayValue(data.category.iconValue)} />
               </View>
               <View style={styles.titleText}>
                 <Text variant="heading">{data.category.name}</Text>
@@ -414,9 +415,10 @@ function CategorySpendingChart({
                 `legend-${item.account.id}`,
               )}
             </Svg>
-            <Text variant="caption">
-              {getAccountIconSymbol(item.account.iconValue)} {item.account.name}
-            </Text>
+            <View style={styles.legendAccount}>
+              <IconGlyph size={14} value={getIconDisplayValue(item.account.iconValue)} />
+              <Text variant="caption">{item.account.name}</Text>
+            </View>
           </View>
         ))}
       </View>
@@ -586,6 +588,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
   },
+  legendAccount: { alignItems: 'center', flexDirection: 'row', gap: 4 },
   sectionHeading: {
     alignItems: 'flex-end',
     flexDirection: 'row',

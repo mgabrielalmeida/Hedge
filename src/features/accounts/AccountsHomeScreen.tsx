@@ -6,7 +6,8 @@ import { useSQLiteContext } from 'expo-sqlite';
 import {
   Button,
   Card,
-  getAccountIconSymbol,
+  getIconDisplayValue,
+  IconGlyph,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
   Screen,
@@ -90,8 +91,6 @@ export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccount
 
 function AccountCard({ account }: { account: Account }) {
   const { tokens } = useTheme();
-  const symbol = getAccountIconSymbol(account.iconValue);
-
   return (
     <Card>
       <View style={styles.accountRow}>
@@ -102,7 +101,7 @@ function AccountCard({ account }: { account: Account }) {
             borderRadius: tokens.radius.md,
           },
         ]}>
-          <Text style={{ color: tokens.onPrimary }}>{symbol}</Text>
+          <IconGlyph value={getIconDisplayValue(account.iconValue)} />
         </View>
         <View style={styles.accountText}>
           <Text variant="title">{account.name}</Text>

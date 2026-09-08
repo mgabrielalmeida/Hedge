@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   ACCOUNT_ICON_OPTIONS,
+  getIconDisplayValue,
   Button,
   FadeSelection,
   Field,
@@ -49,7 +50,7 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
     currentBalanceCents === undefined ? '' : formatBrazilianMoneyInput(currentBalanceCents),
   );
   const [openingBalanceDate, setOpeningBalanceDate] = useState(getLocalCivilDate());
-  const [iconValue, setIconValue] = useState(account?.iconValue ?? 'bank');
+  const [iconValue, setIconValue] = useState(() => getIconDisplayValue(account?.iconValue ?? 'lucide:landmark'));
   const [colorValue, setColorValue] = useState(account?.colorValue ?? tokens.primary);
   const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(
     account ? account.themeColorIndex : 2,

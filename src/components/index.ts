@@ -13,12 +13,14 @@ export {
 export { Text } from './Text';
 export { useReducedMotion } from './useReducedMotion';
 export { VisualPicker } from './VisualPicker';
+export { IconGlyph } from './IconGlyph';
 export {
   ACCOUNT_ICON_OPTIONS,
   CATEGORY_ICON_OPTIONS,
   getThemeColorOptions,
   resolveThemeColorValue,
   getAccountIconSymbol,
+  getIconDisplayValue,
   hexToHsl,
   hslToHex,
   normalizeHexColor,

@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CATEGORY_ICON_OPTIONS,
+  getIconDisplayValue,
   Field,
   MoneyField,
   scheduleAfterSecondaryTransition,
@@ -32,7 +33,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
   const [category, setCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState('');
-  const [iconValue, setIconValue] = useState<string>(CATEGORY_ICON_OPTIONS[0].value);
+  const [iconValue, setIconValue] = useState<string>('emoji:🏷️');
   const [colorValue, setColorValue] = useState(tokens.primary);
   const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(2);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
           setCategory(found);
           setName(found.name);
           setBudget(formatBudget(found.monthlyBudgetCents));
-          setIconValue(found.iconValue);
+          setIconValue(getIconDisplayValue(found.iconValue));
           setColorValue(found.colorValue);
           setThemeColorIndex(found.themeColorIndex);
         }

@@ -34,7 +34,7 @@ distribuída.
 | Estado global | React Context apenas para tema e configurações pequenas |
 | Preferências | `expo-sqlite/kv-store` |
 | Entrada de datas | `@react-native-community/datetimepicker`, usando o controle nativo do sistema |
-| Gráficos vetoriais | `react-native-svg`, para gráficos locais integrados aos temas |
+| Gráficos vetoriais | `react-native-svg` e `react-native-svg-transformer`, para gráficos e ícones SVG locais |
 | Interface do sistema | `expo-status-bar` e `expo-navigation-bar`, acompanhando a aparência resolvida do tema |
 | Testes | Jest com `jest-expo` |
 | Lint | ESLint com `eslint-config-expo` |
@@ -227,8 +227,9 @@ O `DatePickerField` também fica nessa área e converte escolhas do controle
 nativo para datas civis no formato `YYYY-MM-DD` antes de devolvê-las ao
 formulário.
 Seletores visuais reutilizados por contas e categorias também permanecem nessa
-área, com opções locais de ícones e cinco tons derivados do tema ativo, sem
-dependência de recursos remotos.
+área, com opções locais de ícones minimalistas Lucide e emojis, além de cinco
+tons derivados do tema ativo, sem dependência de recursos remotos. Ícones
+minimalistas são SVGs empacotados e preservam sua cor fixa, independente do tema.
 Cada conta e categoria persiste os dois valores e os exibe em conjunto: o ícone
 sobre a cor escolhida. A escolha de um dos cinco tons predefinidos também
 persiste seu índice, para que seja resolvida novamente ao tema ativo mudar;

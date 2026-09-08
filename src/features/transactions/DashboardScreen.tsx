@@ -7,6 +7,8 @@ import {
   Button,
   Card,
   FadeSelection,
+  getIconDisplayValue,
+  IconGlyph,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
   Screen,
@@ -285,7 +287,6 @@ function CategoryBudgetCard({
   const percentageLabel = hasBudget ? `${Math.round(percentage)}%` : '—';
   const progressColor = getProgressColor(percentage, tokens);
   const visualColor = resolveThemeColorValue(category.colorValue, category.themeColorIndex, tokens.primary);
-  const visualSymbol = category.iconValue;
   const description = hasBudget
     ? `${formatBrazilianCurrency(spendingCents)} de ${formatBrazilianCurrency(category.monthlyBudgetCents)} gastos`
     : `${formatBrazilianCurrency(spendingCents)} gastos · sem orçamento definido`;
@@ -299,7 +300,7 @@ function CategoryBudgetCard({
             { backgroundColor: visualColor, borderRadius: tokens.radius.md },
           ]}
         >
-          <Text style={{ color: tokens.onPrimary }}>{visualSymbol}</Text>
+          <IconGlyph value={getIconDisplayValue(category.iconValue)} />
         </View>
         <View style={styles.categoryHeading}>
           <Text variant="title">{category.name}</Text>
