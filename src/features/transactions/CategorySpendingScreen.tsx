@@ -10,6 +10,7 @@ import {
   EntityVisual,
   getIconDisplayValue,
   MoneyText,
+  PressableCard,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
   ScreenHeader,
@@ -33,6 +34,7 @@ import { subscribeToRecurringProcessing } from './useRecurringProcessing';
 type CategorySpendingScreenProps = {
   categoryId?: number;
   onBack: () => void;
+  onEditExpense: (id: number) => void;
   selectedMonth?: YearMonth;
 };
 
@@ -48,6 +50,7 @@ const CHART_DRAW_DURATION = 900;
 export function CategorySpendingScreen({
   categoryId,
   onBack,
+  onEditExpense,
   selectedMonth,
 }: CategorySpendingScreenProps) {
   const database = useSQLiteContext();
@@ -139,7 +142,7 @@ export function CategorySpendingScreen({
       </View>
 
       <View style={styles.expenseList}>
-        {expenses.length === 0 ? <EmptyStateCard message="Nenhuma despesa nesta categoria durante o mês." /> : expenses.map((expense) => <ExpenseCard accounts={data.accounts} expense={expense} key={expense.id} />)}
+        {expenses.length === 0 ? <EmptyStateCard message="Nenhuma despesa nesta categoria durante o mês." /> : expenses.map((expense) => <ExpenseCard accounts={data.accounts} expense={expense} key={expense.id} onEdit={() => onEditExpense(expense.id)} />)}
       </View>
     </ScrollableScreen>
   );
@@ -148,14 +151,16 @@ export function CategorySpendingScreen({
 function ExpenseCard({
   accounts,
   expense,
+  onEdit,
 }: {
   accounts: readonly Account[];
   expense: ExpenseTransaction;
+  onEdit: () => void;
 }) {
   const account = accounts.find((item) => item.id === expense.accountId);
 
   return (
-    <Card>
+    <PressableCard accessibilityLabel={`Editar lançamento ${expense.name}`} onPress={onEdit}>
       <View style={styles.expenseHeader}>
         <Text variant="title" style={styles.expenseName}>{expense.name}</Text>
         <Text tone="negative" style={styles.expenseAmount}>
@@ -170,7 +175,7 @@ function ExpenseCard({
           {expense.description}
         </Text>
       ) : null}
-    </Card>
+    </PressableCard>
   );
 }
 

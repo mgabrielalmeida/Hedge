@@ -19,6 +19,7 @@ export default function CategorySpendingRoute() {
     <CategorySpendingScreen
       categoryId={categoryId}
       onBack={() => router.back()}
+      onEditExpense={(id) => router.push(`/transactions/${id}` as never)}
       selectedMonth={selectedMonth}
     />
   );

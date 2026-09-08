@@ -1,6 +1,6 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import {
   Button,
@@ -18,7 +18,7 @@ import {
   VisualPicker,
   resolveThemeColorValue,
 } from '@/components';
-import { createCategory, findCategoryById, updateCategory } from '@/db/repositories';
+import { createCategory, deleteCategory, findCategoryById, updateCategory } from '@/db/repositories';
 import { parseMoneyInput, validateRequiredText } from '@/domain';
 import type { Category, ThemeColorIndex } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -114,6 +114,18 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
     }
   }
 
+  function confirmDelete() {
+    if (!category) return;
+    Alert.alert(
+      'Excluir categoria?',
+      `“${category.name}” deixará de aparecer nas despesas. Regras recorrentes associadas serão desativadas.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: () => void deleteCategory(database, category.id).then(onDone).catch(() => setFeedback('A categoria não foi excluída. Tente novamente ou volte sem fazer alterações.')) },
+      ],
+    );
+  }
+
   if (loading) return <ScreenState message="Buscando os dados da categoria…" status="loading" title="Carregando categoria" />;
 
   if (loadError) return <ScreenState actionLabel={loadError === 'Categoria não encontrada.' ? 'Voltar' : 'Tentar novamente'} message={loadError} onAction={loadError === 'Categoria não encontrada.' ? onDone : () => void load()} onSecondaryAction={loadError === 'Categoria não encontrada.' ? undefined : onDone} secondaryActionLabel={loadError === 'Categoria não encontrada.' ? undefined : 'Voltar'} status={loadError === 'Categoria não encontrada.' ? 'notFound' : 'error'} />;
@@ -137,6 +149,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
               themeColorIndex={themeColorIndex}
             />
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar categoria'} onPress={() => void save()} />
+            {category ? <Button label="Excluir categoria" onPress={confirmDelete} variant="destructive" /> : null}
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>
         </Card>
