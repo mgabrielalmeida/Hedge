@@ -175,7 +175,7 @@ linha com conta de origem e destino.
 Contas usam arquivamento lógico para preservar o histórico e as referências de
 transferências: registros arquivados são excluídos das consultas que alimentam
 telas e não podem receber novas escritas. Arquivar uma conta desativa suas
-regras recorrentes ativas na mesma transação. Regras recorrentes usam exclusão lógica para preservar procedência. Uma tabela
+regras recorrentes ativas na mesma transação. Regras recorrentes usam exclusão lógica para preservar procedência e podem ser pausadas sem exclusão; regras pausadas não geram novas ocorrências até serem retomadas. Uma tabela
 de ocorrências registra cada data processada mesmo depois da exclusão do
 lançamento gerado, evitando geração duplicada. Ao inicializar ou retornar ao
 primeiro plano, o repositório gera em uma transação todas as datas vencidas e
@@ -223,14 +223,18 @@ interface sem remover os controles do sistema.
 
 Os componentes compartilhados mínimos são `Screen`, `Text`, `Card`, `Field` e
 `Button`. Eles ficam em `src/components`, recebem suas decisões visuais do
-tema e não têm conhecimento de funcionalidades ou do banco de dados.
+tema e não têm conhecimento de funcionalidades ou do banco de dados. Cores de
+primeiro plano sobre cores persistidas pelo usuário são resolvidas por uma
+regra de contraste em `src/theme`, escolhendo entre tokens do tema ativo; não
+devem usar preto ou branco literais como fallback visual.
 O `DatePickerField` também fica nessa área e converte escolhas do controle
 nativo para datas civis no formato `YYYY-MM-DD` antes de devolvê-las ao
 formulário.
 Seletores visuais reutilizados por contas e categorias também permanecem nessa
 área, com opções locais de ícones minimalistas Lucide e emojis, além de cinco
 tons derivados do tema ativo, sem dependência de recursos remotos. Ícones
-minimalistas são SVGs empacotados e preservam sua cor fixa, independente do tema.
+minimalistas são SVGs empacotados e recebem a cor resolvida pelos tokens ou
+pela regra de contraste do tema ativo.
 Cada conta e categoria persiste os dois valores e os exibe em conjunto: o ícone
 sobre a cor escolhida. A escolha de um dos cinco tons predefinidos também
 persiste seu índice, para que seja resolvida novamente ao tema ativo mudar;

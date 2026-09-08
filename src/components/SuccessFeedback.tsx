@@ -52,6 +52,7 @@ export function SuccessFeedbackProvider({ children }: PropsWithChildren) {
               borderColor: tokens.positive,
               borderRadius: tokens.radius.md,
               padding: tokens.spacing.md,
+              shadowColor: tokens.shadow,
             }]}
           >
             <Text style={{ color: tokens.onPositiveContainer, fontWeight: '700' }}>Concluído</Text>
@@ -71,5 +72,5 @@ export function useSuccessFeedback(): SuccessFeedbackContextValue {
 
 const styles = StyleSheet.create({
   layer: { left: 0, paddingHorizontal: 24, position: 'absolute', right: 0, top: 56, zIndex: 20 },
-  toast: { borderWidth: 1, elevation: 4, shadowColor: '#000', shadowOffset: { height: 3, width: 0 }, shadowOpacity: 0.18, shadowRadius: 8 },
+  toast: { borderWidth: 1, elevation: 4, shadowOffset: { height: 3, width: 0 }, shadowOpacity: 0.18, shadowRadius: 8 },
 });

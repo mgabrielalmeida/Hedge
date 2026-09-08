@@ -50,8 +50,8 @@ export async function deleteCategory(db: RepositoryDatabase, id: number, clock: 
 function validated(input: CategoryInput): Required<CategoryInput> {
   const name = validateRequiredText(input.name);
   const iconValue = input.iconValue ?? '🏷️';
-  const colorValue = input.colorValue ?? '#276749';
-  const themeColorIndex = input.themeColorIndex ?? null;
+  const colorValue = input.colorValue ?? 'theme';
+  const themeColorIndex = input.themeColorIndex ?? 2;
   if (!name.ok || !validateCategoryBudget(input.monthlyBudgetCents).ok || !validateRequiredText(iconValue).ok || !validateRequiredText(colorValue).ok || (themeColorIndex !== null && (!Number.isInteger(themeColorIndex) || themeColorIndex < 0 || themeColorIndex > 4))) throw new Error('Invalid category input.');
   return { ...input, name: name.value, iconValue: iconValue.trim(), colorValue: colorValue.trim(), themeColorIndex };
 }

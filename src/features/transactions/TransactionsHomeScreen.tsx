@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -8,6 +8,7 @@ import {
   ChipGroup,
   EmptyStateCard,
   FadeSelection,
+  FormFeedback,
   MoneyText,
   MonthNavigator,
   PressableCard,
@@ -19,10 +20,12 @@ import {
   SegmentedControl,
   Text,
   useReducedMotion,
+  useSuccessFeedback,
 } from '@/components';
-import { listAccounts, listCategories, listRecurringRules, listTransactions } from '@/db/repositories';
-import { calculateAccountBalance, calculateConsolidatedBalance, formatBrazilianCurrency, formatCivilDate } from '@/domain';
+import { listAccounts, listCategories, listRecurringRules, listTransactions, pauseRecurringRule, resumeRecurringRule } from '@/db/repositories';
+import { calculateAccountBalance, calculateConsolidatedBalance, formatBrazilianCurrency, formatCivilDate, getNextRecurringChargeDate } from '@/domain';
 import type { Account, Category, RecurringRule, Transaction, TransferTransaction, YearMonth } from '@/domain';
+import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 import { formatYearMonth, shiftYearMonth } from './monthNavigation';
@@ -59,6 +62,7 @@ export function TransactionsHomeScreen({
 }: TransactionsHomeScreenProps) {
   const db = useSQLiteContext();
   const screenReduceMotion = useReducedMotion();
+  const { showSuccess } = useSuccessFeedback();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
@@ -68,6 +72,7 @@ export function TransactionsHomeScreen({
   const [selectedMonth, setSelectedMonth] = useState<YearMonth>(() => getLocalCivilDate().slice(0, 7));
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [recurringActionError, setRecurringActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -75,7 +80,7 @@ export function TransactionsHomeScreen({
         listAccounts(db),
         listTransactions(db),
         listCategories(db),
-        listRecurringRules(db, true),
+        listRecurringRules(db),
       ]);
       if (loadedAccounts.length === 0) {
         onNoAccounts();
@@ -110,13 +115,11 @@ export function TransactionsHomeScreen({
       ? item.kind === 'transfer'
       : item.kind === 'expense' || item.kind === 'income';
   });
-  const visibleRecurringRules = recurringRules.filter((rule) => (
-    (selectedAccountId === null || rule.accountId === selectedAccountId) &&
-    rule.startDate.slice(0, 7) <= selectedMonth &&
-    (rule.endDate === null || rule.endDate.slice(0, 7) >= selectedMonth)
-  ));
+  const visibleRecurringRules = recurringRules
+    .filter((rule) => rule.deletedAt === null && (selectedAccountId === null || rule.accountId === selectedAccountId))
+    .map((rule) => ({ rule, nextChargeDate: getNextRecurringChargeDate(rule, getLocalCivilDate()) }))
+    .sort((left, right) => (left.nextChargeDate ?? '9999-12-31').localeCompare(right.nextChargeDate ?? '9999-12-31'));
   const transactionGroups = groupByDate(visibleTransactions.map((item) => ({ date: item.transactionDate, item })));
-  const recurringRuleGroups = groupByDate(visibleRecurringRules.map((item) => ({ date: item.startDate, item })));
   const displayedBalance = selectedAccount
     ? calculateAccountBalance(transactions, selectedAccount.id)
     : calculateConsolidatedBalance(transactions);
@@ -124,9 +127,23 @@ export function TransactionsHomeScreen({
   if (isLoading) return <ScreenState message="Buscando lançamentos e recorrências…" status="loading" title="Carregando histórico" />;
   if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
 
+  async function toggleRecurringRule(rule: RecurringRule) {
+    try {
+      const changed = rule.isActive
+        ? await pauseRecurringRule(db, rule.id)
+        : await resumeRecurringRule(db, rule.id);
+      if (!changed) throw new Error('Recurring rule state did not change.');
+      setRecurringActionError(null);
+      showSuccess(rule.isActive ? 'Recorrência pausada.' : 'Recorrência retomada.');
+      await load();
+    } catch {
+      setRecurringActionError(`Não foi possível ${rule.isActive ? 'pausar' : 'retomar'} a recorrência. Tente novamente.`);
+    }
+  }
+
   return (
     <ScrollableScreen>
-        <ScreenHeader title="Histórico" />
+        <ScreenHeader title="Histórico e recorrências" />
         <Card>
           <FadeSelection selectionKey={selectedAccountId ?? 'all'}>
             <Text tone="muted" variant="caption">{selectedAccount ? 'Saldo atual' : 'Saldo consolidado'}</Text>
@@ -146,19 +163,26 @@ export function TransactionsHomeScreen({
           options={HISTORY_TYPES}
           value={historyType}
         />
-        <MonthFilter month={selectedMonth} onChange={setSelectedMonth} />
+        {historyType !== 'recurring' ? <MonthFilter month={selectedMonth} onChange={setSelectedMonth} /> : null}
         <View style={styles.list}>
-          {historyType === 'recurring' ? recurringRuleGroups.length === 0 ? (
-            <EmptyStateCard message="Nenhuma regra recorrente está ativa neste mês." />
-          ) : recurringRuleGroups.map((group) => (
-            <HistoryDateGroup date={group.date} key={group.date}>
-              {group.items.map((rule) => (
-                <PressableCard accessibilityLabel={`Editar recorrência ${rule.name}`} key={rule.id} onPress={() => onEditRecurringRule(rule.id)}>
-                  <RecurringRuleCard accounts={accounts} categories={categories} rule={rule} />
-                </PressableCard>
+          {historyType === 'recurring' ? visibleRecurringRules.length === 0 ? (
+            <EmptyStateCard message="Nenhuma recorrência configurada para esta conta." />
+          ) : (
+            <>
+              {recurringActionError ? <FormFeedback message={recurringActionError} title="Não foi possível alterar a recorrência" /> : null}
+              {visibleRecurringRules.map(({ nextChargeDate, rule }) => (
+                <RecurringRuleCenterCard
+                  accounts={accounts}
+                  categories={categories}
+                  key={rule.id}
+                  nextChargeDate={nextChargeDate}
+                  onEdit={rule.isActive ? () => onEditRecurringRule(rule.id) : undefined}
+                  onToggle={() => void toggleRecurringRule(rule)}
+                  rule={rule}
+                />
               ))}
-            </HistoryDateGroup>
-          )) : visibleTransactions.length === 0 ? (
+            </>
+          ) : visibleTransactions.length === 0 ? (
             <EmptyStateCard message={historyType === 'transfers' ? 'Nenhuma transferência registrada neste mês.' : 'Nenhum lançamento registrado neste mês.'} />
           ) : transactionGroups.map((group) => (
             <HistoryDateGroup date={group.date} key={group.date}>
@@ -238,28 +262,65 @@ function TransferCard({ accounts, transaction }: { accounts: readonly Account[];
   );
 }
 
-function RecurringRuleCard({ accounts, categories, rule }: {
+function RecurringRuleCenterCard({ accounts, categories, nextChargeDate, onEdit, onToggle, rule }: {
   accounts: readonly Account[];
   categories: readonly Category[];
+  nextChargeDate: string | null;
+  onEdit?: () => void;
+  onToggle: () => void;
   rule: RecurringRule;
 }) {
+  const { tokens } = useTheme();
   const account = accounts.find((item) => item.id === rule.accountId)?.name ?? 'Conta indisponível';
   const category = rule.categoryId === null
     ? null
     : categories.find((item) => item.id === rule.categoryId)?.name ?? 'Categoria excluída';
-  return (
+  const content = (
     <View>
       <Text variant="title">{rule.name}</Text>
       <Text tone={rule.kind === 'income' ? 'positive' : 'negative'}>
         {formatBrazilianCurrency(rule.amountCents)}
       </Text>
       <Text tone="muted" variant="caption">
-        {formatRecurringSchedule(rule)} · {account}{category ? ` · ${category}` : ''}
+        Próxima cobrança: {!rule.isActive ? 'Pausada' : nextChargeDate ? formatCivilDate(nextChargeDate) : 'Encerrada'}
       </Text>
       <Text tone="muted" variant="caption">
-        Desde {formatCivilDate(rule.startDate)}{rule.endDate ? ` até ${formatCivilDate(rule.endDate)}` : ''}
+        Frequência: {formatRecurringSchedule(rule)}
       </Text>
+      <Text tone="muted" variant="caption">Conta: {account}</Text>
+      {category ? <Text tone="muted" variant="caption">Categoria: {category}</Text> : null}
     </View>
+  );
+  return (
+    <Card>
+      <View style={styles.recurringHeader}>
+        {onEdit ? (
+          <Pressable
+            accessibilityLabel={`Editar recorrência ${rule.name}`}
+            accessibilityRole="button"
+            onPress={onEdit}
+            style={({ pressed }) => [styles.recurringDetails, { opacity: pressed ? 0.78 : 1 }]}
+          >
+            {content}
+          </Pressable>
+        ) : <View style={styles.recurringDetails}>{content}</View>}
+        <Pressable
+          accessibilityLabel={rule.isActive ? `Pausar recorrência ${rule.name}` : `Retomar recorrência ${rule.name}`}
+          accessibilityRole="button"
+          onPress={onToggle}
+          style={({ pressed }) => [styles.recurringAction, {
+            backgroundColor: tokens.primaryContainer,
+            borderColor: tokens.border,
+            borderRadius: tokens.radius.pill,
+            opacity: pressed ? 0.72 : 1,
+          }]}
+        >
+          <Text style={{ color: tokens.onPrimaryContainer, fontWeight: '600' }} variant="caption">
+            {rule.isActive ? 'Pausar' : 'Retomar'}
+          </Text>
+        </Pressable>
+      </View>
+    </Card>
   );
 }
 
@@ -277,4 +338,7 @@ const styles = StyleSheet.create({
   dateGroupItems: { gap: 10 },
   dateHeading: { fontWeight: '600', paddingHorizontal: 4 },
   list: { gap: 10 },
+  recurringAction: { alignItems: 'center', borderWidth: 1, justifyContent: 'center', minHeight: 40, minWidth: 64, paddingHorizontal: 10 },
+  recurringDetails: { flex: 1, minWidth: 0 },
+  recurringHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 10 },
 });

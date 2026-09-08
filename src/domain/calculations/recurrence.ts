@@ -41,6 +41,26 @@ export function listRecurringRuleDatesDueBy(rule: RecurringRule, processingDate:
   }
 }
 
+export function getNextRecurringChargeDate(rule: RecurringRule, fromDate: CivilDate): CivilDate | null {
+  if (!rule.isActive) return null;
+  const start = compareCivilDates(fromDate, rule.startDate) < 0 ? rule.startDate : fromDate;
+  const { year, month } = getCivilDateParts(start);
+  let next: CivilDate;
+  if (rule.schedule.frequency === 'weekly') {
+    next = addDays(start, (rule.schedule.chargeDay - getMondayBasedWeekday(start) + 7) % 7);
+  } else if (rule.schedule.frequency === 'monthly') {
+    next = civilDate(year, month, Math.min(rule.schedule.chargeDay, daysInMonth(year, month)));
+    if (compareCivilDates(next, start) < 0) {
+      const following = nextMonth(year, month);
+      next = civilDate(following.year, following.month, Math.min(rule.schedule.chargeDay, daysInMonth(following.year, following.month)));
+    }
+  } else {
+    next = civilDate(year, rule.schedule.chargeMonth, Math.min(rule.schedule.chargeDay, daysInMonth(year, rule.schedule.chargeMonth)));
+    if (compareCivilDates(next, start) < 0) next = civilDate(year + 1, rule.schedule.chargeMonth, Math.min(rule.schedule.chargeDay, daysInMonth(year + 1, rule.schedule.chargeMonth)));
+  }
+  return rule.endDate !== null && compareCivilDates(next, rule.endDate) > 0 ? null : next;
+}
+
 function weeklyDates(rule: RecurringRule, endDate: CivilDate): readonly CivilDate[] {
   const offset = (rule.schedule.chargeDay - getMondayBasedWeekday(rule.startDate) + 7) % 7;
   const dates: CivilDate[] = [];

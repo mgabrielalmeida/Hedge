@@ -63,6 +63,18 @@ export async function deleteRecurringRule(db: RepositoryDatabase, id: number, cl
   const timestamp = clock();
   await db.runAsync('UPDATE recurring_rules SET is_active = 0, deleted_at = ?, updated_at = ? WHERE id = ?;', timestamp, timestamp, id); return true;
 }
+export async function pauseRecurringRule(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
+  const existing = await findRecurringRuleById(db, id);
+  if (!existing?.isActive) return false;
+  await db.runAsync('UPDATE recurring_rules SET is_active = 0, deleted_at = NULL, updated_at = ? WHERE id = ? AND is_active = 1;', clock(), id);
+  return true;
+}
+export async function resumeRecurringRule(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
+  const existing = await findRecurringRuleById(db, id);
+  if (!existing || existing.isActive || existing.deletedAt !== null) return false;
+  await db.runAsync('UPDATE recurring_rules SET is_active = 1, updated_at = ? WHERE id = ? AND is_active = 0 AND deleted_at IS NULL;', clock(), id);
+  return true;
+}
 export async function createDueOccurrence(
   db: RepositoryDatabase,
   ruleId: EntityId,

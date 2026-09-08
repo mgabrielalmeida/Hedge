@@ -1,5 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 
+import { getHighestContrastColor } from '@/theme/colorContrast';
+import { useTheme } from '@/theme/ThemeProvider';
+
 import { IconGlyph } from './IconGlyph';
 
 type EntityVisualProps = {
@@ -15,20 +18,24 @@ const sizes = {
 } as const;
 
 export function EntityVisual({ color, iconValue, size = 'medium' }: EntityVisualProps) {
+  const { tokens } = useTheme();
   const dimensions = sizes[size];
+  const backgroundColor = isHexColor(color) ? color : tokens.primary;
+  const iconColor = getHighestContrastColor(
+    backgroundColor,
+    [tokens.onPrimary, tokens.text, tokens.onPrimaryContainer],
+    tokens.text,
+  );
+
   return (
-    <View style={[styles.visual, { backgroundColor: color, borderRadius: dimensions.tile / 4, height: dimensions.tile, width: dimensions.tile }]}>
-      <IconGlyph color={getReadableIconColor(color)} size={dimensions.icon} value={iconValue} />
+    <View style={[styles.visual, { backgroundColor, borderRadius: dimensions.tile / 4, height: dimensions.tile, width: dimensions.tile }]}>
+      <IconGlyph color={iconColor} size={dimensions.icon} value={iconValue} />
     </View>
   );
 }
 
-function getReadableIconColor(color: string): string {
-  const value = color.replace('#', '');
-  if (!/^[0-9a-f]{6}$/i.test(value)) return '#1F2937';
-  const [red, green, blue] = value.match(/../g)!.map((part) => Number.parseInt(part, 16));
-  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
-  return luminance < 150 ? '#FFFFFF' : '#1F2937';
+function isHexColor(value: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(value.trim());
 }
 
 const styles = StyleSheet.create({ visual: { alignItems: 'center', justifyContent: 'center' } });

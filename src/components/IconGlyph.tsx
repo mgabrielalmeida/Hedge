@@ -2,6 +2,8 @@ import { StyleSheet } from 'react-native';
 import type { ComponentType } from 'react';
 import type { SvgProps } from 'react-native-svg';
 
+import { useTheme } from '@/theme/ThemeProvider';
+
 import { Text } from './Text';
 
 type IconGlyphProps = {
@@ -9,8 +11,6 @@ type IconGlyphProps = {
   size?: number;
   value: string;
 };
-
-const MINIMALIST_ICON_COLOR = '#1F2937';
 
 const lucideIcons: Readonly<Record<string, ComponentType<SvgProps>>> = {
   'lucide:apple': require('../../assets/lucide_icons/apple.svg').default,
@@ -123,11 +123,12 @@ const lucideIcons: Readonly<Record<string, ComponentType<SvgProps>>> = {
   'lucide:wifi': require('../../assets/lucide_icons/wifi.svg').default,
 };
 
-export function IconGlyph({ color = MINIMALIST_ICON_COLOR, size = 22, value }: IconGlyphProps) {
+export function IconGlyph({ color, size = 22, value }: IconGlyphProps) {
+  const { tokens } = useTheme();
   const LucideIcon = lucideIcons[value];
 
   if (LucideIcon) {
-    return <LucideIcon color={color} height={size} width={size} />;
+    return <LucideIcon color={color ?? tokens.text} height={size} width={size} />;
   }
 
   return <Text style={[styles.emoji, { fontSize: size, lineHeight: Math.round(size * 1.25) }]}>{value.replace('emoji:', '')}</Text>;
