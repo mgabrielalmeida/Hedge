@@ -1,5 +1,5 @@
-import type { ComponentProps, PropsWithChildren } from 'react';
-import { ScrollView, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import type { ComponentProps, PropsWithChildren, ReactNode } from 'react';
+import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -7,10 +7,11 @@ import { Screen } from './Screen';
 
 type ScrollableScreenProps = PropsWithChildren<Omit<ComponentProps<typeof ScrollView>, 'children' | 'contentContainerStyle' | 'style'> & {
   contentContainerStyle?: StyleProp<ViewStyle>;
+  footer?: ReactNode;
   style?: StyleProp<ViewStyle>;
 }>;
 
-export function ScrollableScreen({ children, contentContainerStyle, style, ...props }: ScrollableScreenProps) {
+export function ScrollableScreen({ children, contentContainerStyle, footer, style, ...props }: ScrollableScreenProps) {
   const { tokens } = useTheme();
 
   return (
@@ -19,7 +20,7 @@ export function ScrollableScreen({ children, contentContainerStyle, style, ...pr
         {...props}
         contentContainerStyle={[
           styles.content,
-          { gap: tokens.spacing.xl, paddingVertical: tokens.spacing.xl },
+          { gap: tokens.spacing.xl, paddingBottom: tokens.spacing.xl, paddingTop: tokens.spacing.xl },
           contentContainerStyle,
         ]}
         keyboardShouldPersistTaps="handled"
@@ -27,6 +28,7 @@ export function ScrollableScreen({ children, contentContainerStyle, style, ...pr
       >
         {children}
       </ScrollView>
+      {footer ? <View style={{ paddingBottom: tokens.spacing.lg, paddingTop: tokens.spacing.sm }}>{footer}</View> : null}
     </Screen>
   );
 }

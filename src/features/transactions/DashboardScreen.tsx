@@ -62,6 +62,7 @@ export function DashboardScreen({
   const [selectedMonth, setSelectedMonth] = useState(() => getLocalCivilDate().slice(0, 7));
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -104,7 +105,23 @@ export function DashboardScreen({
   if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
 
   return (
-    <ScrollableScreen>
+    <ScrollableScreen
+      footer={
+        <View style={styles.addArea}>
+          {isAddMenuOpen ? (
+            <Card elevated>
+              <View style={styles.addChoices}>
+                <Button label="Despesa" onPress={() => { setIsAddMenuOpen(false); onNewExpense(); }} style={styles.addChoice} variant="secondary" />
+                <Button label="Renda" onPress={() => { setIsAddMenuOpen(false); onNewIncome(); }} style={styles.addChoice} variant="secondary" />
+                <Button disabled={accounts.length < 2} label="Transferir" onPress={() => { setIsAddMenuOpen(false); onNewTransfer(); }} style={styles.addChoice} variant="secondary" />
+              </View>
+              {accounts.length < 2 ? <Text tone="muted" variant="caption" style={styles.transferHint}>Cadastre outra conta para transferir.</Text> : null}
+            </Card>
+          ) : null}
+          <Button accessibilityState={{ expanded: isAddMenuOpen }} label="Adicionar" onPress={() => setIsAddMenuOpen((isOpen) => !isOpen)} />
+        </View>
+      }
+    >
         <ScreenHeader title="Visão financeira" />
 
         <Card elevated>
@@ -163,19 +180,6 @@ export function DashboardScreen({
           ))}
         </View>
 
-        <Button label="Nova despesa" onPress={onNewExpense} />
-        <Button label="Nova renda" onPress={onNewIncome} variant="secondary" />
-        <Button
-          disabled={accounts.length < 2}
-          label="Nova transferência"
-          onPress={onNewTransfer}
-          variant="secondary"
-        />
-        {accounts.length < 2 ? (
-          <Text tone="muted" variant="caption">
-            Cadastre outra conta para fazer transferências.
-          </Text>
-        ) : null}
     </ScrollableScreen>
   );
 }
@@ -266,6 +270,9 @@ function getProgressColor(
 }
 
 const styles = StyleSheet.create({
+  addArea: { gap: 8 },
+  addChoice: { flex: 1, paddingHorizontal: 8 },
+  addChoices: { flexDirection: 'row', gap: 8 },
   budgetDescription: {
     marginTop: 8,
   },
@@ -294,4 +301,5 @@ const styles = StyleSheet.create({
     marginTop: 6,
     overflow: 'hidden',
   },
+  transferHint: { marginTop: 8 },
 });
