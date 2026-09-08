@@ -12,7 +12,7 @@ import {
   useReducedMotion,
 } from '@/components';
 import { listAccounts, listCategories, listRecurringRules, listTransactions } from '@/db/repositories';
-import { calculateAccountBalance, formatBrazilianCurrency } from '@/domain';
+import { calculateAccountBalance, calculateConsolidatedBalance, formatBrazilianCurrency } from '@/domain';
 import type { Account, Category, RecurringRule, Transaction, TransferTransaction } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -58,7 +58,7 @@ export function TransactionsHomeScreen({
         return;
       }
       setAccounts(loadedAccounts);
-      setSelectedAccountId((id) => id ?? loadedAccounts[0].id);
+      setSelectedAccountId((id) => id !== null && loadedAccounts.some((account) => account.id === id) ? id : null);
       setTransactions(loadedTransactions);
       setCategories(loadedCategories);
       setRecurringRules(loadedRecurringRules);
@@ -73,10 +73,21 @@ export function TransactionsHomeScreen({
   ), [load, screenReduceMotion]));
   useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
 
-  const selectedAccount = accounts.find((item) => item.id === selectedAccountId) ?? null;
-  const visibleTransactions = transactions.filter((item) => historyType === 'transfers'
-    ? item.kind === 'transfer'
-    : item.kind === 'expense' || item.kind === 'income');
+  const selectedAccount = selectedAccountId === null
+    ? null
+    : accounts.find((item) => item.id === selectedAccountId) ?? null;
+  const visibleTransactions = transactions.filter((item) => {
+    const hasSelectedAccount = selectedAccountId === null || item.accountId === selectedAccountId ||
+      (item.kind === 'transfer' && item.destinationAccountId === selectedAccountId);
+    if (!hasSelectedAccount) return false;
+    return historyType === 'transfers'
+      ? item.kind === 'transfer'
+      : item.kind === 'expense' || item.kind === 'income';
+  });
+  const visibleRecurringRules = recurringRules.filter((rule) => selectedAccountId === null || rule.accountId === selectedAccountId);
+  const displayedBalance = selectedAccount
+    ? calculateAccountBalance(transactions, selectedAccount.id)
+    : calculateConsolidatedBalance(transactions);
 
   return (
     <Screen>
@@ -84,39 +95,25 @@ export function TransactionsHomeScreen({
         <View>
           <Text variant="heading">Histórico</Text>
         </View>
-        {selectedAccount ? (
-          <Card>
-            <FadeSelection selectionKey={selectedAccount.id}>
-              <Text tone="muted" variant="caption">Saldo atual</Text>
-              <Text variant="title">{selectedAccount.name}</Text>
-              <Text variant="heading">
-                {formatBrazilianCurrency(calculateAccountBalance(transactions, selectedAccount.id))}
-              </Text>
-            </FadeSelection>
-            <View style={styles.accounts}>
-              {accounts.map((account) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: account.id === selectedAccountId }}
-                  key={account.id}
-                  onPress={() => setSelectedAccountId(account.id)}
-                  style={[
-                    styles.account,
-                    { borderColor: account.id === selectedAccountId ? tokens.primary : tokens.border },
-                  ]}
-                >
-                  <Text variant="caption">{account.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </Card>
-        ) : null}
+        <Card>
+          <FadeSelection selectionKey={selectedAccountId ?? 'all'}>
+            <Text tone="muted" variant="caption">{selectedAccount ? 'Saldo atual' : 'Saldo consolidado'}</Text>
+            <Text variant="title">{selectedAccount?.name ?? 'Todas as contas'}</Text>
+            <Text variant="heading">{formatBrazilianCurrency(displayedBalance)}</Text>
+          </FadeSelection>
+          <View style={styles.accounts}>
+            <AccountChoice label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
+            {accounts.map((account) => (
+              <AccountChoice key={account.id} label={account.name} onPress={() => setSelectedAccountId(account.id)} selected={account.id === selectedAccountId} />
+            ))}
+          </View>
+        </Card>
         <HistoryToggle selected={historyType} onSelect={setHistoryType} />
         {error ? <Text tone="negative">{error}</Text> : null}
         <View style={styles.list}>
-          {historyType === 'recurring' ? recurringRules.length === 0 ? (
+          {historyType === 'recurring' ? visibleRecurringRules.length === 0 ? (
             <Card><Text tone="muted">Nenhuma regra recorrente cadastrada ainda.</Text></Card>
-          ) : recurringRules.map((rule) => (
+          ) : visibleRecurringRules.map((rule) => (
             <Pressable key={rule.id} onPress={() => onEditRecurringRule(rule.id)}>
               <RecurringRuleCard accounts={accounts} categories={categories} rule={rule} />
             </Pressable>
@@ -143,6 +140,20 @@ export function TransactionsHomeScreen({
         </View>
       </ScrollView>
     </Screen>
+  );
+}
+
+function AccountChoice({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
+  const { tokens } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[styles.account, { borderColor: selected ? tokens.primary : tokens.border }]}
+    >
+      <Text variant="caption">{label}</Text>
+    </Pressable>
   );
 }
 

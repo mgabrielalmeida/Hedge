@@ -145,7 +145,10 @@ categoria é obrigatória para uma despesa e não é necessária para uma renda.
 Não é permitido registrar lançamentos pontuais com data futura.
 
 O usuário pode acessar um histórico de despesas e rendas pontuais e pode
-editar ou excluir seus lançamentos. O lançamento de saldo inicial também segue
+filtrá-lo por uma conta ativa ou pela opção **Todas**, que apresenta o saldo
+consolidado e o histórico sem filtro. Transferências vinculadas à conta
+selecionada, seja como origem ou destino, aparecem no respectivo histórico de
+transferências. O usuário pode editar ou excluir seus lançamentos. O lançamento de saldo inicial também segue
 essas regras, embora não seja apresentado como um atributo da conta. A
 exclusão é permanente: o lançamento deixa de integrar o histórico e os
 cálculos de saldo e gastos.
