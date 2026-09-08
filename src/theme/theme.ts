@@ -8,6 +8,9 @@ export const THEME_NAMES = [
   'rose',
   'sand',
   'midnight',
+  'volcanic',
+  'aurora',
+  'citrus',
 ] as const;
 
 export type ThemeName = (typeof THEME_NAMES)[number];
@@ -77,6 +80,9 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
   { name: 'rose', title: 'Rosa', description: 'Tons rosa vibrantes e delicados.' },
   { name: 'sand', title: 'Areia', description: 'Neutros quentes e naturais.' },
   { name: 'midnight', title: 'Meia-noite', description: 'Grafite elegante com azul glacial.' },
+  { name: 'volcanic', title: 'Volcânico', description: 'Vermelhos de lava e cinzas minerais.' },
+  { name: 'aurora', title: 'Aurora', description: 'Teal luminoso com violeta sereno.' },
+  { name: 'citrus', title: 'Cítrico', description: 'Verdes vivos e dourado ensolarado.' },
 ];
 
 const themes: Record<ThemeName, Record<ResolvedAppearance, ThemeColors>> = {
@@ -232,6 +238,72 @@ const themes: Record<ThemeName, Record<ResolvedAppearance, ThemeColors>> = {
       warning: '#EAC76F', warningContainer: '#4C3A00', onWarningContainer: '#FFE7A6',
       info: '#9BD2F2', infoContainer: '#234E67', onInfoContainer: '#CBEAFF',
       focusRing: '#C6E8FA', shadow: 'rgba(0, 0, 0, 0.58)', overlay: 'rgba(0, 0, 0, 0.7)',
+    },
+  },
+  volcanic: {
+    light: {
+      background: '#F8F7F7', surface: '#FFFFFF', surfaceElevated: '#FFFFFF', surfaceSubtle: '#EEECEC',
+      text: '#242124', textMuted: '#6A6367', primary: '#B3261E', onPrimary: '#FFFFFF',
+      primaryContainer: '#FFDAD5', onPrimaryContainer: '#68000A', border: '#DDD8D9', borderStrong: '#AFA7A9',
+      positive: '#397151', positiveContainer: '#D8F1E2', onPositiveContainer: '#173F2A',
+      negative: '#B3261E', onNegative: '#FFFFFF', negativeContainer: '#FFDAD5', onNegativeContainer: '#68000A',
+      warning: '#875100', warningContainer: '#FFE2B8', onWarningContainer: '#482900',
+      info: '#58626B', infoContainer: '#E1E7EB', onInfoContainer: '#2E363C',
+      focusRing: '#B3261E', shadow: 'rgba(36, 33, 36, 0.18)', overlay: 'rgba(36, 33, 36, 0.38)',
+    },
+    dark: {
+      background: '#141213', surface: '#201D1E', surfaceElevated: '#2A2527', surfaceSubtle: '#352E30',
+      text: '#F3EFF0', textMuted: '#C8BEC0', primary: '#FFB4AA', onPrimary: '#68000A',
+      primaryContainer: '#8C1D17', onPrimaryContainer: '#FFDAD5', border: '#4F4547', borderStrong: '#817477',
+      positive: '#98D5B2', positiveContainer: '#214B34', onPositiveContainer: '#C8F1D9',
+      negative: '#FFB4AA', onNegative: '#68000A', negativeContainer: '#93000A', onNegativeContainer: '#FFDAD5',
+      warning: '#F2BF6C', warningContainer: '#4E3800', onWarningContainer: '#FFE1A7',
+      info: '#C1CBD3', infoContainer: '#3C464D', onInfoContainer: '#DDE7EE',
+      focusRing: '#FFD0C8', shadow: 'rgba(0, 0, 0, 0.58)', overlay: 'rgba(0, 0, 0, 0.7)',
+    },
+  },
+  aurora: {
+    light: {
+      background: '#F5F8FA', surface: '#FFFFFF', surfaceElevated: '#FFFFFF', surfaceSubtle: '#E7F0F2',
+      text: '#172B31', textMuted: '#597077', primary: '#167A78', onPrimary: '#FFFFFF',
+      primaryContainer: '#B8F2ED', onPrimaryContainer: '#004F4E', border: '#D1E0E1', borderStrong: '#9CB8BA',
+      positive: '#397151', positiveContainer: '#D8F1E2', onPositiveContainer: '#173F2A',
+      negative: '#B3264B', onNegative: '#FFFFFF', negativeContainer: '#FFD9E2', onNegativeContainer: '#65132B',
+      warning: '#825F00', warningContainer: '#FCE9C2', onWarningContainer: '#463300',
+      info: '#625A9A', infoContainer: '#E8E2FF', onInfoContainer: '#393268',
+      focusRing: '#167A78', shadow: 'rgba(23, 43, 49, 0.18)', overlay: 'rgba(23, 43, 49, 0.36)',
+    },
+    dark: {
+      background: '#0D1719', surface: '#152326', surfaceElevated: '#1E2E31', surfaceSubtle: '#26393C',
+      text: '#E5F2F3', textMuted: '#B5C9CA', primary: '#8DDBD4', onPrimary: '#003735',
+      primaryContainer: '#005F5C', onPrimaryContainer: '#B8F2ED', border: '#3A5053', borderStrong: '#6B8587',
+      positive: '#98D5B2', positiveContainer: '#214B34', onPositiveContainer: '#C8F1D9',
+      negative: '#FFB1C4', onNegative: '#650029', negativeContainer: '#7B1940', onNegativeContainer: '#FFD9E2',
+      warning: '#EAC66F', warningContainer: '#4C3A00', onWarningContainer: '#FFE7A6',
+      info: '#C9C1FF', infoContainer: '#49427B', onInfoContainer: '#E8E2FF',
+      focusRing: '#B5F4ED', shadow: 'rgba(0, 0, 0, 0.52)', overlay: 'rgba(0, 0, 0, 0.66)',
+    },
+  },
+  citrus: {
+    light: {
+      background: '#FAF9F1', surface: '#FFFFFF', surfaceElevated: '#FFFFFF', surfaceSubtle: '#EFF0DB',
+      text: '#28301A', textMuted: '#667052', primary: '#5D7510', onPrimary: '#FFFFFF',
+      primaryContainer: '#DCF5A5', onPrimaryContainer: '#314100', border: '#DDE1CA', borderStrong: '#B3BA9C',
+      positive: '#397151', positiveContainer: '#D8F1E2', onPositiveContainer: '#173F2A',
+      negative: '#B3261E', onNegative: '#FFFFFF', negativeContainer: '#FFDAD5', onNegativeContainer: '#68000A',
+      warning: '#815D00', warningContainer: '#FCE9B8', onWarningContainer: '#483400',
+      info: '#38666B', infoContainer: '#D6F1F2', onInfoContainer: '#17464B',
+      focusRing: '#5D7510', shadow: 'rgba(40, 48, 26, 0.18)', overlay: 'rgba(40, 48, 26, 0.36)',
+    },
+    dark: {
+      background: '#15180E', surface: '#202419', surfaceElevated: '#2A2F21', surfaceSubtle: '#353B2A',
+      text: '#EEF4DE', textMuted: '#C1C9AD', primary: '#C1E85A', onPrimary: '#2B3800',
+      primaryContainer: '#475C00', onPrimaryContainer: '#DCF5A5', border: '#48503A', borderStrong: '#788165',
+      positive: '#98D5B2', positiveContainer: '#214B34', onPositiveContainer: '#C8F1D9',
+      negative: '#FFB4AA', onNegative: '#68000A', negativeContainer: '#93000A', onNegativeContainer: '#FFDAD5',
+      warning: '#F2C96D', warningContainer: '#4E3B00', onWarningContainer: '#FFE7A6',
+      info: '#9DDBDE', infoContainer: '#1D4D50', onInfoContainer: '#C0F4F5',
+      focusRing: '#E0FF8B', shadow: 'rgba(0, 0, 0, 0.52)', overlay: 'rgba(0, 0, 0, 0.66)',
     },
   },
 };

@@ -89,13 +89,13 @@ describe('theme preferences', () => {
   it('persists each preference through the injected storage', async () => {
     const storage = createStorage();
 
-    await saveThemeName('midnight', storage);
+    await saveThemeName('volcanic', storage);
     await saveAppearancePreference('light', storage);
 
     expect(storage.setItem).toHaveBeenNthCalledWith(
       1,
       'preferences.themeName',
-      'midnight',
+      'volcanic',
     );
     expect(storage.setItem).toHaveBeenNthCalledWith(
       2,

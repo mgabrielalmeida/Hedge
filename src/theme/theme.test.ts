@@ -27,9 +27,10 @@ describe('getThemeTokens', () => {
   });
 
   it('recognizes every supported theme name', () => {
-    expect(THEME_NAMES).toHaveLength(7);
+    expect(THEME_NAMES).toHaveLength(10);
     expect(THEME_NAMES.every(isThemeName)).toBe(true);
     expect(isThemeName('rose')).toBe(true);
+    expect(isThemeName('volcanic')).toBe(true);
     expect(isThemeName('unsupported')).toBe(false);
   });
 });
