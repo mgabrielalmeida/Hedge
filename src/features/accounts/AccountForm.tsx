@@ -170,6 +170,7 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
       ) : null}
 
       <VisualPicker
+        key={iconValue}
         iconOptions={ACCOUNT_ICON_OPTIONS}
         iconValue={iconValue}
         colorValue={colorValue}

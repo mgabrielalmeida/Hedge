@@ -6,6 +6,7 @@ export { Field } from './Field';
 export { FadeSelection } from './FadeSelection';
 export { MoneyField } from './MoneyField';
 export { Screen } from './Screen';
+export { SegmentedControl } from './SegmentedControl';
 export {
   SECONDARY_SCREEN_TRANSITION_DURATION,
   scheduleAfterSecondaryTransition,

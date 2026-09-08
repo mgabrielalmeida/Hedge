@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeProvider';
@@ -5,6 +6,7 @@ import type { ThemeColorIndex } from '@/domain';
 
 import { Text } from './Text';
 import { IconGlyph } from './IconGlyph';
+import { SegmentedControl } from './SegmentedControl';
 import {
   hexToHsl,
   hslToHex,
@@ -62,26 +64,33 @@ export function VisualPicker({
   themeColorIndex,
 }: VisualPickerProps) {
   const { tokens } = useTheme();
+  const selectedIconKind = iconOptions.find((option) => option.value === iconValue)?.kind;
+  const [activeIconKind, setActiveIconKind] = useState<'emoji' | 'minimalist'>(
+    selectedIconKind ?? 'minimalist',
+  );
   const themeColorOptions = getThemeColorOptions(tokens.primary);
   const resolvedColorValue = resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary);
 
+  const visibleIconOptions = iconOptions.filter((option) => option.kind === activeIconKind);
+
   return (
     <View style={styles.container}>
-      {(['minimalist', 'emoji'] as const).map((kind) => {
-        const options = iconOptions.filter((option) => option.kind === kind);
-        if (options.length === 0) return null;
-
-        return (
-          <View key={kind} style={styles.iconSection}>
-            <Text variant="caption" style={{ color: tokens.textMuted }}>
-              {kind === 'minimalist' ? 'Minimalistas' : 'Emojis'}
-            </Text>
-            <View
-              accessibilityLabel={kind === 'minimalist' ? 'Ícones minimalistas' : 'Emojis'}
-              accessibilityRole="radiogroup"
-              style={styles.grid}
-            >
-              {options.map((option) => {
+      <Text variant="caption" style={{ color: tokens.textMuted }}>Ícone</Text>
+      <SegmentedControl
+        accessibilityLabel="Tipo de ícone"
+        onChange={setActiveIconKind}
+        options={[
+          { label: 'Minimalistas', value: 'minimalist' },
+          { label: 'Emojis', value: 'emoji' },
+        ]}
+        value={activeIconKind}
+      />
+      <View
+        accessibilityLabel={activeIconKind === 'minimalist' ? 'Ícones minimalistas' : 'Emojis'}
+        accessibilityRole="radiogroup"
+        style={styles.grid}
+      >
+        {visibleIconOptions.map((option) => {
           const selected = iconValue === option.value;
 
           return (
@@ -94,7 +103,7 @@ export function VisualPicker({
               style={({ pressed }) => [
                 styles.option,
                 {
-                  backgroundColor: selected ? tokens.primaryContainer : tokens.surfaceSubtle,
+                  backgroundColor: resolvedColorValue,
                   borderColor: selected ? tokens.focusRing : tokens.border,
                   borderRadius: tokens.radius.md,
                   borderWidth: selected ? 3 : 1,
@@ -106,11 +115,8 @@ export function VisualPicker({
               {selected ? <SelectionBadge /> : null}
             </Pressable>
           );
-              })}
-            </View>
-          </View>
-        );
-      })}
+        })}
+      </View>
 
       <Text variant="caption" style={{ color: tokens.textMuted }}>Cor</Text>
       <View accessibilityLabel="Cor do indicador visual" accessibilityRole="radiogroup" style={styles.grid}>
@@ -360,7 +366,6 @@ const styles = StyleSheet.create({
     width: 44,
   },
   hueSwatch: { borderRadius: 16, height: 32, width: 32 },
-  iconSection: { gap: 8 },
   mixer: { borderWidth: 1, gap: 16, padding: 14 },
   mixerPreview: {
     borderWidth: 3,

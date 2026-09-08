@@ -416,7 +416,18 @@ function CategorySpendingChart({
               )}
             </Svg>
             <View style={styles.legendAccount}>
-              <IconGlyph size={14} value={getIconDisplayValue(item.account.iconValue)} />
+              <View
+                style={[
+                  styles.legendIcon,
+                  {
+                    backgroundColor: item.accountColor,
+                    borderColor: tokens.border,
+                    borderRadius: tokens.radius.sm,
+                  },
+                ]}
+              >
+                <IconGlyph size={15} value={getIconDisplayValue(item.account.iconValue)} />
+              </View>
               <Text variant="caption">{item.account.name}</Text>
             </View>
           </View>
@@ -589,6 +600,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   legendAccount: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  legendIcon: { alignItems: 'center', borderWidth: 1, height: 24, justifyContent: 'center', width: 24 },
   sectionHeading: {
     alignItems: 'flex-end',
     flexDirection: 'row',

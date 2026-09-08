@@ -112,6 +112,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
             <Field error={error ?? undefined} label="Nome" onChangeText={setName} placeholder="Ex.: Moradia" value={name} />
             <MoneyField label="Orçamento mensal" onChangeText={setBudget} placeholder="0,00" value={budget} />
             <VisualPicker
+              key={iconValue}
               iconOptions={CATEGORY_ICON_OPTIONS}
               iconValue={iconValue}
               colorValue={colorValue}

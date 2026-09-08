@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -8,6 +8,7 @@ import {
   FadeSelection,
   scheduleAfterSecondaryTransition,
   Screen,
+  SegmentedControl,
   Text,
   useReducedMotion,
 } from '@/components';
@@ -20,8 +21,11 @@ import { subscribeToRecurringProcessing } from './useRecurringProcessing';
 
 type HistoryType = 'transactions' | 'transfers' | 'recurring';
 
-const HISTORY_TYPES: readonly HistoryType[] = ['transactions', 'transfers', 'recurring'];
-const HISTORY_TOGGLE_DURATION = 220;
+const HISTORY_TYPES = [
+  { label: 'Lançamentos', value: 'transactions' },
+  { label: 'Transferências', value: 'transfers' },
+  { label: 'Recorrências', value: 'recurring' },
+] as const;
 
 type TransactionsHomeScreenProps = {
   onEditRecurringRule: (id: number) => void;
@@ -108,7 +112,12 @@ export function TransactionsHomeScreen({
             ))}
           </View>
         </Card>
-        <HistoryToggle selected={historyType} onSelect={setHistoryType} />
+        <SegmentedControl
+          accessibilityLabel="Tipo de histórico"
+          onChange={setHistoryType}
+          options={HISTORY_TYPES}
+          value={historyType}
+        />
         {error ? <Text tone="negative">{error}</Text> : null}
         <View style={styles.list}>
           {historyType === 'recurring' ? visibleRecurringRules.length === 0 ? (
@@ -153,117 +162,6 @@ function AccountChoice({ label, onPress, selected }: { label: string; onPress: (
       style={[styles.account, { borderColor: selected ? tokens.primary : tokens.border }]}
     >
       <Text variant="caption">{label}</Text>
-    </Pressable>
-  );
-}
-
-function HistoryToggle({
-  onSelect,
-  selected,
-}: {
-  onSelect: (value: HistoryType) => void;
-  selected: HistoryType;
-}) {
-  const { tokens } = useTheme();
-  const reduceMotion = useReducedMotion();
-  const motionEnabled = reduceMotion === false;
-  const selectedIndex = HISTORY_TYPES.indexOf(selected);
-  const [indicatorIndex] = useState(() => new Animated.Value(selectedIndex));
-  const [toggleWidth, setToggleWidth] = useState(0);
-  const optionWidth = Math.max(toggleWidth - 8, 0) / HISTORY_TYPES.length;
-  const inputRange = HISTORY_TYPES.map((_, index) => index);
-  const outputRange = HISTORY_TYPES.map((_, index) => index * optionWidth + 4);
-
-  useEffect(() => {
-    if (!motionEnabled) {
-      indicatorIndex.setValue(selectedIndex);
-      return;
-    }
-
-    const animation = Animated.timing(indicatorIndex, {
-      duration: HISTORY_TOGGLE_DURATION,
-      easing: Easing.out(Easing.cubic),
-      toValue: selectedIndex,
-      useNativeDriver: true,
-    });
-
-    animation.start();
-    return () => animation.stop();
-  }, [indicatorIndex, motionEnabled, selectedIndex]);
-
-  return (
-    <View
-      accessibilityRole="tablist"
-      onLayout={(event) => {
-        const nextWidth = event.nativeEvent.layout.width;
-        setToggleWidth((currentWidth) => currentWidth === nextWidth ? currentWidth : nextWidth);
-      }}
-      style={[styles.toggle, { backgroundColor: tokens.surfaceSubtle, borderColor: tokens.border }]}
-    >
-      {toggleWidth > 0 ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.toggleIndicator,
-            {
-              backgroundColor: tokens.surfaceElevated,
-              borderColor: tokens.borderStrong,
-              borderRadius: tokens.radius.md,
-              transform: [{
-                translateX: indicatorIndex.interpolate({ inputRange, outputRange }),
-              }],
-              width: optionWidth,
-            },
-          ]}
-        />
-      ) : null}
-      <ToggleOption
-        label="Lançamentos"
-        onPress={() => onSelect('transactions')}
-        selected={selected === 'transactions'}
-      />
-      <ToggleOption
-        label="Transferências"
-        onPress={() => onSelect('transfers')}
-        selected={selected === 'transfers'}
-      />
-      <ToggleOption
-        label="Recorrências"
-        onPress={() => onSelect('recurring')}
-        selected={selected === 'recurring'}
-      />
-    </View>
-  );
-}
-
-function ToggleOption({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
-  const { tokens } = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.toggleOption,
-        {
-          borderRadius: tokens.radius.md,
-          opacity: pressed ? 0.76 : 1,
-        },
-      ]}
-    >
-      <Text
-        adjustsFontSizeToFit
-        minimumFontScale={0.8}
-        numberOfLines={1}
-        variant="caption"
-        style={{
-          color: selected ? tokens.primary : tokens.textMuted,
-          fontWeight: '600',
-          textAlign: 'center',
-        }}
-      >
-        {label}
-      </Text>
     </Pressable>
   );
 }
@@ -333,14 +231,4 @@ const styles = StyleSheet.create({
   accounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   content: { gap: 18, paddingVertical: 24 },
   list: { gap: 10 },
-  toggle: { borderWidth: 1, flexDirection: 'row', padding: 4, position: 'relative' },
-  toggleIndicator: { bottom: 4, borderWidth: 1, position: 'absolute', top: 4 },
-  toggleOption: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: 6,
-    paddingVertical: 8,
-  },
 });
