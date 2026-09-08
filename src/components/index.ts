@@ -14,6 +14,7 @@ export { PressableCard } from './PressableCard';
 export { Screen } from './Screen';
 export { ScreenHeader } from './ScreenHeader';
 export { ScreenState } from './ScreenState';
+export { SuccessFeedbackProvider, useSuccessFeedback } from './SuccessFeedback';
 export { ScrollableScreen } from './ScrollableScreen';
 export { ChipGroup, SelectableChip } from './SelectableChip';
 export { SegmentedControl } from './SegmentedControl';

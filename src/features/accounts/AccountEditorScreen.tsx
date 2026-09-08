@@ -11,6 +11,7 @@ import {
   ScreenState,
   ScrollableScreen,
   useReducedMotion,
+  useSuccessFeedback,
 } from '@/components';
 import { archiveAccount, findAccountById, getAccountBalance } from '@/db/repositories';
 import type { Account, Cents } from '@/domain';
@@ -30,6 +31,7 @@ type AccountEditorData = {
 export function AccountEditorScreen({ accountId, onDone }: AccountEditorScreenProps) {
   const database = useSQLiteContext();
   const reduceMotion = useReducedMotion();
+  const { showSuccess } = useSuccessFeedback();
   const [data, setData] = useState<AccountEditorData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export function AccountEditorScreen({ accountId, onDone }: AccountEditorScreenPr
                 'O histórico e as transferências serão preservados, mas a conta deixará de aparecer no aplicativo. Novos lançamentos serão bloqueados e recorrências associadas serão desativadas.',
                 [
                   { text: 'Cancelar', style: 'cancel' },
-                  { text: 'Arquivar', style: 'destructive', onPress: () => void archiveAccount(database, accountId).then(onDone).catch(() => setFeedback('A conta não foi arquivada. Tente novamente ou volte sem fazer alterações.')) },
+                  { text: 'Arquivar', style: 'destructive', onPress: () => void archiveAccount(database, accountId).then(() => { showSuccess('Conta arquivada.'); onDone(); }).catch(() => setFeedback('A conta não foi arquivada. Tente novamente ou volte sem fazer alterações.')) },
                 ],
               )}
               variant="destructive"

@@ -17,6 +17,7 @@ import {
   SelectableChip,
   Text,
   useReducedMotion,
+  useSuccessFeedback,
 } from '@/components';
 import {
   createTransaction,
@@ -44,6 +45,7 @@ type TransferScreenProps = {
 export function TransferScreen({ deferInitialLoad = true, onDone, transactionId }: TransferScreenProps) {
   const db = useSQLiteContext();
   const reduceMotion = useReducedMotion();
+  const { showSuccess } = useSuccessFeedback();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [sourceAccountId, setSourceAccountId] = useState<number | null>(null);
   const [destinationAccountId, setDestinationAccountId] = useState<number | null>(null);
@@ -136,6 +138,7 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
       } as const;
       if (existing) await updateTransaction(db, existing.id, input);
       else await createTransaction(db, input);
+      showSuccess(existing ? 'Transferência atualizada.' : 'Transferência criada.');
       onDone();
     } catch {
       setError('Não foi possível salvar a transferência.');
@@ -148,6 +151,7 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
     if (!existing) return;
     try {
       await deleteTransaction(db, existing.id);
+      showSuccess('Transferência excluída.');
       onDone();
     } catch {
       setError('Não foi possível excluir a transferência.');

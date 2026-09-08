@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, FormFeedback, ScreenHeader, ScrollableScreen, Text } from '@/components';
+import { Button, Card, FormFeedback, ScreenHeader, ScrollableScreen, Text, useSuccessFeedback } from '@/components';
 import {
   getThemeTokens,
   THEME_OPTIONS,
@@ -41,6 +41,7 @@ export function ThemeSelection({
     themeName,
     tokens,
   } = useTheme();
+  const { showSuccess } = useSuccessFeedback();
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -52,6 +53,8 @@ export function ThemeSelection({
 
     if (!saved) {
       setError('A escolha foi aplicada nesta sessão, mas não pôde ser salva.');
+    } else {
+      showSuccess('Preferência salva.');
     }
   }
 

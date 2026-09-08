@@ -187,7 +187,8 @@ alterada depois de aplicada; mudanças futuras exigem novas migrações.
 
 Estado temporário de tela, como campos de formulário e abertura de modais,
 permanece local com hooks do React. React Context será usado somente para dados
-pequenos e realmente transversais, inicialmente tema e preferências.
+pequenos e realmente transversais: tema, preferências e uma única confirmação
+temporária de operação concluída exibida acima da navegação.
 
 Redux, Zustand, React Query e bibliotecas equivalentes não fazem parte da
 arquitetura inicial.

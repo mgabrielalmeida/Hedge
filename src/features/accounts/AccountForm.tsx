@@ -16,6 +16,7 @@ import {
   VisualPicker,
   resolveThemeColorValue,
   SelectableChip,
+  useSuccessFeedback,
 } from '@/components';
 import { createAccount, updateAccountWithBalance } from '@/db/repositories';
 import { formatBrazilianMoneyInput, parseMoneyInput, validateRequiredText } from '@/domain';
@@ -44,6 +45,7 @@ type AccountFormProps = {
 export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel }: AccountFormProps) {
   const database = useSQLiteContext();
   const { tokens } = useTheme();
+  const { showSuccess } = useSuccessFeedback();
   const initialBank = getInitialBank(account);
   const [accountName, setAccountName] = useState(account?.name ?? '');
   const [bank, setBank] = useState<(typeof BANK_OPTIONS)[number] | null>(initialBank);
@@ -107,6 +109,7 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
             openingBalanceDate,
           });
       if (!savedAccount) throw new Error('Account was not found.');
+      showSuccess(account ? 'Conta atualizada.' : 'Conta criada.');
       onSaved(savedAccount);
     } catch {
       setFeedback(`Não foi possível ${account ? 'salvar' : 'criar'} a conta. Confira os dados e toque em salvar novamente.`);

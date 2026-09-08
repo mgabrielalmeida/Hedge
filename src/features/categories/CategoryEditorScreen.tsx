@@ -15,6 +15,7 @@ import {
   ScreenState,
   ScrollableScreen,
   useReducedMotion,
+  useSuccessFeedback,
   VisualPicker,
   resolveThemeColorValue,
 } from '@/components';
@@ -32,6 +33,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
   const database = useSQLiteContext();
   const reduceMotion = useReducedMotion();
   const { tokens } = useTheme();
+  const { showSuccess } = useSuccessFeedback();
   const [category, setCategory] = useState<Category | null>(null);
   const [name, setName] = useState('');
   const [budget, setBudget] = useState('');
@@ -101,6 +103,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
       };
       if (category) await updateCategory(database, category.id, input);
       else await createCategory(database, input);
+      showSuccess(category ? 'Categoria atualizada.' : 'Categoria criada.');
       onDone();
     } catch (reason) {
       if (String(reason).includes('UNIQUE')) {
@@ -121,7 +124,7 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
       `“${category.name}” deixará de aparecer nas despesas. Regras recorrentes associadas serão desativadas.`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: () => void deleteCategory(database, category.id).then(onDone).catch(() => setFeedback('A categoria não foi excluída. Tente novamente ou volte sem fazer alterações.')) },
+        { text: 'Excluir', style: 'destructive', onPress: () => void deleteCategory(database, category.id).then(() => { showSuccess('Categoria excluída.'); onDone(); }).catch(() => setFeedback('A categoria não foi excluída. Tente novamente ou volte sem fazer alterações.')) },
       ],
     );
   }

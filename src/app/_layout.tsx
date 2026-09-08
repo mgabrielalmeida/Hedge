@@ -9,6 +9,7 @@ import { DATABASE_NAME, initializeDatabase } from '@/db/database';
 import {
   BootstrapScreen,
   SECONDARY_SCREEN_TRANSITION_DURATION,
+  SuccessFeedbackProvider,
   useReducedMotion,
 } from '@/components';
 import {
@@ -129,7 +130,9 @@ function AppBootstrap() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <AppBootstrap />
+      <SuccessFeedbackProvider>
+        <AppBootstrap />
+      </SuccessFeedbackProvider>
     </ThemeProvider>
   );
 }

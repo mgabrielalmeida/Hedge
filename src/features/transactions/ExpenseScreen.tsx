@@ -20,6 +20,7 @@ import {
   SelectableChip,
   Text,
   useReducedMotion,
+  useSuccessFeedback,
 } from '@/components';
 import {
   createRecurringRule,
@@ -73,6 +74,7 @@ export function ExpenseScreen({
 }: ExpenseScreenProps) {
   const db = useSQLiteContext();
   const reduceMotion = useReducedMotion();
+  const { showSuccess } = useSuccessFeedback();
   const initialDate = getLocalCivilDate();
   const initialDateParts = getCivilDateParts(initialDate);
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
@@ -225,6 +227,10 @@ export function ExpenseScreen({
         if (existingTransaction) await updateTransaction(db, existingTransaction.id, input);
         else await createTransaction(db, input);
       }
+      const feedbackMessage = recurrenceEnabled
+        ? existingRule ? 'Regra recorrente atualizada.' : 'Regra recorrente criada.'
+        : existingTransaction ? `${kind === 'expense' ? 'Despesa' : 'Renda'} atualizada.` : `${kind === 'expense' ? 'Despesa' : 'Renda'} criada.`;
+      showSuccess(feedbackMessage);
       onDone();
     } catch {
       setError(`Não foi possível salvar ${kind === 'expense' ? 'a despesa' : 'a renda'}.`);
@@ -278,8 +284,8 @@ export function ExpenseScreen({
               }
             }} /> : null}
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} onPress={() => void save()} />
-            {existingTransaction ? <Button label="Excluir lançamento" onPress={() => Alert.alert('Excluir lançamento?', 'Esta ação remove o lançamento e atualiza o saldo da conta.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteTransaction(db, existingTransaction.id).then(onDone).catch(() => setError('O lançamento não foi excluído. Tente novamente ou volte sem fazer alterações.')) }])} variant="destructive" /> : null}
-            {existingRule ? <Button label="Excluir regra recorrente" onPress={() => Alert.alert('Excluir regra recorrente?', 'Os lançamentos já gerados serão mantidos no histórico.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteRecurringRule(db, existingRule.id).then(onDone).catch(() => setError('A regra recorrente não foi excluída. Tente novamente ou volte sem fazer alterações.')) }])} variant="destructive" /> : null}
+            {existingTransaction ? <Button label="Excluir lançamento" onPress={() => Alert.alert('Excluir lançamento?', 'Esta ação remove o lançamento e atualiza o saldo da conta.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteTransaction(db, existingTransaction.id).then(() => { showSuccess('Lançamento excluído.'); onDone(); }).catch(() => setError('O lançamento não foi excluído. Tente novamente ou volte sem fazer alterações.')) }])} variant="destructive" /> : null}
+            {existingRule ? <Button label="Excluir regra recorrente" onPress={() => Alert.alert('Excluir regra recorrente?', 'Os lançamentos já gerados serão mantidos no histórico.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteRecurringRule(db, existingRule.id).then(() => { showSuccess('Regra recorrente excluída.'); onDone(); }).catch(() => setError('A regra recorrente não foi excluída. Tente novamente ou volte sem fazer alterações.')) }])} variant="destructive" /> : null}
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>
         </Card>
