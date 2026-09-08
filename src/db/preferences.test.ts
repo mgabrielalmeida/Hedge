@@ -3,8 +3,11 @@ import {
   type PreferenceStorage,
   loadThemePreferences,
   saveAppearancePreference,
+  saveBalanceVisibilityPreference,
+  saveCustomTheme,
   saveThemeName,
 } from './preferences';
+import { DEFAULT_CUSTOM_THEME } from '@/theme/customTheme';
 
 function createStorage(values: Record<string, string | null> = {}): PreferenceStorage {
   return {
@@ -25,12 +28,16 @@ describe('theme preferences', () => {
   it('loads valid persisted values', async () => {
     const storage = createStorage({
       'preferences.appearance': 'dark',
-      'preferences.themeName': 'hedge',
+      'preferences.customTheme': JSON.stringify({ primary: '#A23E2D', secondary: '#70458A' }),
+      'preferences.hideBalances': 'true',
+      'preferences.themeName': 'custom',
     });
 
     await expect(loadThemePreferences(storage)).resolves.toEqual({
       appearance: 'dark',
-      themeName: 'hedge',
+      customTheme: { primary: '#A23E2D', secondary: '#70458A' },
+      hideBalances: true,
+      themeName: 'custom',
     });
   });
 
@@ -39,6 +46,8 @@ describe('theme preferences', () => {
 
     await expect(loadThemePreferences(storage)).resolves.toEqual({
       appearance: 'system',
+      customTheme: DEFAULT_CUSTOM_THEME,
+      hideBalances: false,
       themeName: 'rose',
     });
   });
@@ -51,6 +60,8 @@ describe('theme preferences', () => {
 
     await expect(loadThemePreferences(storage)).resolves.toEqual({
       appearance: 'system',
+      customTheme: DEFAULT_CUSTOM_THEME,
+      hideBalances: false,
       themeName: 'hedge',
     });
   });
@@ -82,6 +93,8 @@ describe('theme preferences', () => {
 
     await expect(loadThemePreferences(storage)).resolves.toEqual({
       appearance: 'system',
+      customTheme: DEFAULT_CUSTOM_THEME,
+      hideBalances: false,
       themeName: 'hedge',
     });
   });
@@ -91,6 +104,8 @@ describe('theme preferences', () => {
 
     await saveThemeName('volcanic', storage);
     await saveAppearancePreference('light', storage);
+    await saveBalanceVisibilityPreference(true, storage);
+    await saveCustomTheme({ primary: '#A23E2D', secondary: '#70458A' }, storage);
 
     expect(storage.setItem).toHaveBeenNthCalledWith(
       1,
@@ -101,6 +116,16 @@ describe('theme preferences', () => {
       2,
       'preferences.appearance',
       'light',
+    );
+    expect(storage.setItem).toHaveBeenNthCalledWith(
+      3,
+      'preferences.hideBalances',
+      'true',
+    );
+    expect(storage.setItem).toHaveBeenNthCalledWith(
+      4,
+      'preferences.customTheme',
+      JSON.stringify({ primary: '#A23E2D', secondary: '#70458A' }),
     );
   });
 
@@ -116,6 +141,12 @@ describe('theme preferences', () => {
       saveThemeName('unsupported' as never, storage),
     ).rejects.toThrow('Unsupported theme name');
     await expect(saveAppearancePreference('dark', storage)).rejects.toThrow(
+      'storage unavailable',
+    );
+    await expect(saveBalanceVisibilityPreference(false, storage)).rejects.toThrow(
+      'storage unavailable',
+    );
+    await expect(saveCustomTheme(DEFAULT_CUSTOM_THEME, storage)).rejects.toThrow(
       'storage unavailable',
     );
   });

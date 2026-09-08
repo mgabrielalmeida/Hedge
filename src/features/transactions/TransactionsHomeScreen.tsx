@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Card,
+  BalanceVisibilityButton,
   ChipGroup,
   EmptyStateCard,
   FadeSelection,
@@ -63,6 +64,7 @@ export function TransactionsHomeScreen({
   const db = useSQLiteContext();
   const screenReduceMotion = useReducedMotion();
   const { showSuccess } = useSuccessFeedback();
+  const { hideBalances, setBalancesHidden } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
@@ -146,9 +148,15 @@ export function TransactionsHomeScreen({
         <ScreenHeader title="Histórico e recorrências" />
         <Card>
           <FadeSelection selectionKey={selectedAccountId ?? 'all'}>
-            <Text tone="muted" variant="caption">{selectedAccount ? 'Saldo atual' : 'Saldo consolidado'}</Text>
+            <View style={styles.balanceHeader}>
+              <Text tone="muted" variant="caption">{selectedAccount ? 'Saldo atual' : 'Saldo consolidado'}</Text>
+              <BalanceVisibilityButton
+                hidden={hideBalances}
+                onPress={() => void setBalancesHidden(!hideBalances)}
+              />
+            </View>
             <Text variant="title">{selectedAccount?.name ?? 'Todas as contas'}</Text>
-            <MoneyText cents={displayedBalance} variant="heading" />
+            <MoneyText cents={displayedBalance} hidden={hideBalances} variant="heading" />
           </FadeSelection>
           <ChipGroup accessibilityLabel="Conta do histórico">
             <SelectableChip label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
@@ -334,6 +342,7 @@ function formatRecurringSchedule(rule: RecurringRule): string {
 }
 
 const styles = StyleSheet.create({
+  balanceHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   dateGroup: { gap: 8 },
   dateGroupItems: { gap: 10 },
   dateHeading: { fontWeight: '600', paddingHorizontal: 4 },

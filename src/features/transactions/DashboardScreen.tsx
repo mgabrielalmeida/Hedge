@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Button,
+  BalanceVisibilityButton,
   Card,
   ChipGroup,
   EntityVisual,
@@ -54,7 +55,7 @@ export function DashboardScreen({
 }: DashboardScreenProps) {
   const database = useSQLiteContext();
   const reduceMotion = useReducedMotion();
-  const { tokens } = useTheme();
+  const { hideBalances, setBalancesHidden, tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [categories, setCategories] = useState<readonly Category[]>([]);
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
@@ -125,8 +126,14 @@ export function DashboardScreen({
         <ScreenHeader title="Visão financeira" />
 
         <Card elevated>
-          <Text tone="muted" variant="caption">Saldo consolidado</Text>
-           <MoneyText cents={consolidatedBalance} variant="display" />
+          <View style={styles.balanceHeader}>
+            <Text tone="muted" variant="caption">Saldo consolidado</Text>
+            <BalanceVisibilityButton
+              hidden={hideBalances}
+              onPress={() => void setBalancesHidden(!hideBalances)}
+            />
+          </View>
+          <MoneyText cents={consolidatedBalance} hidden={hideBalances} variant="display" />
 
           {selectedAccount ? (
             <>
@@ -134,7 +141,7 @@ export function DashboardScreen({
                 <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.md }}>
                   Conta selecionada: {selectedAccount.name}
                 </Text>
-                 <MoneyText cents={calculateAccountBalance(transactions, selectedAccount.id)} variant="title" />
+                 <MoneyText cents={calculateAccountBalance(transactions, selectedAccount.id)} hidden={hideBalances} variant="title" />
               </FadeSelection>
                <ChipGroup accessibilityLabel="Conta selecionada">
                  {accounts.map((account) => {
@@ -273,6 +280,7 @@ const styles = StyleSheet.create({
   addArea: { gap: 8 },
   addChoice: { flex: 1, paddingHorizontal: 8 },
   addChoices: { flexDirection: 'row', gap: 8 },
+  balanceHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   budgetDescription: {
     marginTop: 8,
   },

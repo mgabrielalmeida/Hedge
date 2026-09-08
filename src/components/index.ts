@@ -1,4 +1,5 @@
 export { Button } from './Button';
+export { BalanceVisibilityButton } from './BalanceVisibilityButton';
 export { BootstrapScreen } from './BootstrapScreen';
 export { Card } from './Card';
 export { DatePickerField } from './DatePickerField';

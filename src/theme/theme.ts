@@ -1,3 +1,9 @@
+import {
+  createCustomThemeColors,
+  DEFAULT_CUSTOM_THEME,
+  type CustomThemeDefinition,
+} from './customTheme';
+
 export type AppearancePreference = 'light' | 'dark' | 'system';
 
 export const THEME_NAMES = [
@@ -11,6 +17,7 @@ export const THEME_NAMES = [
   'volcanic',
   'aurora',
   'citrus',
+  'custom',
 ] as const;
 
 export type ThemeName = (typeof THEME_NAMES)[number];
@@ -64,7 +71,7 @@ export type ThemeOption = {
   title: string;
 };
 
-type ThemeColors = Omit<ThemeTokens, 'radius' | 'spacing' | 'typography'>;
+export type ThemeColors = Omit<ThemeTokens, 'radius' | 'spacing' | 'typography'>;
 
 const layoutTokens = {
   radius: { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 },
@@ -83,9 +90,10 @@ export const THEME_OPTIONS: readonly ThemeOption[] = [
   { name: 'volcanic', title: 'Volcânico', description: 'Vermelhos de lava e cinzas minerais.' },
   { name: 'aurora', title: 'Aurora', description: 'Teal luminoso com violeta sereno.' },
   { name: 'citrus', title: 'Cítrico', description: 'Verdes vivos e dourado ensolarado.' },
+  { name: 'custom', title: 'Custom', description: 'Uma paleta criada por você.' },
 ];
 
-const themes: Record<ThemeName, Record<ResolvedAppearance, ThemeColors>> = {
+const themes: Record<Exclude<ThemeName, 'custom'>, Record<ResolvedAppearance, ThemeColors>> = {
   hedge: {
     light: {
       background: '#F6F8F5', surface: '#FFFFFF', surfaceElevated: '#FFFFFF', surfaceSubtle: '#EDF3ED',
@@ -312,6 +320,13 @@ export function isThemeName(value: string | null): value is ThemeName {
   return THEME_NAMES.some((themeName) => themeName === value);
 }
 
-export function getThemeTokens(themeName: ThemeName, appearance: ResolvedAppearance): ThemeTokens {
-  return { ...themes[themeName][appearance], ...layoutTokens };
+export function getThemeTokens(
+  themeName: ThemeName,
+  appearance: ResolvedAppearance,
+  customTheme: CustomThemeDefinition = DEFAULT_CUSTOM_THEME,
+): ThemeTokens {
+  const colors = themeName === 'custom'
+    ? createCustomThemeColors(customTheme, appearance)
+    : themes[themeName][appearance];
+  return { ...colors, ...layoutTokens };
 }

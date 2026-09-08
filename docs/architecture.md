@@ -198,7 +198,7 @@ arquitetura inicial.
 Tema visual e aparência do sistema serão dimensões separadas:
 
 - **tema:** Hedge, Oceano, Pôr do sol, Amora, Rosa, Areia, Meia-noite, Volcânico,
-  Aurora, Cítrico ou outro conjunto futuro;
+  Aurora, Cítrico, Custom ou outro conjunto futuro;
 - **aparência:** clara, escura ou acompanhar o sistema.
 
 Um tema fornece tokens semânticos de cor, incluindo `background`, `surface`,
@@ -207,14 +207,18 @@ Um tema fornece tokens semânticos de cor, incluindo `background`, `surface`,
 negativo, de atenção e informativo, além dos tokens compartilhados de
 espaçamento, raio e tipografia. O provider resolve tema e aparência para um
 conjunto final de tokens. Os temas disponíveis são Hedge, Oceano, Pôr do sol,
-Amora, Rosa, Areia, Meia-noite, Volcânico, Aurora e Cítrico; todos oferecem
-variantes clara e escura para
-validar que componentes não dependem de uma paleta específica.
+Amora, Rosa, Areia, Meia-noite, Volcânico, Aurora, Cítrico e Custom; todos
+oferecem variantes clara e escura para validar que componentes não dependem de
+uma paleta específica. O tema Custom persiste somente duas sementes escolhidas
+pelo usuário — principal e secundária — e deriva localmente os demais tokens.
+A principal governa ações e foco; a secundária orienta superfícies neutras e o
+estado informativo. Estados positivo, negativo e de atenção mantêm significado
+visual próprio, e cores de primeiro plano são escolhidas por contraste.
 
-A seleção é armazenada no `expo-sqlite/kv-store` pelo adaptador
+A seleção de tema, aparência e a preferência de ocultar saldos é armazenada no `expo-sqlite/kv-store` pelo adaptador
 `src/db/preferences.ts`. Essa é a única área autorizada a acessar o storage
 diretamente: o `ThemeProvider` consome sua API tipada, aplica os padrões para
-dados inválidos ou indisponíveis e expõe gravações que informam falha sem gerar
+nomes e definições Custom inválidos ou indisponíveis e expõe gravações que informam falha sem gerar
 rejeições não observadas. Inicialmente, temas podem alterar cores e propriedades
 visuais pequenas, mas não a estrutura ou o espaçamento fundamental das telas.
 No Android, a barra de navegação nativa permanece visível e acompanha a

@@ -12,6 +12,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 
 type ThemeSelectionProps = {
   actionLabel?: string;
+  onEditCustom: () => void;
   onFinish: () => void;
   showDescription?: boolean;
   title?: string;
@@ -29,12 +30,14 @@ const appearanceOptions: readonly {
 
 export function ThemeSelection({
   actionLabel = 'Continuar',
+  onEditCustom,
   onFinish,
   showDescription = true,
   title = 'Escolha seu tema',
 }: ThemeSelectionProps) {
   const {
     appearance,
+    customTheme,
     isDark,
     setAppearance,
     setThemeName,
@@ -59,6 +62,10 @@ export function ThemeSelection({
   }
 
   function selectTheme(name: ThemeName) {
+    if (name === 'custom') {
+      onEditCustom();
+      return;
+    }
     void savePreference(() => setThemeName(name));
   }
 
@@ -75,11 +82,11 @@ export function ThemeSelection({
           <View style={styles.choices}>
             {THEME_OPTIONS.map((choice) => {
               const selected = themeName === choice.name;
-              const preview = getThemeTokens(choice.name, isDark ? 'dark' : 'light');
+              const preview = getThemeTokens(choice.name, isDark ? 'dark' : 'light', customTheme);
 
               return (
                 <Pressable
-                  accessibilityLabel={`Tema ${choice.title}`}
+                  accessibilityLabel={choice.name === 'custom' ? 'Editar tema Custom' : `Tema ${choice.title}`}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
                   key={choice.name}
@@ -101,6 +108,7 @@ export function ThemeSelection({
                       <View style={styles.choiceText}>
                         <Text variant="title">{choice.title}</Text>
                         <Text tone="muted" variant="caption">{choice.description}</Text>
+                        {choice.name === 'custom' ? <Text style={{ color: tokens.primary }} variant="caption">Editar cores</Text> : null}
                       </View>
                     </Card>
                   )}

@@ -13,6 +13,8 @@ import {
   DEFAULT_THEME_PREFERENCES,
   loadThemePreferences,
   saveAppearancePreference,
+  saveBalanceVisibilityPreference,
+  saveCustomTheme,
   saveThemeName,
 } from '@/db/preferences';
 
@@ -22,12 +24,17 @@ import {
   type ThemeName,
   type ThemeTokens,
 } from './theme';
+import type { CustomThemeDefinition } from './customTheme';
 
 type ThemeContextValue = {
   appearance: AppearancePreference;
+  activateCustomTheme: (customTheme: CustomThemeDefinition) => Promise<boolean>;
+  customTheme: CustomThemeDefinition;
+  hideBalances: boolean;
   isReady: boolean;
   isDark: boolean;
   setAppearance: (appearance: AppearancePreference) => Promise<boolean>;
+  setBalancesHidden: (hidden: boolean) => Promise<boolean>;
   setThemeName: (themeName: ThemeName) => Promise<boolean>;
   themeName: ThemeName;
   tokens: ThemeTokens;
@@ -42,6 +49,12 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   );
   const [appearance, setAppearance] =
     useState<AppearancePreference>(DEFAULT_THEME_PREFERENCES.appearance);
+  const [customTheme, setCustomTheme] = useState<CustomThemeDefinition>(
+    DEFAULT_THEME_PREFERENCES.customTheme,
+  );
+  const [hideBalances, setHideBalances] = useState<boolean>(
+    DEFAULT_THEME_PREFERENCES.hideBalances,
+  );
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -50,6 +63,8 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
       setThemeName(preferences.themeName);
       setAppearance(preferences.appearance);
+      setCustomTheme(preferences.customTheme);
+      setHideBalances(preferences.hideBalances);
       setIsReady(true);
     }
 
@@ -78,25 +93,57 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
+  const updateBalanceVisibility = useCallback(async (hidden: boolean) => {
+    setHideBalances(hidden);
+
+    try {
+      await saveBalanceVisibilityPreference(hidden);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const activateCustomTheme = useCallback(async (nextCustomTheme: CustomThemeDefinition) => {
+    setCustomTheme(nextCustomTheme);
+    setThemeName('custom');
+
+    try {
+      await saveCustomTheme(nextCustomTheme);
+      await saveThemeName('custom');
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const resolvedAppearance = appearance === 'system' ? systemAppearance : appearance;
-  const tokens = getThemeTokens(themeName, resolvedAppearance);
+  const tokens = getThemeTokens(themeName, resolvedAppearance, customTheme);
   const value = useMemo(
     () => ({
       appearance,
+      activateCustomTheme,
+      customTheme,
+      hideBalances,
       isDark: resolvedAppearance === 'dark',
       isReady,
       setAppearance: updateAppearance,
+      setBalancesHidden: updateBalanceVisibility,
       setThemeName: updateThemeName,
       themeName,
       tokens,
     }),
     [
       appearance,
+      activateCustomTheme,
+      customTheme,
+      hideBalances,
       isReady,
       resolvedAppearance,
       themeName,
       tokens,
       updateAppearance,
+      updateBalanceVisibility,
       updateThemeName,
     ],
   );

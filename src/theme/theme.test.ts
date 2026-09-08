@@ -27,10 +27,19 @@ describe('getThemeTokens', () => {
   });
 
   it('recognizes every supported theme name', () => {
-    expect(THEME_NAMES).toHaveLength(10);
+    expect(THEME_NAMES).toHaveLength(11);
     expect(THEME_NAMES.every(isThemeName)).toBe(true);
     expect(isThemeName('rose')).toBe(true);
     expect(isThemeName('volcanic')).toBe(true);
+    expect(isThemeName('custom')).toBe(true);
     expect(isThemeName('unsupported')).toBe(false);
+  });
+
+  it('resolves the custom theme from the supplied definition', () => {
+    const first = getThemeTokens('custom', 'light', { primary: '#A23E2D', secondary: '#176B9C' });
+    const second = getThemeTokens('custom', 'light', { primary: '#70458A', secondary: '#176B9C' });
+
+    expect(first.primary).not.toBe(second.primary);
+    expect(first.spacing).toEqual(second.spacing);
   });
 });
