@@ -68,8 +68,14 @@ function AppBootstrap() {
   const { isDark, isReady: isThemeReady, tokens } = useTheme();
   const [isDatabaseReady, setIsDatabaseReady] = useState(false);
   const [databaseError, setDatabaseError] = useState<Error | null>(null);
+  const [databaseAttempt, setDatabaseAttempt] = useState(0);
   const markDatabaseReady = useCallback(() => setIsDatabaseReady(true), []);
   const handleDatabaseError = useCallback((error: Error) => setDatabaseError(error), []);
+  const retryDatabase = useCallback(() => {
+    setDatabaseError(null);
+    setIsDatabaseReady(false);
+    setDatabaseAttempt((attempt) => attempt + 1);
+  }, []);
 
   if (!isThemeReady) {
     return (
@@ -87,7 +93,8 @@ function AppBootstrap() {
     return (
       <BootstrapScreen
         isDark={isDark}
-        message="Não foi possível preparar o armazenamento local. Feche e abra o aplicativo novamente."
+        message="Não foi possível preparar o armazenamento local. Tente novamente; se a falha continuar, feche e abra o aplicativo."
+        onRetry={retryDatabase}
         title="Não foi possível abrir o Hedge"
         tokens={tokens}
       />
@@ -108,6 +115,7 @@ function AppBootstrap() {
         />
       ) : null}
       <SQLiteProvider
+        key={databaseAttempt}
         databaseName={DATABASE_NAME}
         onError={handleDatabaseError}
         onInit={initializeDatabase}

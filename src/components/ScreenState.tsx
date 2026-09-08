@@ -11,11 +11,13 @@ type ScreenStateProps = {
   fullScreen?: boolean;
   message: string;
   onAction?: () => void;
+  onSecondaryAction?: () => void;
+  secondaryActionLabel?: string;
   status: 'empty' | 'error' | 'loading' | 'notFound';
   title?: string;
 };
 
-export function ScreenState({ actionLabel, fullScreen = true, message, onAction, status, title }: ScreenStateProps) {
+export function ScreenState({ actionLabel, fullScreen = true, message, onAction, onSecondaryAction, secondaryActionLabel, status, title }: ScreenStateProps) {
   const { tokens } = useTheme();
   const tone = status === 'error' || status === 'notFound' ? 'negative' : 'muted';
   const defaultTitle = status === 'loading'
@@ -34,6 +36,7 @@ export function ScreenState({ actionLabel, fullScreen = true, message, onAction,
       </Text>
       <Text tone={tone} style={[styles.message, { marginTop: tokens.spacing.sm }]}>{message}</Text>
       {onAction && actionLabel ? <Button label={actionLabel} onPress={onAction} style={{ marginTop: tokens.spacing.lg }} /> : null}
+      {onSecondaryAction && secondaryActionLabel ? <Button label={secondaryActionLabel} onPress={onSecondaryAction} style={{ marginTop: tokens.spacing.sm }} variant="ghost" /> : null}
     </View>
   );
   return fullScreen ? <Screen>{content}</Screen> : content;

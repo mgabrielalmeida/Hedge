@@ -5,6 +5,7 @@ export { DatePickerField } from './DatePickerField';
 export { EmptyStateCard } from './EmptyStateCard';
 export { EntityVisual } from './EntityVisual';
 export { Field } from './Field';
+export { FormFeedback } from './FormFeedback';
 export { FadeSelection } from './FadeSelection';
 export { MoneyField } from './MoneyField';
 export { MoneyText } from './MoneyText';

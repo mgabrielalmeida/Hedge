@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, ScreenHeader, ScrollableScreen, Text } from '@/components';
+import { Button, Card, FormFeedback, ScreenHeader, ScrollableScreen, Text } from '@/components';
 import {
   getThemeTokens,
   THEME_OPTIONS,
@@ -147,7 +147,7 @@ export function ThemeSelection({
           </View>
         </View>
 
-        {error ? <Text tone="warning">{error}</Text> : null}
+        {error ? <FormFeedback message={`${error} Toque novamente na opção desejada para tentar salvar.`} title="A preferência não foi salva" /> : null}
         <Button disabled={isSaving} label={isSaving ? 'Salvando…' : actionLabel} onPress={onFinish} />
     </ScrollableScreen>
   );

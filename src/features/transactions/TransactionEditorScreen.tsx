@@ -17,6 +17,7 @@ export function TransactionEditorScreen({ onDone, transactionId }: { onDone: () 
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -36,13 +37,13 @@ export function TransactionEditorScreen({ onDone, transactionId }: { onDone: () 
       active = false;
       cancel();
     };
-  }, [db, reduceMotion, transactionId]);
+  }, [db, loadAttempt, reduceMotion, transactionId]);
 
   if (isLoading) {
     return <ScreenState message="Buscando os dados do lançamento…" status="loading" title="Carregando lançamento" />;
   }
   if (loadFailed) {
-    return <ScreenState actionLabel="Voltar" message="Não foi possível carregar o lançamento." onAction={onDone} status="error" />;
+    return <ScreenState actionLabel="Tentar novamente" message="Não foi possível carregar o lançamento." onAction={() => { setLoadFailed(false); setIsLoading(true); setLoadAttempt((attempt) => attempt + 1); }} onSecondaryAction={onDone} secondaryActionLabel="Voltar" status="error" />;
   }
   if (!transaction) {
     return <ScreenState actionLabel="Voltar" message="Lançamento não encontrado." onAction={onDone} status="notFound" />;

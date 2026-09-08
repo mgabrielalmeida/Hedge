@@ -10,6 +10,7 @@ import {
   DatePickerField,
   FadeSelection,
   Field,
+  FormFeedback,
   MoneyField,
   Text,
   VisualPicker,
@@ -58,29 +59,33 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
   const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(
     account ? account.themeColorIndex : 2,
   );
-  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ balance?: string; institution?: string; name?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const institutionName = bank === 'Outra instituição' ? customInstitution : bank ?? '';
+
+  function clearFieldError(field: 'balance' | 'institution' | 'name') {
+    setFieldErrors((current) => ({ ...current, [field]: undefined }));
+  }
 
   async function submit() {
     const name = validateRequiredText(accountName);
     const institution = validateRequiredText(institutionName);
     const amount = parseMoneyInput(initialBalance.replace(/\./g, ''), { allowNegative: true });
 
-    if (!name.ok) {
-      setError('Informe um nome para a conta.');
+    const nextFieldErrors = {
+      name: name.ok ? undefined : 'Informe um nome para a conta.',
+      institution: institution.ok ? undefined : 'Selecione ou informe uma instituição.',
+      balance: amount.ok ? undefined : 'Informe um saldo válido, como 0,00 ou -125,50.',
+    };
+    if (!name.ok || !institution.ok || !amount.ok) {
+      setFieldErrors(nextFieldErrors);
+      setFeedback('Os campos destacados precisam ser corrigidos antes de salvar.');
       return;
     }
-    if (!institution.ok) {
-      setError('Selecione ou informe uma instituição.');
-      return;
-    }
-    if (!amount.ok) {
-      setError('Informe um saldo inicial válido, como 0,00 ou -125,50.');
-      return;
-    }
-    setError(null);
+    setFieldErrors({});
+    setFeedback(null);
     setIsSubmitting(true);
     try {
       const visualInput = {
@@ -104,7 +109,7 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
       if (!savedAccount) throw new Error('Account was not found.');
       onSaved(savedAccount);
     } catch {
-      setError(`Não foi possível ${account ? 'salvar' : 'criar'} a conta. Tente novamente.`);
+      setFeedback(`Não foi possível ${account ? 'salvar' : 'criar'} a conta. Confira os dados e toque em salvar novamente.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -112,11 +117,12 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
 
   return (
     <View style={styles.form}>
+      {feedback ? <FormFeedback message={feedback} /> : null}
       <Field
         autoCapitalize="words"
-        error={error ?? undefined}
+        error={fieldErrors.name}
         label="Nome da conta"
-        onChangeText={setAccountName}
+        onChangeText={(value) => { setAccountName(value); clearFieldError('name'); }}
         placeholder="Ex.: Conta principal"
         value={accountName}
       />
@@ -129,19 +135,21 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
               <SelectableChip
                 key={option}
                 label={option}
-                onPress={() => setBank(option)}
+                onPress={() => { setBank(option); clearFieldError('institution'); }}
                 selected={bank === option}
               />
             ))}
           </ChipGroup>
         </FadeSelection>
+        {fieldErrors.institution && bank !== 'Outra instituição' ? <Text tone="negative" variant="caption" style={styles.validation}>{fieldErrors.institution}</Text> : null}
       </View>
 
       {bank === 'Outra instituição' ? (
         <Field
           autoCapitalize="words"
+          error={fieldErrors.institution}
           label="Nome da instituição"
-          onChangeText={setCustomInstitution}
+          onChangeText={(value) => { setCustomInstitution(value); clearFieldError('institution'); }}
           placeholder="Ex.: Cooperativa local"
           value={customInstitution}
         />
@@ -149,9 +157,10 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
 
       <MoneyField
         allowNegative
+        error={fieldErrors.balance}
         helperText={account ? 'Se o valor mudar, a diferença será registrada como “Retífica de saldo”.' : undefined}
         label={account ? 'Saldo atual' : 'Saldo inicial'}
-        onChangeText={setInitialBalance}
+        onChangeText={(value) => { setInitialBalance(value); clearFieldError('balance'); }}
         placeholder="0,00"
         value={initialBalance}
       />
@@ -196,4 +205,5 @@ const styles = StyleSheet.create({
   form: { gap: 18 },
   label: { marginBottom: 8 },
   submit: { marginTop: 6 },
+  validation: { marginTop: 6 },
 });

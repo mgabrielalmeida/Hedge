@@ -16,6 +16,7 @@ export function RecurringRuleEditorScreen({ onDone, recurringRuleId }: { onDone:
   const [rule, setRule] = useState<RecurringRule | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -35,10 +36,10 @@ export function RecurringRuleEditorScreen({ onDone, recurringRuleId }: { onDone:
       active = false;
       cancel();
     };
-  }, [db, recurringRuleId, reduceMotion]);
+  }, [db, loadAttempt, recurringRuleId, reduceMotion]);
 
   if (isLoading) return <ScreenState message="Buscando os dados da recorrência…" status="loading" title="Carregando recorrência" />;
-  if (loadFailed) return <ScreenState actionLabel="Voltar" message="Não foi possível carregar a recorrência." onAction={onDone} status="error" />;
+  if (loadFailed) return <ScreenState actionLabel="Tentar novamente" message="Não foi possível carregar a recorrência." onAction={() => { setLoadFailed(false); setIsLoading(true); setLoadAttempt((attempt) => attempt + 1); }} onSecondaryAction={onDone} secondaryActionLabel="Voltar" status="error" />;
   if (!rule?.isActive) return <ScreenState actionLabel="Voltar" message="Regra recorrente não encontrada." onAction={onDone} status="notFound" />;
 
   return <ExpenseScreen deferInitialLoad={false} kind={rule.kind} onDone={onDone} recurringRuleId={recurringRuleId} />;

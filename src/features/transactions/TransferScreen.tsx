@@ -8,6 +8,7 @@ import {
   ChipGroup,
   DatePickerField,
   FadeSelection,
+  FormFeedback,
   MoneyField,
   scheduleAfterSecondaryTransition,
   ScreenHeader,
@@ -52,7 +53,9 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -86,7 +89,7 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
       active = false;
       cancel();
     };
-  }, [db, deferInitialLoad, reduceMotion, transactionId]);
+  }, [db, deferInitialLoad, loadAttempt, reduceMotion, transactionId]);
 
   function selectSource(id: number) {
     setSourceAccountId(id);
@@ -112,11 +115,14 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
       destinationAccountId === null ||
       sourceAccountId === destinationAccountId
     ) {
-      setError('Preencha origem, destino, valor maior que zero e uma data que não seja futura.');
+      setShowFieldErrors(true);
+      setError('Os campos destacados precisam ser corrigidos antes de salvar.');
       return;
     }
 
     setSaving(true);
+    setShowFieldErrors(false);
+    setError(null);
     try {
       const input = {
         kind: 'transfer',
@@ -153,7 +159,7 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
   }
 
   if (loadFailed) {
-    return <ScreenState actionLabel="Voltar" message="Não foi possível carregar as contas." onAction={onDone} status="error" />;
+    return <ScreenState actionLabel="Tentar novamente" message="Não foi possível carregar as contas." onAction={() => { setLoadFailed(false); setIsLoading(true); setLoadAttempt((attempt) => attempt + 1); }} onSecondaryAction={onDone} secondaryActionLabel="Voltar" status="error" />;
   }
 
   if (accounts.length < 2) {
@@ -171,28 +177,41 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
     );
   }
 
+  const parsedAmount = parseMoneyInput(amount.replace(/\./g, ''));
+  const parsedDate = parseCivilDate(date);
+  const amountError = showFieldErrors && (!parsedAmount.ok || parsedAmount.value <= 0)
+    ? 'Informe um valor maior que zero.'
+    : undefined;
+  const dateError = showFieldErrors && (!parsedDate.ok || !validateNotFuture(parsedDate.value, getLocalCivilDate()).ok)
+    ? 'Escolha uma data válida que não seja futura.'
+    : undefined;
+  const accountsMatch = sourceAccountId !== null && sourceAccountId === destinationAccountId;
+
   return (
     <ScrollableScreen>
         <ScreenHeader onBack={onDone} title={`${existing ? 'Editar' : 'Nova'} transferência`} />
         <Card elevated>
           <View style={styles.form}>
-            {error ? <Text tone="negative">{error}</Text> : null}
+            {error ? <FormFeedback message={error} /> : null}
             <AccountChoices
               accounts={accounts}
+              error={showFieldErrors && (sourceAccountId === null || accountsMatch)}
               label="Origem"
               onSelect={selectSource}
               selectedId={sourceAccountId}
             />
             <AccountChoices
               accounts={accounts}
+              error={showFieldErrors && (destinationAccountId === null || accountsMatch)}
               label="Destino"
               onSelect={selectDestination}
               selectedId={destinationAccountId}
             />
-            <MoneyField label="Valor" onChangeText={setAmount} value={amount} placeholder="0,00" />
+            <MoneyField error={amountError} label="Valor" onChangeText={(value) => { setAmount(value); setShowFieldErrors(false); }} value={amount} placeholder="0,00" />
             <DatePickerField
+              error={dateError}
               label="Data"
-              onChange={setDate}
+              onChange={(value) => { setDate(value); setShowFieldErrors(false); }}
               value={date}
             />
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} onPress={() => void save()} />
@@ -219,11 +238,13 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
 
 function AccountChoices({
   accounts,
+  error = false,
   label,
   onSelect,
   selectedId,
 }: {
   accounts: readonly Account[];
+  error?: boolean;
   label: string;
   onSelect: (id: number) => void;
   selectedId: number | null;
@@ -231,9 +252,9 @@ function AccountChoices({
   const { tokens } = useTheme();
   return (
     <View>
-      <Text tone="muted" variant="caption" style={{ marginBottom: tokens.spacing.sm }}>{label}</Text>
+      <Text tone={error ? 'negative' : 'muted'} variant="caption" style={{ marginBottom: tokens.spacing.sm }}>{label}</Text>
       <FadeSelection selectionKey={selectedId}>
-        <ChipGroup accessibilityLabel={label}>
+        <ChipGroup accessibilityLabel={label} error={error}>
           {accounts.map((account) => {
             const selected = selectedId === account.id;
             return (

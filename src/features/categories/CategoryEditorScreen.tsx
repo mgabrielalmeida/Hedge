@@ -1,5 +1,5 @@
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -8,12 +8,12 @@ import {
   CATEGORY_ICON_OPTIONS,
   getIconDisplayValue,
   Field,
+  FormFeedback,
   MoneyField,
   scheduleAfterSecondaryTransition,
   ScreenHeader,
   ScreenState,
   ScrollableScreen,
-  Text,
   useReducedMotion,
   VisualPicker,
   resolveThemeColorValue,
@@ -38,49 +38,59 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
   const [iconValue, setIconValue] = useState<string>('emoji:🏷️');
   const [colorValue, setColorValue] = useState(tokens.primary);
   const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(2);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ budget?: string; name?: string }>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    const cancel = scheduleAfterSecondaryTransition(() => {
-      if (categoryId === undefined) {
-        if (active) setLoading(false);
-        return;
-      }
-      void (async () => {
-        const found = await findCategoryById(database, categoryId);
-        if (!active) return;
-        if (!found) {
-          setError('Categoria não encontrada.');
-        } else {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    if (categoryId === undefined) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const found = await findCategoryById(database, categoryId);
+      if (!found) {
+        setLoadError('Categoria não encontrada.');
+      } else {
           setCategory(found);
           setName(found.name);
           setBudget(formatBudget(found.monthlyBudgetCents));
           setIconValue(getIconDisplayValue(found.iconValue));
           setColorValue(found.colorValue);
           setThemeColorIndex(found.themeColorIndex);
-        }
-        setLoading(false);
-      })();
-    }, reduceMotion === false);
+      }
+    } catch {
+      setLoadError('Não foi possível carregar a categoria.');
+    } finally {
+      setLoading(false);
+    }
+  }, [categoryId, database]);
 
-    return () => {
-      active = false;
-      cancel();
-    };
-  }, [categoryId, database, reduceMotion]);
+  useEffect(() => {
+    const cancel = scheduleAfterSecondaryTransition(() => {
+      void load();
+    }, reduceMotion === false);
+    return cancel;
+  }, [load, reduceMotion]);
 
   async function save() {
     const validName = validateRequiredText(name);
     const validBudget = parseMoneyInput(budget.replace(/\./g, ''));
     if (!validName.ok || !validBudget.ok) {
-      setError('Informe nome e orçamento mensal válidos.');
+      setFieldErrors({
+        name: validName.ok ? undefined : 'Informe um nome para a categoria.',
+        budget: validBudget.ok ? undefined : 'Informe um orçamento mensal válido.',
+      });
+      setFeedback('Os campos destacados precisam ser corrigidos antes de salvar.');
       return;
     }
     setSaving(true);
-    setError(null);
+    setFieldErrors({});
+    setFeedback(null);
     try {
       const input = {
         name: validName.value,
@@ -93,7 +103,12 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
       else await createCategory(database, input);
       onDone();
     } catch (reason) {
-      setError(String(reason).includes('UNIQUE') ? 'Já existe uma categoria com esse nome.' : 'Não foi possível salvar a categoria.');
+      if (String(reason).includes('UNIQUE')) {
+        setFieldErrors({ name: 'Já existe uma categoria com esse nome.' });
+        setFeedback('Escolha outro nome para continuar.');
+      } else {
+        setFeedback('Não foi possível salvar a categoria. Confira os dados e toque em salvar novamente.');
+      }
     } finally {
       setSaving(false);
     }
@@ -101,16 +116,16 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
 
   if (loading) return <ScreenState message="Buscando os dados da categoria…" status="loading" title="Carregando categoria" />;
 
-  if (error === 'Categoria não encontrada.') return <ScreenState actionLabel="Voltar" message={error} onAction={onDone} status="notFound" />;
+  if (loadError) return <ScreenState actionLabel={loadError === 'Categoria não encontrada.' ? 'Voltar' : 'Tentar novamente'} message={loadError} onAction={loadError === 'Categoria não encontrada.' ? onDone : () => void load()} onSecondaryAction={loadError === 'Categoria não encontrada.' ? undefined : onDone} secondaryActionLabel={loadError === 'Categoria não encontrada.' ? undefined : 'Voltar'} status={loadError === 'Categoria não encontrada.' ? 'notFound' : 'error'} />;
 
   return (
     <ScrollableScreen>
         <ScreenHeader onBack={onDone} title={category ? 'Editar categoria' : 'Nova categoria'} />
         <Card elevated>
           <View style={styles.form}>
-            {error ? <Text tone="negative" variant="caption">{error}</Text> : null}
-            <Field label="Nome" onChangeText={setName} placeholder="Ex.: Moradia" value={name} />
-            <MoneyField label="Orçamento mensal" onChangeText={setBudget} placeholder="0,00" value={budget} />
+            {feedback ? <FormFeedback message={feedback} /> : null}
+            <Field error={fieldErrors.name} label="Nome" onChangeText={(value) => { setName(value); setFieldErrors((current) => ({ ...current, name: undefined })); }} placeholder="Ex.: Moradia" value={name} />
+            <MoneyField error={fieldErrors.budget} label="Orçamento mensal" onChangeText={(value) => { setBudget(value); setFieldErrors((current) => ({ ...current, budget: undefined })); }} placeholder="0,00" value={budget} />
             <VisualPicker
               key={iconValue}
               iconOptions={CATEGORY_ICON_OPTIONS}

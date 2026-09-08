@@ -8,6 +8,7 @@ import {
   Card,
   EmptyStateCard,
   EntityVisual,
+  FormFeedback,
   getIconDisplayValue,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
@@ -39,6 +40,7 @@ export function CategoriesScreen({
   const reduceMotion = useReducedMotion();
   const [categories, setCategories] = useState<readonly Category[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try { setCategories(await listCategories(database)); setError(null); } catch { setError('Não foi possível carregar as categorias.'); }
@@ -53,7 +55,14 @@ export function CategoriesScreen({
       `“${category.name}” deixará de aparecer nas despesas. Regras recorrentes associadas serão desativadas.`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: () => void (async () => { await deleteCategory(database, category.id); await load(); })() },
+        { text: 'Excluir', style: 'destructive', onPress: () => void (async () => {
+          try {
+            await deleteCategory(database, category.id);
+            await load();
+          } catch {
+            setFeedback('A categoria não foi excluída. Tente novamente ou continue editando suas categorias.');
+          }
+        })() },
       ],
     );
   }
@@ -61,6 +70,7 @@ export function CategoriesScreen({
   return (
     <ScrollableScreen>
         <ScreenHeader description={showDescription ? 'Defina seus limites mensais e indicadores.' : undefined} title="Categorias" />
+        {feedback ? <FormFeedback message={feedback} title="Não foi possível excluir" /> : null}
         {error ? <ScreenState actionLabel="Tentar novamente" fullScreen={false} message={error} onAction={() => void load()} status="error" /> : categories === null ? <ScreenState fullScreen={false} message="Buscando suas categorias…" status="loading" title="Carregando categorias" /> : <>
           <View style={styles.list}>
             {categories.map((category) => <CategoryCard category={category} key={category.id} onDelete={() => confirmDelete(category)} onEdit={() => onEdit(category.id)} />)}

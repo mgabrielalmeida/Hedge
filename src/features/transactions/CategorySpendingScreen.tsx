@@ -112,7 +112,10 @@ export function CategorySpendingScreen({
     ? calculateCategoryMonthlySpending(data.transactions, data.category.id, selectedMonth)
     : 0;
 
-  if (error) return <ScreenState actionLabel="Voltar" message={error} onAction={onBack} status="error" />;
+  if (error) {
+    const canRetry = error === 'Não foi possível carregar as despesas da categoria.';
+    return <ScreenState actionLabel={canRetry ? 'Tentar novamente' : 'Voltar'} message={error} onAction={canRetry ? () => void load() : onBack} onSecondaryAction={canRetry ? onBack : undefined} secondaryActionLabel={canRetry ? 'Voltar' : undefined} status={canRetry ? 'error' : 'notFound'} />;
+  }
   if (!data || !selectedMonth) return <ScreenState message="Buscando as despesas da categoria…" status="loading" title="Carregando despesas" />;
 
   return (

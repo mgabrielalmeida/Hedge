@@ -35,7 +35,7 @@ export default function OnboardingRoute() {
   }, [hasExistingAccount, router]);
 
   if (failed) {
-    return <BootstrapScreen isDark={isDark} message="Não foi possível abrir suas contas. Feche e abra o aplicativo novamente." title="Erro ao abrir o Hedge" tokens={tokens} />;
+    return <BootstrapScreen isDark={isDark} message="Não foi possível abrir suas contas. Tente novamente; se a falha continuar, feche e abra o aplicativo." onRetry={() => void checkAccounts()} title="Erro ao abrir o Hedge" tokens={tokens} />;
   }
 
   if (hasExistingAccount !== false) {

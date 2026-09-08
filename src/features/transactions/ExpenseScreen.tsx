@@ -9,6 +9,7 @@ import {
   DatePickerField,
   FadeSelection,
   Field,
+  FormFeedback,
   getIconDisplayValue,
   IconGlyph,
   MoneyField,
@@ -83,6 +84,8 @@ export function ExpenseScreen({
   const [date, setDate] = useState(initialDate);
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showRequiredErrors, setShowRequiredErrors] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -132,7 +135,7 @@ export function ExpenseScreen({
           setEndDate(rule.endDate ?? '');
         }
       }).catch(() => {
-        if (active) setError('Não foi possível carregar os dados do formulário.');
+        if (active) setLoadError('Não foi possível carregar os dados do formulário.');
       }).finally(() => {
         if (active) setIsLoading(false);
       });
@@ -141,7 +144,7 @@ export function ExpenseScreen({
       active = false;
       cancel();
     };
-  }, [db, deferInitialLoad, recurringRuleId, reduceMotion, transactionId]);
+  }, [db, deferInitialLoad, loadAttempt, recurringRuleId, reduceMotion, transactionId]);
 
   async function save() {
     const money = parseMoneyInput(amount.replace(/\./g, ''));
@@ -157,14 +160,14 @@ export function ExpenseScreen({
     }
 
     if (!money.ok || money.value <= 0) {
-      setShowRequiredErrors(false);
-      setError('Informe um valor maior que zero.');
+      setShowRequiredErrors(true);
+      setError('Os campos destacados precisam ser corrigidos antes de salvar.');
       return;
     }
 
     if (!recurrenceEnabled && !validateNotFuture(civil.value, getLocalCivilDate()).ok) {
-      setShowRequiredErrors(false);
-      setError('A data selecionada não pode ser futura.');
+      setShowRequiredErrors(true);
+      setError('Os campos destacados precisam ser corrigidos antes de salvar.');
       return;
     }
 
@@ -179,7 +182,8 @@ export function ExpenseScreen({
       (parsedEndDate !== null && !parsedEndDate.ok) ||
       !validateDateRange(civil.value, parsedEndDate === null ? null : parsedEndDate.value).ok
     )) {
-      setError('Confira a frequência, o dia de cobrança e o período da recorrência.');
+      setShowRequiredErrors(true);
+      setError('Confira os campos da recorrência destacados antes de salvar.');
       return;
     }
 
@@ -233,12 +237,18 @@ export function ExpenseScreen({
     return <ScreenState message="Preparando o formulário do lançamento…" status="loading" title="Carregando formulário" />;
   }
 
+  if (loadError) {
+    return <ScreenState actionLabel="Tentar novamente" message={loadError} onAction={() => { setLoadError(null); setIsLoading(true); setLoadAttempt((attempt) => attempt + 1); }} onSecondaryAction={onDone} secondaryActionLabel="Voltar" status="error" title="Não foi possível abrir o formulário" />;
+  }
+
   const isEditing = existingTransaction !== null || existingRule !== null;
   const noun = kind === 'expense' ? 'despesa' : 'renda';
   const title = `${isEditing ? 'Editar' : 'Nova'} ${noun}${recurrenceEnabled ? ' recorrente' : ''}`;
   const nameIsMissing = !validateRequiredText(name).ok;
-  const amountIsMissing = amount.trim() === '';
-  const dateIsMissing = !parseCivilDate(date).ok;
+  const parsedAmount = parseMoneyInput(amount.replace(/\./g, ''));
+  const amountIsMissing = !parsedAmount.ok || parsedAmount.value <= 0;
+  const parsedDate = parseCivilDate(date);
+  const dateIsMissing = !parsedDate.ok || (!recurrenceEnabled && !validateNotFuture(parsedDate.value, getLocalCivilDate()).ok);
   const accountIsMissing = accountId === null;
   const categoryIsMissing = categoryId === null;
   return (
@@ -246,15 +256,16 @@ export function ExpenseScreen({
         <ScreenHeader onBack={onDone} title={title} />
         <Card elevated>
           <View style={styles.form}>
-            {error ? <Text tone="negative" variant="caption">{error}</Text> : null}
-            <Field error={showRequiredErrors && nameIsMissing ? 'Obrigatório' : undefined} label="Nome" onChangeText={setName} value={name} placeholder={kind === 'expense' ? 'Ex.: Mercado' : 'Ex.: Salário'} />
-            <MoneyField error={showRequiredErrors && amountIsMissing ? 'Obrigatório' : undefined} label="Valor" onChangeText={setAmount} value={amount} placeholder="0,00" />
-            <DatePickerField error={showRequiredErrors && dateIsMissing ? 'Obrigatório' : undefined} label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChange={setDate} value={date} />
+            {error ? <FormFeedback message={error} /> : null}
+            <Field error={showRequiredErrors && nameIsMissing ? 'Informe um nome.' : undefined} label="Nome" onChangeText={(value) => { setName(value); setShowRequiredErrors(false); }} value={name} placeholder={kind === 'expense' ? 'Ex.: Mercado' : 'Ex.: Salário'} />
+            <MoneyField error={showRequiredErrors && amountIsMissing ? 'Informe um valor maior que zero.' : undefined} label="Valor" onChangeText={(value) => { setAmount(value); setShowRequiredErrors(false); }} value={amount} placeholder="0,00" />
+            <DatePickerField error={showRequiredErrors && dateIsMissing ? 'Escolha uma data válida que não seja futura.' : undefined} label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChange={(value) => { setDate(value); setShowRequiredErrors(false); }} value={date} />
             <Text tone={showRequiredErrors && accountIsMissing ? 'negative' : 'muted'} variant="caption">Conta</Text>
             <FadeSelection selectionKey={accountId}>
-              <ChipGroup accessibilityLabel="Conta" error={showRequiredErrors && accountIsMissing}>{accounts.map((account) => <SelectableChip key={account.id} label={account.name} onPress={() => setAccountId(account.id)} selected={accountId === account.id} />)}</ChipGroup>
+              <ChipGroup accessibilityLabel="Conta" error={showRequiredErrors && accountIsMissing}>{accounts.map((account) => <SelectableChip key={account.id} label={account.name} onPress={() => { setAccountId(account.id); setShowRequiredErrors(false); }} selected={accountId === account.id} />)}</ChipGroup>
             </FadeSelection>
-            {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><ChipGroup accessibilityLabel="Categoria" error={showRequiredErrors && categoryIsMissing}>{categories.map((category) => <SelectableChip icon={<IconGlyph size={16} value={getIconDisplayValue(category.iconValue)} />} key={category.id} label={category.name} onPress={() => setCategoryId(category.id)} selected={categoryId === category.id} />)}</ChipGroup></> : null}
+            {showRequiredErrors && accountIsMissing ? <Text tone="negative" variant="caption">Selecione uma conta.</Text> : null}
+            {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><ChipGroup accessibilityLabel="Categoria" error={showRequiredErrors && categoryIsMissing}>{categories.map((category) => <SelectableChip icon={<IconGlyph size={16} value={getIconDisplayValue(category.iconValue)} />} key={category.id} label={category.name} onPress={() => { setCategoryId(category.id); setShowRequiredErrors(false); }} selected={categoryId === category.id} />)}</ChipGroup>{showRequiredErrors && categoryIsMissing ? <Text tone="negative" variant="caption">Selecione uma categoria.</Text> : null}</> : null}
             <Field label="Descrição (opcional)" onChangeText={setDescription} value={description} placeholder="Adicionar observação" multiline />
             {transactionId === undefined && recurringRuleId === undefined ? <><Text tone="muted" variant="caption">Regra recorrente (opcional)</Text><ChipGroup accessibilityLabel="Regra recorrente"><SelectableChip label="Não se repete" onPress={() => setRecurrenceEnabled(false)} selected={!recurrenceEnabled} /><SelectableChip label="Configurar recorrência" onPress={() => setRecurrenceEnabled(true)} selected={recurrenceEnabled} /></ChipGroup></> : null}
             {recurrenceEnabled ? <RecurrenceFields chargeDay={chargeDay} chargeMonth={chargeMonth} endDate={endDate} frequency={frequency} onChargeDayChange={setChargeDay} onChargeMonthChange={setChargeMonth} onEndDateChange={setEndDate} onFrequencyChange={(nextFrequency) => {
@@ -267,8 +278,8 @@ export function ExpenseScreen({
               }
             }} /> : null}
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} onPress={() => void save()} />
-            {existingTransaction ? <Button label="Excluir lançamento" onPress={() => Alert.alert('Excluir lançamento?', 'Esta ação remove o lançamento e atualiza o saldo da conta.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteTransaction(db, existingTransaction.id).then(onDone) }])} variant="destructive" /> : null}
-            {existingRule ? <Button label="Excluir regra recorrente" onPress={() => Alert.alert('Excluir regra recorrente?', 'Os lançamentos já gerados serão mantidos no histórico.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteRecurringRule(db, existingRule.id).then(onDone) }])} variant="destructive" /> : null}
+            {existingTransaction ? <Button label="Excluir lançamento" onPress={() => Alert.alert('Excluir lançamento?', 'Esta ação remove o lançamento e atualiza o saldo da conta.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteTransaction(db, existingTransaction.id).then(onDone).catch(() => setError('O lançamento não foi excluído. Tente novamente ou volte sem fazer alterações.')) }])} variant="destructive" /> : null}
+            {existingRule ? <Button label="Excluir regra recorrente" onPress={() => Alert.alert('Excluir regra recorrente?', 'Os lançamentos já gerados serão mantidos no histórico.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteRecurringRule(db, existingRule.id).then(onDone).catch(() => setError('A regra recorrente não foi excluída. Tente novamente ou volte sem fazer alterações.')) }])} variant="destructive" /> : null}
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>
         </Card>
