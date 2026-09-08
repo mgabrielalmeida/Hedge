@@ -3,6 +3,7 @@ export { BootstrapScreen } from './BootstrapScreen';
 export { Card } from './Card';
 export { DatePickerField } from './DatePickerField';
 export { Field } from './Field';
+export { FadeSelection } from './FadeSelection';
 export { MoneyField } from './MoneyField';
 export { Screen } from './Screen';
 export {

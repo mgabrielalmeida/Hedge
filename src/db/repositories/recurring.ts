@@ -36,15 +36,16 @@ export type RecurringProcessingResult = {
 };
 
 export async function listRecurringRules(db: RepositoryDatabase, activeOnly = false): Promise<readonly RecurringRule[]> {
-  const rows = await db.getAllAsync<RecurringRuleRow>(`SELECT ${ruleColumns} FROM recurring_rules ${activeOnly ? 'WHERE is_active = 1' : ''} ORDER BY id DESC;`);
+  const rows = await db.getAllAsync<RecurringRuleRow>(`SELECT r.${ruleColumns.replaceAll(', ', ', r.')} FROM recurring_rules r JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0 WHERE ${activeOnly ? 'r.is_active = 1' : '1 = 1'} ORDER BY r.id DESC;`);
   return rows.map(mapRecurringRule);
 }
 export async function findRecurringRuleById(db: RepositoryDatabase, id: number): Promise<RecurringRule | null> {
-  const row = await db.getFirstAsync<RecurringRuleRow>(`SELECT ${ruleColumns} FROM recurring_rules WHERE id = ?;`, id);
+  const row = await db.getFirstAsync<RecurringRuleRow>(`SELECT r.${ruleColumns.replaceAll(', ', ', r.')} FROM recurring_rules r JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0 WHERE r.id = ?;`, id);
   return row ? mapRecurringRule(row) : null;
 }
 export async function createRecurringRule(db: RepositoryDatabase, input: RecurringRuleInput, clock: Clock = systemClock): Promise<RecurringRule> {
   const rule = normalized(input); const timestamp = clock();
+  await assertActiveAccount(db, rule.accountId);
   await db.runAsync(`INSERT INTO recurring_rules (kind, account_id, category_id, name, description, amount_cents, frequency, charge_day, charge_month, start_date, end_date, is_active, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?);`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, rule.frequency, rule.chargeDay, rule.chargeMonth, rule.startDate, rule.endDate, timestamp, timestamp);
   const row = await db.getFirstAsync<RecurringRuleRow>(`SELECT ${ruleColumns} FROM recurring_rules WHERE id = last_insert_rowid();`);
   if (!row) throw new Error('Created recurring rule was not found.'); return mapRecurringRule(row);
@@ -53,6 +54,7 @@ export async function updateRecurringRule(db: RepositoryDatabase, id: number, in
   const existing = await findRecurringRuleById(db, id);
   if (!existing?.isActive) return null;
   const rule = normalized(input);
+  await assertActiveAccount(db, rule.accountId);
   await db.runAsync(`UPDATE recurring_rules SET kind = ?, account_id = ?, category_id = ?, name = ?, description = ?, amount_cents = ?, frequency = ?, charge_day = ?, charge_month = ?, start_date = ?, end_date = ?, updated_at = ? WHERE id = ? AND is_active = 1;`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, rule.frequency, rule.chargeDay, rule.chargeMonth, rule.startDate, rule.endDate, clock(), id);
   return findRecurringRuleById(db, id);
 }
@@ -70,7 +72,7 @@ export async function createDueOccurrence(
   if (!validId(ruleId) || !parseCivilDate(scheduledDate).ok) throw new Error('Invalid recurring occurrence.');
   let created: DueOccurrence | null = null;
   await db.withExclusiveTransactionAsync(async (session) => {
-    const ruleRow = await session.getFirstAsync<RecurringRuleRow>(`SELECT ${ruleColumns} FROM recurring_rules WHERE id = ?;`, ruleId);
+    const ruleRow = await session.getFirstAsync<RecurringRuleRow>(`SELECT r.${ruleColumns.replaceAll(', ', ', r.')} FROM recurring_rules r JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0 WHERE r.id = ?;`, ruleId);
     if (!ruleRow) throw new Error('Recurring rule was not found.');
     const rule = mapRecurringRule(ruleRow);
     if (!rule.isActive || !isRecurringRuleDueOn(rule, scheduledDate)) throw new Error('Recurring rule is not due.');
@@ -92,12 +94,13 @@ export async function processDueRecurringRules(
   const generated: DueOccurrence[] = [];
   await db.withExclusiveTransactionAsync(async (session) => {
     const rows = await session.getAllAsync<RecurringRuleRow>(
-      `SELECT ${ruleColumns}
-       FROM recurring_rules
-       WHERE is_active = 1
-         AND start_date <= ?
-         AND (end_date IS NULL OR end_date >= ?)
-       ORDER BY id;`,
+      `SELECT r.${ruleColumns.replaceAll(', ', ', r.')}
+       FROM recurring_rules r
+       JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0
+       WHERE r.is_active = 1
+         AND r.start_date <= ?
+         AND (r.end_date IS NULL OR r.end_date >= ?)
+       ORDER BY r.id;`,
       scheduledDate,
       scheduledDate,
     );
@@ -176,3 +179,8 @@ function normalized(input: RecurringRuleInput): Required<Omit<RecurringRuleInput
   return { ...input, name: name.value, description: normalizeOptionalText(input.description), categoryId, chargeMonth, endDate };
 }
 function validId(value: number): boolean { return Number.isSafeInteger(value) && value > 0; }
+
+async function assertActiveAccount(db: RepositoryDatabase, accountId: number): Promise<void> {
+  const account = await db.getFirstAsync<{ id: number }>('SELECT id FROM accounts WHERE id = ? AND is_archived = 0;', accountId);
+  if (!account) throw new Error('Archived or missing account cannot receive recurring rules.');
+}

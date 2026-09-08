@@ -68,12 +68,11 @@ Não existe tabela de instituições nem restrição de unicidade para o indicad
 visual. Referências de lançamentos e recorrências usam `ON DELETE RESTRICT`,
 impedindo perda acidental do histórico.
 
-O MVP passou a permitir a exclusão de uma conta quando ao menos outra conta
-permanecer cadastrada. O schema v1 ainda não permite essa operação, pois toda
-conta possui ao menos seu lançamento de saldo inicial e as referências usam
-`ON DELETE RESTRICT`. A implementação exigirá uma nova migração, sem alterar
-a migração 1, depois que for definida a política para lançamentos,
-transferências, regras recorrentes e ocorrências vinculados à conta excluída.
+O schema v1 não exclui contas: toda conta possui ao menos seu lançamento de
+saldo inicial e as referências usam `ON DELETE RESTRICT`. A decisão posterior
+é arquivá-las, preservando histórico e referências. A migração 6 acrescenta
+`is_archived` e `archived_at`; repositórios filtram contas e registros a elas
+vinculados das consultas de interface e bloqueiam novas escritas nesses vínculos.
 
 ## `categories`
 

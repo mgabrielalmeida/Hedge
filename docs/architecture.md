@@ -172,7 +172,10 @@ ocorrências recorrentes. Identificadores são inteiros locais, saldos são
 derivados dos lançamentos e transferências são representadas por uma única
 linha com conta de origem e destino.
 
-Regras recorrentes usam exclusão lógica para preservar procedência. Uma tabela
+Contas usam arquivamento lógico para preservar o histórico e as referências de
+transferências: registros arquivados são excluídos das consultas que alimentam
+telas e não podem receber novas escritas. Arquivar uma conta desativa suas
+regras recorrentes ativas na mesma transação. Regras recorrentes usam exclusão lógica para preservar procedência. Uma tabela
 de ocorrências registra cada data processada mesmo depois da exclusão do
 lançamento gerado, evitando geração duplicada. A migração 1 não deve ser
 alterada depois de aplicada; mudanças futuras exigem novas migrações.

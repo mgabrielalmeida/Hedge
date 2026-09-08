@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import {
   ACCOUNT_ICON_OPTIONS,
   Button,
+  FadeSelection,
   Field,
   MoneyField,
   Text,
@@ -124,16 +125,18 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
 
       <View>
         <Text variant="caption" style={[styles.label, { color: tokens.textMuted }]}>Banco ou instituição</Text>
-        <View style={styles.options}>
-          {BANK_OPTIONS.map((option) => (
-            <Choice
-              key={option}
-              label={option}
-              onPress={() => setBank(option)}
-              selected={bank === option}
-            />
-          ))}
-        </View>
+        <FadeSelection selectionKey={bank}>
+          <View style={styles.options}>
+            {BANK_OPTIONS.map((option) => (
+              <Choice
+                key={option}
+                label={option}
+                onPress={() => setBank(option)}
+                selected={bank === option}
+              />
+            ))}
+          </View>
+        </FadeSelection>
       </View>
 
       {bank === 'Outra instituição' ? (

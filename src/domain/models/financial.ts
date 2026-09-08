@@ -12,6 +12,8 @@ export interface Account {
   readonly iconValue: string;
   readonly colorValue: string;
   readonly themeColorIndex: ThemeColorIndex | null;
+  readonly isArchived: boolean;
+  readonly archivedAt: UtcTimestamp | null;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
 }

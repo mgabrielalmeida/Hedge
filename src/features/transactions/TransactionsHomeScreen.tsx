@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Card,
+  FadeSelection,
   scheduleAfterSecondaryTransition,
   Screen,
   Text,
@@ -85,11 +86,13 @@ export function TransactionsHomeScreen({
         </View>
         {selectedAccount ? (
           <Card>
-            <Text tone="muted" variant="caption">Saldo atual</Text>
-            <Text variant="title">{selectedAccount.name}</Text>
-            <Text variant="heading">
-              {formatBrazilianCurrency(calculateAccountBalance(transactions, selectedAccount.id))}
-            </Text>
+            <FadeSelection selectionKey={selectedAccount.id}>
+              <Text tone="muted" variant="caption">Saldo atual</Text>
+              <Text variant="title">{selectedAccount.name}</Text>
+              <Text variant="heading">
+                {formatBrazilianCurrency(calculateAccountBalance(transactions, selectedAccount.id))}
+              </Text>
+            </FadeSelection>
             <View style={styles.accounts}>
               {accounts.map((account) => (
                 <Pressable

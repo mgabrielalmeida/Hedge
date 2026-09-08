@@ -19,6 +19,7 @@ export type TransactionInput = {
 
 export async function createTransaction(db: RepositoryDatabase, input: TransactionInput, clock: Clock = systemClock): Promise<Transaction> {
   const transaction = normalized(input); const timestamp = clock();
+  await assertActiveAccounts(db, transaction.accountId, transaction.destinationAccountId);
   await db.runAsync(
     `INSERT INTO transactions (kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -29,22 +30,29 @@ export async function createTransaction(db: RepositoryDatabase, input: Transacti
 }
 
 export async function listTransactions(db: RepositoryDatabase): Promise<readonly Transaction[]> {
-  const rows = await db.getAllAsync<TransactionRow>(`SELECT ${transactionColumns} FROM transactions ORDER BY transaction_date DESC, id DESC;`);
+  const rows = await db.getAllAsync<TransactionRow>(`SELECT t.${transactionColumns.replaceAll(', ', ', t.')} FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 LEFT JOIN accounts d ON d.id = t.destination_account_id WHERE t.destination_account_id IS NULL OR d.is_archived = 0 ORDER BY t.transaction_date DESC, t.id DESC;`);
   return rows.map(mapTransaction);
 }
 
 export async function findTransactionById(db: RepositoryDatabase, id: number): Promise<Transaction | null> {
-  const row = await db.getFirstAsync<TransactionRow>(`SELECT ${transactionColumns} FROM transactions WHERE id = ?;`, id);
+  const row = await db.getFirstAsync<TransactionRow>(`SELECT t.${transactionColumns.replaceAll(', ', ', t.')} FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 LEFT JOIN accounts d ON d.id = t.destination_account_id WHERE t.id = ? AND (t.destination_account_id IS NULL OR d.is_archived = 0);`, id);
   return row ? mapTransaction(row) : null;
 }
 
 export async function updateTransaction(db: RepositoryDatabase, id: number, input: TransactionInput, clock: Clock = systemClock): Promise<Transaction | null> {
+  if (!await findTransactionById(db, id)) return null;
   const transaction = normalized(input);
+  await assertActiveAccounts(db, transaction.accountId, transaction.destinationAccountId);
   await db.runAsync(
     `UPDATE transactions SET kind = ?, account_id = ?, destination_account_id = ?, category_id = ?, name = ?, description = ?, amount_cents = ?, transaction_date = ?, updated_at = ? WHERE id = ?;`,
     transaction.kind, transaction.accountId, transaction.destinationAccountId, transaction.categoryId, transaction.name, transaction.description, transaction.amountCents, transaction.transactionDate, clock(), id,
   );
   return findTransactionById(db, id);
+}
+async function assertActiveAccounts(db: RepositoryDatabase, accountId: number, destinationAccountId: number | null): Promise<void> {
+  const accounts = await db.getAllAsync<{ id: number }>('SELECT id FROM accounts WHERE is_archived = 0 AND (id = ? OR id = ?);', accountId, destinationAccountId);
+  const expected = destinationAccountId === null ? 1 : 2;
+  if (accounts.length !== expected) throw new Error('Archived or missing account cannot receive transactions.');
 }
 
 export async function deleteTransaction(db: RepositoryDatabase, id: number): Promise<boolean> {

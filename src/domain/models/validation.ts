@@ -69,6 +69,8 @@ export function validateAccount(account: Account): ValidationResult<Account, Dom
     !isNormalizedRequiredText(account.iconValue) ||
     !isNormalizedRequiredText(account.colorValue) ||
     !isThemeColorIndex(account.themeColorIndex) ||
+    (account.isArchived && !isUtcTimestamp(account.archivedAt ?? '')) ||
+    (!account.isArchived && account.archivedAt !== null) ||
     !isUtcTimestamp(account.createdAt) ||
     !isUtcTimestamp(account.updatedAt)
   ) {

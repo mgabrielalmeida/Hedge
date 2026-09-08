@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Button,
   Card,
+  FadeSelection,
   Field,
   MoneyField,
   scheduleAfterSecondaryTransition,
@@ -234,30 +235,32 @@ function AccountChoices({
   return (
     <View>
       <Text tone="muted" variant="caption" style={{ marginBottom: tokens.spacing.sm }}>{label}</Text>
-      <View style={styles.choices}>
-        {accounts.map((account) => {
-          const selected = selectedId === account.id;
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              key={account.id}
-              onPress={() => onSelect(account.id)}
-              style={[
-                styles.choice,
-                {
-                  backgroundColor: selected ? tokens.primary : tokens.surface,
-                  borderColor: selected ? tokens.primary : tokens.border,
-                },
-              ]}
-            >
-              <Text variant="caption" style={{ color: selected ? tokens.onPrimary : tokens.text }}>
-                {account.name}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <FadeSelection selectionKey={selectedId}>
+        <View style={styles.choices}>
+          {accounts.map((account) => {
+            const selected = selectedId === account.id;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                key={account.id}
+                onPress={() => onSelect(account.id)}
+                style={[
+                  styles.choice,
+                  {
+                    backgroundColor: selected ? tokens.primary : tokens.surface,
+                    borderColor: selected ? tokens.primary : tokens.border,
+                  },
+                ]}
+              >
+                <Text variant="caption" style={{ color: selected ? tokens.onPrimary : tokens.text }}>
+                  {account.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </FadeSelection>
     </View>
   );
 }

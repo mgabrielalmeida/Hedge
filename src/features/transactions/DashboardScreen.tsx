@@ -6,6 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import {
   Button,
   Card,
+  FadeSelection,
   resolveThemeColorValue,
   scheduleAfterSecondaryTransition,
   Screen,
@@ -94,14 +95,16 @@ export function DashboardScreen({
 
           {selectedAccount ? (
             <>
-              <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.md }}>
-                Conta selecionada: {selectedAccount.name}
-              </Text>
-              <Text variant="title">
-                {formatBrazilianCurrency(
-                  calculateAccountBalance(transactions, selectedAccount.id),
-                )}
-              </Text>
+              <FadeSelection selectionKey={selectedAccount.id}>
+                <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.md }}>
+                  Conta selecionada: {selectedAccount.name}
+                </Text>
+                <Text variant="title">
+                  {formatBrazilianCurrency(
+                    calculateAccountBalance(transactions, selectedAccount.id),
+                  )}
+                </Text>
+              </FadeSelection>
               <View style={styles.accountChips}>
                 {accounts.map((account) => {
                   const selected = account.id === selectedAccountId;

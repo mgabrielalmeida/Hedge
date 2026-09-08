@@ -2,6 +2,7 @@ import { initializeDatabase } from '@/db/database';
 
 import {
   createAccount,
+  archiveAccount,
   createCategory,
   createDueOccurrence,
   createRecurringRule,
@@ -156,6 +157,24 @@ describe('SQLite repositories', () => {
       expect.objectContaining({ id: rule.id, isActive: false, categoryId: null, deletedAt: updatedAt, updatedAt }),
     ]);
     expect((await listCategories(database)).some((item) => item.id === category.id)).toBe(false);
+  });
+
+  it('archives an account without losing its records, hides every related view, and deactivates its rules', async () => {
+    const archived = await createAccount(database, { name: 'Old', institutionName: 'Bank A', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 1_000, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const active = await createAccount(database, { name: 'Current', institutionName: 'Bank B', iconValue: 'wallet', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const category = await createCategory(database, { name: 'Bills', monthlyBudgetCents: 0 }, () => createdAt);
+    const transfer = await createTransaction(database, { kind: 'transfer', accountId: archived.id, destinationAccountId: active.id, name: 'Move', amountCents: -250, transactionDate: '2026-09-02' }, () => createdAt);
+    const rule = await createRecurringRule(database, { kind: 'expense', accountId: archived.id, categoryId: category.id, name: 'Old bill', amountCents: -100, frequency: 'monthly', chargeDay: 2, startDate: '2026-09-01' }, () => createdAt);
+
+    await expect(archiveAccount(database, archived.id, () => updatedAt)).resolves.toBe(true);
+    await expect(listAccounts(database)).resolves.toEqual([expect.objectContaining({ id: active.id, isArchived: false })]);
+    await expect(findAccountById(database, archived.id)).resolves.toBeNull();
+    await expect(listTransactions(database)).resolves.toEqual(expect.not.arrayContaining([expect.objectContaining({ id: transfer.id })]));
+    await expect(listRecurringRules(database)).resolves.toEqual([]);
+    await expect(createTransaction(database, { kind: 'income', accountId: archived.id, name: 'Blocked', amountCents: 1, transactionDate: '2026-09-02' })).rejects.toThrow('Archived');
+    await expect(createRecurringRule(database, { kind: 'expense', accountId: archived.id, categoryId: category.id, name: 'Blocked', amountCents: -1, frequency: 'monthly', chargeDay: 2, startDate: '2026-09-01' })).rejects.toThrow('Archived');
+    await expect(database.getFirstAsync<{ is_active: number; deleted_at: string | null }>('SELECT is_active, deleted_at FROM recurring_rules WHERE id = ?;', rule.id)).resolves.toEqual({ is_active: 0, deleted_at: updatedAt });
+    await expect(database.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM transactions WHERE account_id = ? OR destination_account_id = ?;', archived.id, archived.id)).resolves.toEqual({ count: 2 });
   });
 
   it('persists, maps, edits and permanently deletes each point transaction kind', async () => {

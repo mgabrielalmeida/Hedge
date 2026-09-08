@@ -17,7 +17,7 @@ conta de usuário, servidor ou sincronização.
 As funcionalidades iniciais são:
 
 - cadastrar contas bancárias;
-- editar e excluir contas, desde que pelo menos uma conta permaneça;
+- editar e arquivar contas bancárias;
 - registrar despesas pontuais;
 - registrar rendas pontuais;
 - consultar o histórico de despesas e rendas pontuais;
@@ -111,11 +111,14 @@ exclusão dos demais lançamentos. Ele não é apresentado como um atributo ou
 saldo separado da conta: a interface apresenta o saldo atual, sempre derivado
 dos lançamentos. Contas podem ter saldo negativo.
 
-Quando não houver nenhuma conta no banco de dados, o aplicativo abre o fluxo
-de onboarding para criação da primeira conta. A exclusão de uma conta é
-permitida somente quando houver outra conta cadastrada. A regra de tratamento
-do histórico e das referências vinculadas à conta será definida antes de
-implementar essa exclusão.
+Quando não houver nenhuma conta ativa, o aplicativo abre o fluxo de onboarding
+para criação da primeira conta. Contas não são excluídas fisicamente: o usuário
+pode arquivá-las. O arquivamento preserva todos os lançamentos e transferências
+para fins de histórico e integridade referencial, mas oculta a conta e qualquer
+lançamento, transferência ou recorrência a ela vinculado em todas as telas.
+Uma conta arquivada não pode receber novos lançamentos nem participar de novas
+transferências; suas recorrências ativas são desativadas na mesma operação e
+não voltam a gerar lançamentos. A primeira versão não oferece desarquivamento.
 
 Despesas pontuais decrementam o saldo da conta selecionada e rendas pontuais o
 incrementam. A tela inicial mostra o saldo atual consolidado do usuário e, por

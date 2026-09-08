@@ -1,6 +1,6 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   Button,
@@ -10,7 +10,7 @@ import {
   Text,
   useReducedMotion,
 } from '@/components';
-import { findAccountById, getAccountBalance } from '@/db/repositories';
+import { archiveAccount, findAccountById, getAccountBalance } from '@/db/repositories';
 import type { Account, Cents } from '@/domain';
 
 import { AccountForm } from './AccountForm';
@@ -81,6 +81,18 @@ export function AccountEditorScreen({ accountId, onDone }: AccountEditorScreenPr
               account={data.account}
               currentBalanceCents={data.currentBalanceCents}
               onSaved={onDone}
+            />
+            <Button
+              label="Arquivar conta"
+              onPress={() => Alert.alert(
+                'Arquivar esta conta?',
+                'O histórico e as transferências serão preservados, mas a conta deixará de aparecer no aplicativo. Novos lançamentos serão bloqueados e recorrências associadas serão desativadas.',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  { text: 'Arquivar', style: 'destructive', onPress: () => void archiveAccount(database, accountId).then(onDone).catch(() => setError('Não foi possível arquivar a conta.')) },
+                ],
+              )}
+              variant="destructive"
             />
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>

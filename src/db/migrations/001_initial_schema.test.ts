@@ -5,7 +5,7 @@ describe('initialSchemaMigration', () => {
   it('is registered as the immutable first migration', () => {
     expect(initialSchemaMigration.version).toBe(1);
     expect(migrations[0]).toBe(initialSchemaMigration);
-    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5]);
+    expect(migrations.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it('creates the complete v1 schema as strict tables', () => {

@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   DatePickerField,
+  FadeSelection,
   Field,
   MoneyField,
   scheduleAfterSecondaryTransition,
@@ -257,7 +258,9 @@ export function ExpenseScreen({
             <MoneyField error={showRequiredErrors && amountIsMissing ? 'Obrigatório' : undefined} label="Valor" onChangeText={setAmount} value={amount} placeholder="0,00" />
             <DatePickerField error={showRequiredErrors && dateIsMissing ? 'Obrigatório' : undefined} label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChange={setDate} value={date} />
             <Text tone={showRequiredErrors && accountIsMissing ? 'negative' : 'muted'} variant="caption">Conta</Text>
-            <View style={[styles.choices, showRequiredErrors && accountIsMissing ? [styles.requiredChoices, { borderColor: tokens.negative }] : null]}>{accounts.map((account) => <Choice key={account.id} label={account.name} onPress={() => setAccountId(account.id)} selected={accountId === account.id} />)}</View>
+            <FadeSelection selectionKey={accountId}>
+              <View style={[styles.choices, showRequiredErrors && accountIsMissing ? [styles.requiredChoices, { borderColor: tokens.negative }] : null]}>{accounts.map((account) => <Choice key={account.id} label={account.name} onPress={() => setAccountId(account.id)} selected={accountId === account.id} />)}</View>
+            </FadeSelection>
             {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><View style={[styles.choices, showRequiredErrors && categoryIsMissing ? [styles.requiredChoices, { borderColor: tokens.negative }] : null]}>{categories.map((category) => <Choice key={category.id} label={`${category.iconValue} ${category.name}`} onPress={() => setCategoryId(category.id)} selected={categoryId === category.id} />)}</View></> : null}
             <Field label="Descrição (opcional)" onChangeText={setDescription} value={description} placeholder="Adicionar observação" multiline />
             {transactionId === undefined && recurringRuleId === undefined ? <><Text tone="muted" variant="caption">Regra recorrente (opcional)</Text><View style={styles.choices}><Choice label="Não se repete" onPress={() => setRecurrenceEnabled(false)} selected={!recurrenceEnabled} /><Choice label="Configurar recorrência" onPress={() => setRecurrenceEnabled(true)} selected={recurrenceEnabled} /></View></> : null}

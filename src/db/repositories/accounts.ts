@@ -4,7 +4,7 @@ import type { Account, Cents, CivilDate, ThemeColorIndex } from '@/domain';
 import { type Clock, type RepositoryDatabase, type RepositorySession, systemClock } from './database';
 import { mapAccount, type AccountRow } from './rows';
 
-const accountColumns = 'id, name, institution_name, icon_value, color_value, theme_color_index, created_at, updated_at';
+const accountColumns = 'id, name, institution_name, icon_value, color_value, theme_color_index, is_archived, archived_at, created_at, updated_at';
 
 export type CreateAccountInput = {
   readonly name: string;
@@ -57,12 +57,12 @@ export async function createAccount(db: RepositoryDatabase, input: CreateAccount
 }
 
 export async function listAccounts(db: RepositoryDatabase): Promise<readonly Account[]> {
-  const rows = await db.getAllAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts ORDER BY id ASC;`);
+  const rows = await db.getAllAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE is_archived = 0 ORDER BY id ASC;`);
   return rows.map(mapAccount);
 }
 
 export async function findAccountById(db: RepositoryDatabase, id: number): Promise<Account | null> {
-  const row = await db.getFirstAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE id = ?;`, id);
+  const row = await db.getFirstAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0;`, id);
   return row ? mapAccount(row) : null;
 }
 
@@ -78,7 +78,7 @@ export async function updateAccount(db: RepositoryDatabase, id: number, input: U
   const colorValue = required(input.colorValue, 'account color value');
   const themeColorIndex = input.themeColorIndex ?? null;
   validateThemeColorIndex(themeColorIndex);
-  await db.runAsync('UPDATE accounts SET name = ?, institution_name = ?, visual_type = \'icon\', visual_value = ?, icon_value = ?, color_value = ?, theme_color_index = ?, updated_at = ? WHERE id = ?;', name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, clock(), id);
+  await db.runAsync('UPDATE accounts SET name = ?, institution_name = ?, visual_type = \'icon\', visual_value = ?, icon_value = ?, color_value = ?, theme_color_index = ?, updated_at = ? WHERE id = ? AND is_archived = 0;', name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, clock(), id);
   return findAccountById(db, id);
 }
 
@@ -101,7 +101,7 @@ export async function updateAccountWithBalance(
   let account: Account | null = null;
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const existing = await transaction.getFirstAsync<AccountRow>(
-      `SELECT ${accountColumns} FROM accounts WHERE id = ?;`,
+      `SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0;`,
       id,
     );
     if (!existing) return;
@@ -113,7 +113,7 @@ export async function updateAccountWithBalance(
       `UPDATE accounts
        SET name = ?, institution_name = ?, visual_type = 'icon', visual_value = ?, icon_value = ?,
            color_value = ?, theme_color_index = ?, updated_at = ?
-       WHERE id = ?;`,
+       WHERE id = ? AND is_archived = 0;`,
       name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, timestamp, id,
     );
 
@@ -132,13 +132,35 @@ export async function updateAccountWithBalance(
     }
 
     const updated = await transaction.getFirstAsync<AccountRow>(
-      `SELECT ${accountColumns} FROM accounts WHERE id = ?;`,
+      `SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0;`,
       id,
     );
     if (!updated) throw new Error('Updated account was not found.');
     account = mapAccount(updated);
   });
   return account;
+}
+
+export async function archiveAccount(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
+  const timestamp = clock();
+  let archived = false;
+  await db.withExclusiveTransactionAsync(async (transaction) => {
+    const existing = await transaction.getFirstAsync<{ id: number }>(
+      'SELECT id FROM accounts WHERE id = ? AND is_archived = 0;',
+      id,
+    );
+    if (!existing) return;
+    await transaction.runAsync(
+      'UPDATE accounts SET is_archived = 1, archived_at = ?, updated_at = ? WHERE id = ?;',
+      timestamp, timestamp, id,
+    );
+    await transaction.runAsync(
+      'UPDATE recurring_rules SET is_active = 0, deleted_at = ?, updated_at = ? WHERE account_id = ? AND is_active = 1;',
+      timestamp, timestamp, id,
+    );
+    archived = true;
+  });
+  return archived;
 }
 
 async function readAccountBalance(db: RepositorySession, id: number): Promise<Cents> {
