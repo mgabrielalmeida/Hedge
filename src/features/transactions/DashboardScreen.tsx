@@ -46,7 +46,7 @@ import {
 import { subscribeToRecurringProcessing } from './useRecurringProcessing';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
-const COMPOSITION_TRANSITION_DURATION = 320;
+const COMPOSITION_TRANSITION_DURATION = 480;
 
 type DashboardScreenProps = {
   onCategoryPress: (categoryId: number, selectedMonth: string) => void;
@@ -270,10 +270,6 @@ function MonthlyCategorySpendingChart({
   const { tokens } = useTheme();
   const [chartWidth, setChartWidth] = useState(0);
   const [transitionProgress] = useState(() => new Animated.Value(1));
-  const displayedTotal = useAnimatedCents(
-    composition.totalSpendingCents,
-    reduceMotion,
-  );
   const slices = useMemo(() => {
     const categoryById = new Map(categories.map((category) => [category.id, category]));
     const visibleItems = composition.items.flatMap((item) => {
@@ -292,16 +288,7 @@ function MonthlyCategorySpendingChart({
         spendingCents: item.spendingCents,
       }];
     });
-    const visibleWithOther = composition.otherSpendingCents > 0
-      ? [...visibleItems, {
-        categoryId: null,
-        color: tokens.textMuted,
-        key: 'other',
-        label: 'Outras',
-        spendingCents: composition.otherSpendingCents,
-      }]
-      : visibleItems;
-    return visibleWithOther.reduce<{
+    return visibleItems.reduce<{
       readonly accumulatedRatio: number;
       readonly slices: readonly CategoryCompositionSlice[];
     }>((result, item) => {
@@ -315,7 +302,7 @@ function MonthlyCategorySpendingChart({
         slices: [...result.slices, { ...item, end, start }],
       };
     }, { accumulatedRatio: 0, slices: [] }).slices;
-  }, [categories, composition, tokens.primary, tokens.textMuted]);
+  }, [categories, composition, tokens.primary]);
   const sliceSignature = `${monthLabel}|${slices
     .map((slice) => `${slice.key}:${slice.spendingCents}:${slice.color}`)
     .join('|')}`;
@@ -338,30 +325,38 @@ function MonthlyCategorySpendingChart({
       }, 0);
       return () => clearTimeout(resetTimer);
     }
-    if (previousSignature.current === sliceSignature) return;
+    if (sliceSignature === previousSignature.current) return;
 
     previousSignature.current = sliceSignature;
     previousSlices.current = slices;
+    let animation: Animated.CompositeAnimation | null = null;
+    const startTimer = setTimeout(() => {
+      setTransitionSlices(createCompositionTransition(fromSlices, slices));
+      transitionProgress.setValue(0);
+      animation = Animated.timing(transitionProgress, {
+        duration: COMPOSITION_TRANSITION_DURATION,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+        toValue: 1,
+        useNativeDriver: false,
+      });
+      animation.start(({ finished }) => {
+        if (!finished) return;
+        setTimeout(() => {
+          setTransitionSlices(createCompositionTransition(slices, slices));
+        }, 0);
+      });
+    }, 0);
 
-    setTransitionSlices(createCompositionTransition(fromSlices, slices));
-    transitionProgress.setValue(0);
-    const animation = Animated.timing(transitionProgress, {
-      duration: COMPOSITION_TRANSITION_DURATION,
-      easing: Easing.out(Easing.cubic),
-      toValue: 1,
-      useNativeDriver: false,
-    });
-
-    animation.start(({ finished }) => {
-      if (finished) setTransitionSlices(createCompositionTransition(slices, slices));
-    });
-    return () => animation.stop();
+    return () => {
+      clearTimeout(startTimer);
+      animation?.stop();
+    };
   }, [reduceMotion, sliceSignature, slices, transitionProgress]);
   const renderedTransitionSlices = reduceMotion === false
     ? transitionSlices
     : createCompositionTransition(slices, slices);
-
-  const accessibleSummary = slices.length === 0
+  const hasSpending = composition.totalSpendingCents > 0;
+  const accessibleSummary = !hasSpending
     ? `Nenhuma despesa em ${monthLabel}.`
     : `Gastos em ${monthLabel}: ${slices.map((slice) => (
       `${slice.label}, ${formatBrazilianCurrency(slice.spendingCents)}`
@@ -370,10 +365,7 @@ function MonthlyCategorySpendingChart({
   return (
     <Card>
       <Text variant="title">Gastos do mês</Text>
-      <Text tone="muted" variant="caption" style={styles.compositionMonth}>
-        {monthLabel}
-      </Text>
-      <MoneyText cents={displayedTotal} variant="display" />
+      <MoneyText cents={composition.totalSpendingCents} variant="display" />
 
       <View
         accessibilityLabel={accessibleSummary}
@@ -390,7 +382,7 @@ function MonthlyCategorySpendingChart({
           },
         ]}
       >
-        {chartWidth > 0 && renderedTransitionSlices.length > 0 ? (
+        {chartWidth > 0 && hasSpending ? (
           <Svg height={20} width={chartWidth}>
             {renderedTransitionSlices.map((slice) => (
               <AnimatedRect
@@ -418,13 +410,13 @@ function MonthlyCategorySpendingChart({
         ) : null}
       </View>
 
-      {slices.length === 0 ? (
-        <Text tone="muted" variant="caption" style={styles.compositionEmpty}>
-          Nenhuma despesa neste mês.
-        </Text>
-      ) : (
-        <View accessibilityLabel="Legenda dos gastos por categoria" style={styles.compositionLegend}>
-          {slices.map((slice) => {
+        {!hasSpending ? (
+          <Text tone="muted" variant="caption" style={styles.compositionEmpty}>
+            Nenhuma despesa neste mês.
+          </Text>
+        ) : (
+          <View accessibilityLabel="Legenda dos gastos por categoria" style={styles.compositionLegend}>
+            {slices.map((slice) => {
             const percentage = composition.totalSpendingCents === 0
               ? 0
               : Math.round(slice.spendingCents / composition.totalSpendingCents * 100);
@@ -466,9 +458,9 @@ function MonthlyCategorySpendingChart({
                 {content}
               </Pressable>
             );
-          })}
-        </View>
-      )}
+            })}
+          </View>
+        )}
     </Card>
   );
 }
@@ -498,42 +490,6 @@ function createCompositionTransition(
       toStart: to?.start ?? from?.start ?? 0,
     };
   });
-}
-
-function useAnimatedCents(targetCents: number, reduceMotion: boolean | null): number {
-  const [animatedValue] = useState(() => new Animated.Value(targetCents));
-  const [displayedCents, setDisplayedCents] = useState(targetCents);
-  const previousTarget = useRef(targetCents);
-
-  useEffect(() => {
-    const startingCents = previousTarget.current;
-    previousTarget.current = targetCents;
-    animatedValue.stopAnimation();
-
-    if (reduceMotion !== false) {
-      animatedValue.setValue(targetCents);
-      return;
-    }
-
-    animatedValue.setValue(startingCents);
-    const listenerId = animatedValue.addListener(({ value }) => {
-      setDisplayedCents(Math.round(value));
-    });
-    const animation = Animated.timing(animatedValue, {
-      duration: COMPOSITION_TRANSITION_DURATION,
-      easing: Easing.out(Easing.cubic),
-      toValue: targetCents,
-      useNativeDriver: false,
-    });
-
-    animation.start();
-    return () => {
-      animation.stop();
-      animatedValue.removeListener(listenerId);
-    };
-  }, [animatedValue, reduceMotion, targetCents]);
-
-  return reduceMotion === false ? displayedCents : targetCents;
 }
 
 function MonthlyRecurringOverview({
@@ -707,9 +663,6 @@ const styles = StyleSheet.create({
     gap: 10,
     minHeight: 44,
     paddingHorizontal: 6,
-  },
-  compositionMonth: {
-    marginTop: 2,
   },
   compositionSwatch: {
     height: 10,

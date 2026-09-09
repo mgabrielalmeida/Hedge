@@ -26,7 +26,7 @@ function expense(
 }
 
 describe('monthly category spending composition', () => {
-  it('ranks five categories and groups the remaining and deleted categories', () => {
+  it('preserves the category order and excludes deleted categories from the total', () => {
     const composition = buildMonthlyCategorySpendingComposition([
       expense(1, 1, -1_000),
       expense(2, 2, -6_000),
@@ -41,18 +41,18 @@ describe('monthly category spending composition', () => {
 
     expect(composition).toEqual({
       items: [
+        { categoryId: 1, spendingCents: 1_000 },
         { categoryId: 2, spendingCents: 6_000 },
         { categoryId: 3, spendingCents: 5_000 },
         { categoryId: 4, spendingCents: 4_000 },
         { categoryId: 5, spendingCents: 3_000 },
         { categoryId: 6, spendingCents: 2_000 },
       ],
-      otherSpendingCents: 2_000,
-      totalSpendingCents: 22_000,
+      totalSpendingCents: 21_000,
     });
   });
 
-  it('ignores non-expenses and validates the visible category limit', () => {
+  it('ignores non-expenses and retains zero-spending categories', () => {
     const income: Transaction = {
       accountId: 1,
       amountCents: 5_000,
@@ -68,8 +68,6 @@ describe('monthly category spending composition', () => {
     };
 
     expect(buildMonthlyCategorySpendingComposition([income], [1], '2026-09'))
-      .toEqual({ items: [], otherSpendingCents: 0, totalSpendingCents: 0 });
-    expect(() => buildMonthlyCategorySpendingComposition([], [], '2026-09', 0))
-      .toThrow(RangeError);
+      .toEqual({ items: [{ categoryId: 1, spendingCents: 0 }], totalSpendingCents: 0 });
   });
 });
