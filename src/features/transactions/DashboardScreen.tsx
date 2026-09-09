@@ -23,14 +23,16 @@ import {
   Text,
   useReducedMotion,
 } from '@/components';
-import { listAccounts, listCategories, listTransactions } from '@/db/repositories';
+import { listAccounts, listCategories, listRecurringOccurrencesForMonth, listRecurringRules, listTransactions } from '@/db/repositories';
 import {
   calculateAccountBalance,
   calculateCategoryMonthlySpending,
   calculateConsolidatedBalance,
   formatBrazilianCurrency,
+  formatCivilDate,
+  projectMonthEndBalance,
 } from '@/domain';
-import type { Account, Category, Transaction } from '@/domain';
+import type { Account, Category, RecurringOccurrence, RecurringRule, Transaction } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
@@ -58,6 +60,8 @@ export function DashboardScreen({
   const { hideBalances, setBalancesHidden, tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [categories, setCategories] = useState<readonly Category[]>([]);
+  const [recurringOccurrences, setRecurringOccurrences] = useState<readonly RecurringOccurrence[]>([]);
+  const [recurringRules, setRecurringRules] = useState<readonly RecurringRule[]>([]);
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(() => getLocalCivilDate().slice(0, 7));
@@ -67,9 +71,12 @@ export function DashboardScreen({
 
   const load = useCallback(async () => {
     try {
-      const [loadedAccounts, loadedCategories, loadedTransactions] = await Promise.all([
+      const month = getLocalCivilDate().slice(0, 7);
+      const [loadedAccounts, loadedCategories, loadedOccurrences, loadedRecurringRules, loadedTransactions] = await Promise.all([
         listAccounts(database),
         listCategories(database),
+        listRecurringOccurrencesForMonth(database, month),
+        listRecurringRules(database),
         listTransactions(database),
       ]);
 
@@ -80,6 +87,8 @@ export function DashboardScreen({
 
       setAccounts(loadedAccounts);
       setCategories(loadedCategories);
+      setRecurringOccurrences(loadedOccurrences);
+      setRecurringRules(loadedRecurringRules);
       setTransactions(loadedTransactions);
       setSelectedAccountId((accountId) => accountId ?? loadedAccounts[0].id);
       setError(null);
@@ -101,6 +110,12 @@ export function DashboardScreen({
   const consolidatedBalance = calculateConsolidatedBalance(transactions);
   const previousMonth = shiftYearMonth(selectedMonth, -1);
   const nextMonth = selectedMonth === currentMonth ? null : shiftYearMonth(selectedMonth, 1);
+  const recurringProjection = projectMonthEndBalance(
+    currentMonth,
+    transactions,
+    recurringRules,
+    recurringOccurrences,
+  );
 
   if (isLoading) return <ScreenState message="Atualizando seus saldos e orçamentos…" status="loading" title="Carregando visão financeira" />;
   if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
@@ -187,7 +202,69 @@ export function DashboardScreen({
           ))}
         </View>
 
+        <MonthlyRecurringOverview
+          accounts={accounts}
+          hidden={hideBalances}
+          monthLabel={formatYearMonth(currentMonth)}
+          projection={recurringProjection}
+        />
+
     </ScrollableScreen>
+  );
+}
+
+function MonthlyRecurringOverview({
+  accounts,
+  hidden,
+  monthLabel,
+  projection,
+}: {
+  accounts: readonly Account[];
+  hidden: boolean;
+  monthLabel: string;
+  projection: ReturnType<typeof projectMonthEndBalance>;
+}) {
+  const { tokens } = useTheme();
+  const balanceTone = projection.availableBalanceCents < 0 ? 'negative' : 'positive';
+
+  return (
+    <Card>
+      <View style={styles.recurringSection}>
+        <View>
+          <Text variant="title">Saldo disponível este mês</Text>
+          <MoneyText cents={projection.availableBalanceCents} hidden={hidden} tone={balanceTone} variant="heading" />
+          <Text tone="muted" variant="caption">
+            Estimativa para {formatCivilDate(projection.monthEndDate)}. Inclui lançamentos registrados até essa data e todas as recorrências ativas de {monthLabel}.
+          </Text>
+        </View>
+
+        <View style={styles.recurringList}>
+          <Text variant="title">Recorrências de {monthLabel}</Text>
+          {projection.items.length === 0 ? (
+            <Text tone="muted">Nenhuma recorrência prevista neste mês.</Text>
+          ) : projection.items.map((item) => {
+            const accountName = accounts.find((account) => account.id === item.accountId)?.name ?? 'Conta indisponível';
+            const processed = item.status === 'processed';
+            const statusColor = processed ? tokens.positive : tokens.info;
+
+            return (
+              <View key={`${item.recurringRuleId}-${item.scheduledDate}`} style={[styles.recurringItem, { borderColor: tokens.border }]}>
+                <View style={styles.recurringItemDetails}>
+                  <Text variant="title">{item.name}</Text>
+                  <Text tone="muted" variant="caption">{formatCivilDate(item.scheduledDate)} · {accountName}</Text>
+                </View>
+                <View style={styles.recurringItemValue}>
+                  <MoneyText cents={item.amountCents} tone={item.amountCents < 0 ? 'negative' : 'positive'} variant="title" />
+                  <Text style={{ color: statusColor, fontWeight: '700' }} variant="caption">
+                    {processed ? 'Processada' : 'Prevista'}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </Card>
   );
 }
 
@@ -301,6 +378,11 @@ const styles = StyleSheet.create({
   categoryList: {
     gap: 12,
   },
+  recurringItem: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', gap: 12, paddingTop: 12 },
+  recurringItemDetails: { flex: 1 },
+  recurringItemValue: { alignItems: 'flex-end' },
+  recurringList: { gap: 12 },
+  recurringSection: { gap: 20 },
   progressBar: {
     height: '100%',
   },

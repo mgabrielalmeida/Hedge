@@ -6,6 +6,7 @@ import type {
   RecurringOccurrence,
   RecurringRule,
   Transaction,
+  YearMonth,
 } from '@/domain';
 
 import {
@@ -38,6 +39,17 @@ export type RecurringProcessingResult = {
 export async function listRecurringRules(db: RepositoryDatabase, activeOnly = false): Promise<readonly RecurringRule[]> {
   const rows = await db.getAllAsync<RecurringRuleRow>(`SELECT r.${ruleColumns.replaceAll(', ', ', r.')} FROM recurring_rules r JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0 WHERE ${activeOnly ? 'r.is_active = 1' : '1 = 1'} ORDER BY r.id DESC;`);
   return rows.map(mapRecurringRule);
+}
+export async function listRecurringOccurrencesForMonth(
+  db: RepositoryDatabase,
+  month: YearMonth,
+): Promise<readonly RecurringOccurrence[]> {
+  if (!parseCivilDate(`${month}-01`).ok) throw new Error('Invalid year month.');
+  const rows = await db.getAllAsync<RecurringOccurrenceRow>(
+    'SELECT id, recurring_rule_id, scheduled_date, transaction_id, created_at FROM recurring_occurrences WHERE substr(scheduled_date, 1, 7) = ? ORDER BY scheduled_date, id;',
+    month,
+  );
+  return rows.map(mapRecurringOccurrence);
 }
 export async function findRecurringRuleById(db: RepositoryDatabase, id: number): Promise<RecurringRule | null> {
   const row = await db.getFirstAsync<RecurringRuleRow>(`SELECT r.${ruleColumns.replaceAll(', ', ', r.')} FROM recurring_rules r JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0 WHERE r.id = ?;`, id);
@@ -111,9 +123,7 @@ export async function processDueRecurringRules(
        JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0
        WHERE r.is_active = 1
          AND r.start_date <= ?
-         AND (r.end_date IS NULL OR r.end_date >= ?)
        ORDER BY r.id;`,
-      scheduledDate,
       scheduledDate,
     );
 

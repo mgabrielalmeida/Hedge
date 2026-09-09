@@ -15,6 +15,7 @@ import {
   getAccountBalance,
   listAccounts,
   listCategories,
+  listRecurringOccurrencesForMonth,
   listRecurringRules,
   listTransactions,
   processDueRecurringRules,
@@ -239,6 +240,23 @@ describe('SQLite repositories', () => {
 
     await deleteTransaction(database, firstProcessing.generated[0].transaction.id);
     await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [] });
+    await expect(listRecurringOccurrencesForMonth(database, '2026-09')).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ scheduledDate: '2026-09-02' }),
+    ]));
     expect((await listTransactions(database)).filter((item) => item.transactionDate === '2026-09-02').map((item) => item.name)).toEqual(expect.arrayContaining(['Saldo inicial', 'Yearly fee']));
+  });
+
+  it('processes missed occurrences of an active rule after its end date', async () => {
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const category = await createCategory(database, { name: 'Subscriptions', monthlyBudgetCents: 0 }, () => createdAt);
+    await createRecurringRule(database, {
+      kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Limited subscription', amountCents: -500,
+      frequency: 'monthly', chargeDay: 15, startDate: '2026-01-01', endDate: '2026-02-15',
+    }, () => createdAt);
+
+    const result = await processDueRecurringRules(database, '2026-09-02', () => updatedAt);
+
+    expect(result.generated.map((item) => item.transaction.transactionDate)).toEqual(['2026-01-15', '2026-02-15']);
+    expect(result.generated.every((item) => item.transaction.name === 'Limited subscription')).toBe(true);
   });
 });
