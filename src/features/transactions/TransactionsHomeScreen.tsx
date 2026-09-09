@@ -5,12 +5,12 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Card,
+  AnimatedMoneyText,
   BalanceVisibilityButton,
   ChipGroup,
   EmptyStateCard,
   FadeSelection,
   FormFeedback,
-  MoneyText,
   MonthNavigator,
   PressableCard,
   scheduleAfterSecondaryTransition,
@@ -148,17 +148,17 @@ export function TransactionsHomeScreen({
     <ScrollableScreen>
         <ScreenHeader title="Histórico e recorrências" />
         <Card>
+          <View style={styles.balanceHeader}>
+            <Text tone="muted" variant="caption">{selectedAccount ? 'Saldo atual' : 'Saldo consolidado'}</Text>
+            <BalanceVisibilityButton
+              hidden={hideBalances}
+              onPress={() => void setBalancesHidden(!hideBalances)}
+            />
+          </View>
           <FadeSelection selectionKey={selectedAccountId ?? 'all'}>
-            <View style={styles.balanceHeader}>
-              <Text tone="muted" variant="caption">{selectedAccount ? 'Saldo atual' : 'Saldo consolidado'}</Text>
-              <BalanceVisibilityButton
-                hidden={hideBalances}
-                onPress={() => void setBalancesHidden(!hideBalances)}
-              />
-            </View>
             <Text variant="title">{selectedAccount?.name ?? 'Todas as contas'}</Text>
-            <MoneyText cents={displayedBalance} hidden={hideBalances} variant="heading" />
           </FadeSelection>
+          <AnimatedMoneyText cents={displayedBalance} hidden={hideBalances} variant="heading" />
           <ChipGroup accessibilityLabel="Conta do histórico">
             <SelectableChip label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
             {accounts.map((account) => (

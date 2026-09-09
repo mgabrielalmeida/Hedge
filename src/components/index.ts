@@ -8,6 +8,7 @@ export { EntityVisual } from './EntityVisual';
 export { Field } from './Field';
 export { FormFeedback } from './FormFeedback';
 export { FadeSelection } from './FadeSelection';
+export { AnimatedMoneyText } from './AnimatedMoneyText';
 export { MoneyField } from './MoneyField';
 export { MoneyText } from './MoneyText';
 export { MonthNavigator } from './MonthNavigator';

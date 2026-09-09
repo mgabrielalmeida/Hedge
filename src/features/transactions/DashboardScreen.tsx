@@ -6,6 +6,7 @@ import Svg, { Rect } from 'react-native-svg';
 
 import {
   Button,
+  AnimatedMoneyText,
   BalanceVisibilityButton,
   Card,
   ChipGroup,
@@ -172,8 +173,12 @@ export function DashboardScreen({
                 <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.md }}>
                   Conta selecionada: {selectedAccount.name}
                 </Text>
-                 <MoneyText cents={calculateAccountBalance(transactions, selectedAccount.id)} hidden={hideBalances} variant="title" />
               </FadeSelection>
+              <AnimatedMoneyText
+                cents={calculateAccountBalance(transactions, selectedAccount.id)}
+                hidden={hideBalances}
+                variant="title"
+              />
                <ChipGroup accessibilityLabel="Conta selecionada">
                  {accounts.map((account) => {
                   const selected = account.id === selectedAccountId;
