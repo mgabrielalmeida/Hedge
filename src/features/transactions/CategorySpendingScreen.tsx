@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import Svg, { Circle, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 
 import {
   Card,
@@ -46,6 +46,7 @@ type LoadedData = {
 
 const chartMonthCount = 6;
 const CHART_DRAW_DURATION = 900;
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 export function CategorySpendingScreen({
   categoryId,
@@ -134,7 +135,7 @@ export function CategorySpendingScreen({
         <MoneyText cents={selectedMonthSpending} variant="display" />
       </Card>
 
-      {history ? <CategorySpendingChart accounts={data.accounts} categoryColor={categoryColor} history={history} /> : null}
+      {history ? <CategorySpendingChart accounts={data.accounts} history={history} /> : null}
 
       <View style={styles.sectionHeading}>
         <Text variant="title">Despesas do mês</Text>
@@ -181,37 +182,28 @@ function ExpenseCard({
 
 function CategorySpendingChart({
   accounts,
-  categoryColor,
   history,
 }: {
   accounts: readonly Account[];
-  categoryColor: string;
   history: CategorySpendingHistory;
 }) {
   const { tokens } = useTheme();
   const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(0);
   const [revealProgress] = useState(() => new Animated.Value(0));
-  const chartHeight = 228;
+  const chartHeight = 244;
   const plot = { bottom: 28, left: 58, right: 10, top: 12 };
   const plotWidth = Math.max(width - plot.left - plot.right, 1);
   const plotHeight = chartHeight - plot.top - plot.bottom;
-  const observedMaximum = Math.max(
+  const spendingByMonth = history.months.map((_, monthIndex) => history.series.reduce(
+    (total, series) => total + series.spendingByMonth[monthIndex],
     0,
-    ...history.series.flatMap((series) => series.spendingByMonth),
-  );
-  const axisMaximum = getAxisMaximum(observedMaximum);
+  ));
+  const axisMaximum = getAxisMaximum(Math.max(0, ...spendingByMonth));
   const accountById = new Map(accounts.map((account) => [account.id, account]));
-  const series = history.series.flatMap((item, seriesIndex) => {
+  const series = history.series.flatMap((item) => {
     const account = accountById.get(item.accountId);
-    if (!account) return [];
-
-    const points = item.spendingByMonth.map((spendingCents, index) => ({
-      x: plot.left + (history.months.length === 1
-        ? plotWidth / 2
-        : index * plotWidth / (history.months.length - 1)),
-      y: plot.top + plotHeight - spendingCents / axisMaximum * plotHeight,
-    }));
+    if (!account || !item.spendingByMonth.some((spending) => spending > 0)) return [];
 
     return [{
       account,
@@ -220,10 +212,37 @@ function CategorySpendingChart({
         account.themeColorIndex,
         tokens.primary,
       ),
-      markerShape: seriesIndex % 3,
-      path: createSmoothPath(points),
-      points,
+      spendingByMonth: item.spendingByMonth,
     }];
+  });
+  const chartColumns = history.months.map((month, monthIndex) => {
+    let accumulatedSpending = 0;
+    const baseline = plot.top + plotHeight;
+    const slotWidth = plotWidth / history.months.length;
+    const columnWidth = Math.max(18, Math.min(44, slotWidth * 0.62));
+    const x = plot.left + slotWidth * monthIndex + (slotWidth - columnWidth) / 2;
+    const segments = series.flatMap((item) => {
+      const spendingCents = item.spendingByMonth[monthIndex];
+      accumulatedSpending += spendingCents;
+      if (spendingCents === 0) return [];
+
+      return [{
+        color: item.accountColor,
+        height: spendingCents / axisMaximum * plotHeight,
+        key: `${item.account.id}-${month}`,
+        y: baseline - accumulatedSpending / axisMaximum * plotHeight,
+      }];
+    });
+
+    return {
+      columnWidth,
+      month,
+      monthIndex,
+      monthTotal: spendingByMonth[monthIndex],
+      segments,
+      showTotal: slotWidth >= 52,
+      x,
+    };
   });
   const historySignature = history.series
     .map((item) => `${item.accountId}:${item.spendingByMonth.join(',')}`)
@@ -252,11 +271,22 @@ function CategorySpendingChart({
     return () => animation.stop();
   }, [historySignature, reduceMotion, revealProgress, width]);
 
+  if (series.length === 0) {
+    return (
+      <Card>
+        <Text variant="title">Gastos por conta ao longo dos meses</Text>
+        <Text tone="muted" variant="caption" style={styles.chartSubtitle}>
+          Ainda não há despesas desta categoria no período exibido.
+        </Text>
+      </Card>
+    );
+  }
+
   return (
     <Card>
-      <Text variant="title">Gasto mensal por conta</Text>
+      <Text variant="title">Gastos por conta ao longo dos meses</Text>
       <Text tone="muted" variant="caption" style={styles.chartSubtitle}>
-        Últimos {history.months.length} meses até o mês selecionado
+        Cada coluna mostra o total do mês; os segmentos identificam as contas.
       </Text>
 
       <View
@@ -268,7 +298,7 @@ function CategorySpendingChart({
       >
         {width > 0 ? (
           <Svg
-            accessibilityLabel={`Gráfico de gastos mensais por conta. A escala vai de zero a ${formatBrazilianCurrency(axisMaximum)}.`}
+            accessibilityLabel={`Gráfico de colunas empilhadas dos gastos por conta. A escala vai de zero a ${formatBrazilianCurrency(axisMaximum)}.`}
             accessible
             height={chartHeight}
             width={width}
@@ -299,82 +329,65 @@ function CategorySpendingChart({
                 {formatCompactCurrency(axisMaximum * ratio)}
               </SvgText>
             ))}
-            {history.months.map((month, index) => (
-              <SvgText
-                fill={tokens.textMuted}
-                fontSize={10}
-                key={month}
-                textAnchor="middle"
-                x={plot.left + (history.months.length === 1
-                  ? plotWidth / 2
-                  : index * plotWidth / (history.months.length - 1))}
-                y={chartHeight - 5}
-              >
-                {formatMonthTick(month)}
-              </SvgText>
-            ))}
+            {chartColumns.flatMap(({ columnWidth, month, monthIndex, monthTotal, segments, showTotal, x }) => {
+              const animationStart = monthIndex / (history.months.length + 1);
+              const animationEnd = Math.min(1, animationStart + 2 / (history.months.length + 1));
+              const monthProgress = revealProgress.interpolate({
+                extrapolate: 'clamp',
+                inputRange: [animationStart, animationEnd],
+                outputRange: [0, 1],
+              });
+              const labelY = Math.max(plot.top + 9, plot.top + plotHeight - monthTotal / axisMaximum * plotHeight - 6);
+
+              return [
+                ...segments.map((segment) => (
+                  <AnimatedRect
+                    fill={segment.color}
+                    height={monthProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, segment.height],
+                    })}
+                    key={segment.key}
+                    width={columnWidth}
+                    x={x}
+                    y={monthProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [plot.top + plotHeight, segment.y],
+                    })}
+                  />
+                )),
+                monthTotal > 0 && showTotal ? (
+                  <SvgText
+                    fill={tokens.textMuted}
+                    fontSize={10}
+                    key={`${month}-total`}
+                    textAnchor="middle"
+                    x={x + columnWidth / 2}
+                    y={labelY}
+                  >
+                    {formatCompactCurrency(monthTotal)}
+                  </SvgText>
+                ) : null,
+                <SvgText
+                  fill={tokens.textMuted}
+                  fontSize={10}
+                  key={month}
+                  textAnchor="middle"
+                  x={x + columnWidth / 2}
+                  y={chartHeight - 5}
+                >
+                  {formatMonthTick(month)}
+                </SvgText>,
+              ];
+            })}
           </Svg>
-        ) : null}
-        {width > 0 ? (
-          <Animated.View
-            accessible={false}
-            pointerEvents="none"
-            style={[
-              styles.seriesReveal,
-              {
-                height: chartHeight,
-                width: revealProgress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, width],
-                }),
-              },
-            ]}
-          >
-            <Svg height={chartHeight} width={width}>
-              {series.map((item) => (
-                <Path
-                  d={item.path}
-                  fill="none"
-                  key={item.account.id}
-                  stroke={categoryColor}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={3}
-                />
-              ))}
-              {series.flatMap((item) => item.points.map((point, pointIndex) => renderMarker(
-                point,
-                item.markerShape,
-                item.accountColor,
-                categoryColor,
-                `${item.account.id}-${pointIndex}`,
-              )))}
-            </Svg>
-          </Animated.View>
         ) : null}
       </View>
 
       <View accessibilityLabel="Legenda das contas" style={styles.legend}>
         {series.map((item) => (
           <View key={item.account.id} style={styles.legendItem}>
-            <Svg height={14} width={44}>
-              <Line
-                stroke={categoryColor}
-                strokeLinecap="round"
-                strokeWidth={3}
-                x1={1}
-                x2={43}
-                y1={7}
-                y2={7}
-              />
-              {renderMarker(
-                { x: 22, y: 7 },
-                item.markerShape,
-                item.accountColor,
-                categoryColor,
-                `legend-${item.account.id}`,
-              )}
-            </Svg>
+            <Svg height={14} width={14}><Rect fill={item.accountColor} height={14} width={14} /></Svg>
             <View style={styles.legendAccount}>
               <EntityVisual color={item.accountColor} iconValue={getIconDisplayValue(item.account.iconValue)} size="small" />
               <Text variant="caption">{item.account.name}</Text>
@@ -383,84 +396,12 @@ function CategorySpendingChart({
         ))}
       </View>
       <Text tone="muted" variant="caption" style={styles.chartNote}>
-        As linhas usam a cor da categoria; os marcadores identificam cada conta.
+        A legenda associa cada cor à respectiva conta.
       </Text>
     </Card>
   );
 }
 
-function createSmoothPath(points: readonly { x: number; y: number }[]): string {
-  if (points.length === 0) return '';
-  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-
-  let path = `M ${points[0].x} ${points[0].y}`;
-
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const previous = points[index - 1] ?? points[index];
-    const current = points[index];
-    const next = points[index + 1];
-    const following = points[index + 2] ?? next;
-    const minimumY = Math.min(current.y, next.y);
-    const maximumY = Math.max(current.y, next.y);
-    const firstControlY = clamp(current.y + (next.y - previous.y) / 6, minimumY, maximumY);
-    const secondControlY = clamp(next.y - (following.y - current.y) / 6, minimumY, maximumY);
-
-    path += ` C ${current.x + (next.x - previous.x) / 6} ${firstControlY}`;
-    path += ` ${next.x - (following.x - current.x) / 6} ${secondControlY}`;
-    path += ` ${next.x} ${next.y}`;
-  }
-
-  return path;
-}
-
-function renderMarker(
-  point: { x: number; y: number },
-  shape: number,
-  fill: string,
-  stroke: string,
-  key: string,
-) {
-  if (shape === 1) {
-    return (
-      <Rect
-        fill={fill}
-        height={7}
-        key={key}
-        stroke={stroke}
-        strokeWidth={1.25}
-        width={7}
-        x={point.x - 3.5}
-        y={point.y - 3.5}
-      />
-    );
-  }
-  if (shape === 2) {
-    return (
-      <Polygon
-        fill={fill}
-        key={key}
-        points={`${point.x},${point.y - 4.2} ${point.x + 4.2},${point.y + 3.4} ${point.x - 4.2},${point.y + 3.4}`}
-        stroke={stroke}
-        strokeWidth={1.25}
-      />
-    );
-  }
-  return (
-    <Circle
-      cx={point.x}
-      cy={point.y}
-      fill={fill}
-      key={key}
-      r={3.5}
-      stroke={stroke}
-      strokeWidth={1.25}
-    />
-  );
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(Math.max(value, minimum), maximum);
-}
 
 function getAxisMaximum(observedMaximum: number): number {
   if (observedMaximum <= 0) return 10_000;
@@ -486,7 +427,7 @@ function formatMonthTick(yearMonth: YearMonth): string {
 
 const styles = StyleSheet.create({
   chartContainer: {
-    minHeight: 228,
+    minHeight: 244,
     marginTop: 12,
     width: '100%',
   },
@@ -531,11 +472,5 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  seriesReveal: {
-    left: 0,
-    overflow: 'hidden',
-    position: 'absolute',
-    top: 0,
   },
 });

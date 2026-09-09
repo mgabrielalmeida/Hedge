@@ -6,6 +6,7 @@ import {
   Card,
   FormFeedback,
   ScreenHeader,
+  SegmentedControl,
   ScrollableScreen,
   Text,
   hexToHsl,
@@ -44,6 +45,8 @@ const NEUTRAL_OPTIONS = [
   { label: 'Prata', lightness: 86 },
   { label: 'Branco', lightness: 100 },
 ] as const;
+
+type ColorGroup = 'colored' | 'neutral';
 
 export function CustomThemeEditorScreen({ onBack }: CustomThemeEditorScreenProps) {
   const { activateCustomTheme, customTheme, isDark } = useTheme();
@@ -170,6 +173,9 @@ function ColorSeedPicker({
 }) {
   const { tokens } = useTheme();
   const current = hexToHsl(value) ?? { hue: 0, saturation: 65, lightness: 50 };
+  const [activeColorGroup, setActiveColorGroup] = useState<ColorGroup>(
+    current.saturation < 2 ? 'neutral' : 'colored',
+  );
   const selectedHue = current.saturation < 2 ? null : findClosestHue(current.hue);
 
   return (
@@ -178,9 +184,23 @@ function ColorSeedPicker({
       <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.xs }}>
         {description}
       </Text>
-      <Text variant="caption" style={{ color: tokens.textMuted, marginTop: tokens.spacing.md }}>Cores</Text>
-      <View accessibilityLabel={`${label}: cores`} accessibilityRole="radiogroup" style={[styles.colorGrid, { marginTop: tokens.spacing.sm }]}>
-        {HUE_OPTIONS.map((option) => {
+      <View style={{ marginTop: tokens.spacing.md }}>
+        <SegmentedControl
+          accessibilityLabel={`Tipo de ${label.toLowerCase()}`}
+          onChange={setActiveColorGroup}
+          options={[
+            { label: 'Coloridas', value: 'colored' },
+            { label: 'Neutras', value: 'neutral' },
+          ]}
+          value={activeColorGroup}
+        />
+      </View>
+      <View
+        accessibilityLabel={activeColorGroup === 'colored' ? `${label}: cores coloridas` : `${label}: cores neutras`}
+        accessibilityRole="radiogroup"
+        style={[styles.colorGrid, { marginTop: tokens.spacing.md }]}
+      >
+        {activeColorGroup === 'colored' ? HUE_OPTIONS.map((option) => {
           const selected = option.value === selectedHue;
           const swatchColor = hslToHex(option.value, 76, 50);
 
@@ -207,11 +227,7 @@ function ColorSeedPicker({
               ]}
             />
           );
-        })}
-      </View>
-      <Text variant="caption" style={{ color: tokens.textMuted, marginTop: tokens.spacing.md }}>Neutras</Text>
-      <View accessibilityLabel={`${label}: cores neutras`} accessibilityRole="radiogroup" style={[styles.colorGrid, { marginTop: tokens.spacing.sm }]}>
-        {NEUTRAL_OPTIONS.map((option) => {
+        }) : NEUTRAL_OPTIONS.map((option) => {
           const selected = current.saturation < 2 && Math.abs(current.lightness - option.lightness) < 0.5;
           const swatchColor = hslToHex(0, 0, option.lightness);
 
