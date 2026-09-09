@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import Svg, { Rect } from 'react-native-svg';
 
 import {
   Button,
@@ -38,7 +39,14 @@ import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 import { calculateCategoryBudgetProgress } from './categoryBudgetProgress';
 import { formatYearMonth, shiftYearMonth } from './monthNavigation';
+import {
+  buildMonthlyCategorySpendingComposition,
+  type MonthlyCategorySpendingComposition,
+} from './monthlyCategorySpendingComposition';
 import { subscribeToRecurringProcessing } from './useRecurringProcessing';
+
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
+const COMPOSITION_TRANSITION_DURATION = 320;
 
 type DashboardScreenProps = {
   onCategoryPress: (categoryId: number, selectedMonth: string) => void;
@@ -116,6 +124,14 @@ export function DashboardScreen({
     recurringRules,
     recurringOccurrences,
   );
+  const categorySpendingComposition = useMemo(
+    () => buildMonthlyCategorySpendingComposition(
+      transactions,
+      categories.map((category) => category.id),
+      selectedMonth,
+    ),
+    [categories, selectedMonth, transactions],
+  );
 
   if (isLoading) return <ScreenState message="Atualizando seus saldos e orçamentos…" status="loading" title="Carregando visão financeira" />;
   if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
@@ -176,11 +192,19 @@ export function DashboardScreen({
           ) : null}
         </Card>
 
+        <MonthNavigator accessibilityLabel={`Mês selecionado: ${formatYearMonth(selectedMonth)}`} label={formatYearMonth(selectedMonth)} nextDisabled={nextMonth === null} onNext={() => nextMonth && setSelectedMonth(nextMonth)} onPrevious={() => previousMonth && setSelectedMonth(previousMonth)} previousDisabled={previousMonth === null} />
+
+        <MonthlyCategorySpendingChart
+          categories={categories}
+          composition={categorySpendingComposition}
+          monthLabel={formatYearMonth(selectedMonth)}
+          onCategoryPress={(categoryId) => onCategoryPress(categoryId, selectedMonth)}
+          reduceMotion={reduceMotion}
+        />
+
         <View>
           <Text variant="title">Orçamentos por categoria</Text>
         </View>
-
-         <MonthNavigator accessibilityLabel={`Mês selecionado: ${formatYearMonth(selectedMonth)}`} label={formatYearMonth(selectedMonth)} nextDisabled={nextMonth === null} onNext={() => nextMonth && setSelectedMonth(nextMonth)} onPrevious={() => previousMonth && setSelectedMonth(previousMonth)} previousDisabled={previousMonth === null} />
 
         <View style={styles.categoryList}>
           {categories.map((category) => (
@@ -211,6 +235,305 @@ export function DashboardScreen({
 
     </ScrollableScreen>
   );
+}
+
+type CategoryCompositionSlice = {
+  readonly categoryId: number | null;
+  readonly color: string;
+  readonly end: number;
+  readonly key: string;
+  readonly label: string;
+  readonly spendingCents: number;
+  readonly start: number;
+};
+
+type TransitionCompositionSlice = CategoryCompositionSlice & {
+  readonly fromEnd: number;
+  readonly fromStart: number;
+  readonly toEnd: number;
+  readonly toStart: number;
+};
+
+function MonthlyCategorySpendingChart({
+  categories,
+  composition,
+  monthLabel,
+  onCategoryPress,
+  reduceMotion,
+}: {
+  categories: readonly Category[];
+  composition: MonthlyCategorySpendingComposition;
+  monthLabel: string;
+  onCategoryPress: (categoryId: number) => void;
+  reduceMotion: boolean | null;
+}) {
+  const { tokens } = useTheme();
+  const [chartWidth, setChartWidth] = useState(0);
+  const [transitionProgress] = useState(() => new Animated.Value(1));
+  const displayedTotal = useAnimatedCents(
+    composition.totalSpendingCents,
+    reduceMotion,
+  );
+  const slices = useMemo(() => {
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+    const visibleItems = composition.items.flatMap((item) => {
+      const category = categoryById.get(item.categoryId);
+      if (!category) return [];
+
+      return [{
+        categoryId: category.id,
+        color: resolveThemeColorValue(
+          category.colorValue,
+          category.themeColorIndex,
+          tokens.primary,
+        ),
+        key: `category-${category.id}`,
+        label: category.name,
+        spendingCents: item.spendingCents,
+      }];
+    });
+    const visibleWithOther = composition.otherSpendingCents > 0
+      ? [...visibleItems, {
+        categoryId: null,
+        color: tokens.textMuted,
+        key: 'other',
+        label: 'Outras',
+        spendingCents: composition.otherSpendingCents,
+      }]
+      : visibleItems;
+    return visibleWithOther.reduce<{
+      readonly accumulatedRatio: number;
+      readonly slices: readonly CategoryCompositionSlice[];
+    }>((result, item) => {
+      const start = result.accumulatedRatio;
+      const end = start + (composition.totalSpendingCents === 0
+        ? 0
+        : item.spendingCents / composition.totalSpendingCents);
+
+      return {
+        accumulatedRatio: end,
+        slices: [...result.slices, { ...item, end, start }],
+      };
+    }, { accumulatedRatio: 0, slices: [] }).slices;
+  }, [categories, composition, tokens.primary, tokens.textMuted]);
+  const sliceSignature = `${monthLabel}|${slices
+    .map((slice) => `${slice.key}:${slice.spendingCents}:${slice.color}`)
+    .join('|')}`;
+  const previousSignature = useRef(sliceSignature);
+  const previousSlices = useRef(slices);
+  const [transitionSlices, setTransitionSlices] = useState<readonly TransitionCompositionSlice[]>(
+    () => createCompositionTransition(slices, slices),
+  );
+
+  useEffect(() => {
+    const fromSlices = previousSlices.current;
+    transitionProgress.stopAnimation();
+
+    if (reduceMotion !== false) {
+      previousSignature.current = sliceSignature;
+      previousSlices.current = slices;
+      transitionProgress.setValue(1);
+      const resetTimer = setTimeout(() => {
+        setTransitionSlices(createCompositionTransition(slices, slices));
+      }, 0);
+      return () => clearTimeout(resetTimer);
+    }
+    if (previousSignature.current === sliceSignature) return;
+
+    previousSignature.current = sliceSignature;
+    previousSlices.current = slices;
+
+    setTransitionSlices(createCompositionTransition(fromSlices, slices));
+    transitionProgress.setValue(0);
+    const animation = Animated.timing(transitionProgress, {
+      duration: COMPOSITION_TRANSITION_DURATION,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: false,
+    });
+
+    animation.start(({ finished }) => {
+      if (finished) setTransitionSlices(createCompositionTransition(slices, slices));
+    });
+    return () => animation.stop();
+  }, [reduceMotion, sliceSignature, slices, transitionProgress]);
+  const renderedTransitionSlices = reduceMotion === false
+    ? transitionSlices
+    : createCompositionTransition(slices, slices);
+
+  const accessibleSummary = slices.length === 0
+    ? `Nenhuma despesa em ${monthLabel}.`
+    : `Gastos em ${monthLabel}: ${slices.map((slice) => (
+      `${slice.label}, ${formatBrazilianCurrency(slice.spendingCents)}`
+    )).join('; ')}.`;
+
+  return (
+    <Card>
+      <Text variant="title">Gastos do mês</Text>
+      <Text tone="muted" variant="caption" style={styles.compositionMonth}>
+        {monthLabel}
+      </Text>
+      <MoneyText cents={displayedTotal} variant="display" />
+
+      <View
+        accessibilityLabel={accessibleSummary}
+        accessible
+        onLayout={(event) => {
+          const nextWidth = Math.floor(event.nativeEvent.layout.width);
+          setChartWidth((currentWidth) => currentWidth === nextWidth ? currentWidth : nextWidth);
+        }}
+        style={[
+          styles.compositionTrack,
+          {
+            backgroundColor: tokens.surfaceSubtle,
+            borderRadius: tokens.radius.pill,
+          },
+        ]}
+      >
+        {chartWidth > 0 && renderedTransitionSlices.length > 0 ? (
+          <Svg height={20} width={chartWidth}>
+            {renderedTransitionSlices.map((slice) => (
+              <AnimatedRect
+                fill={slice.color}
+                height={20}
+                key={slice.key}
+                onPress={slice.categoryId === null
+                  ? undefined
+                  : () => onCategoryPress(slice.categoryId as number)}
+                width={transitionProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [
+                    (slice.fromEnd - slice.fromStart) * chartWidth,
+                    (slice.toEnd - slice.toStart) * chartWidth,
+                  ],
+                })}
+                x={transitionProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [slice.fromStart * chartWidth, slice.toStart * chartWidth],
+                })}
+                y={0}
+              />
+            ))}
+          </Svg>
+        ) : null}
+      </View>
+
+      {slices.length === 0 ? (
+        <Text tone="muted" variant="caption" style={styles.compositionEmpty}>
+          Nenhuma despesa neste mês.
+        </Text>
+      ) : (
+        <View accessibilityLabel="Legenda dos gastos por categoria" style={styles.compositionLegend}>
+          {slices.map((slice) => {
+            const percentage = composition.totalSpendingCents === 0
+              ? 0
+              : Math.round(slice.spendingCents / composition.totalSpendingCents * 100);
+            const content = (
+              <>
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[
+                    styles.compositionSwatch,
+                    { backgroundColor: slice.color, borderRadius: tokens.radius.pill },
+                  ]}
+                />
+                <Text style={styles.compositionLabel}>{slice.label}</Text>
+                <Text tone="muted" variant="caption">
+                  {formatBrazilianCurrency(slice.spendingCents)} · {percentage}%
+                </Text>
+              </>
+            );
+
+            if (slice.categoryId === null) {
+              return <View key={slice.key} style={styles.compositionLegendRow}>{content}</View>;
+            }
+
+            return (
+              <Pressable
+                accessibilityLabel={`Abrir ${slice.label}, ${formatBrazilianCurrency(slice.spendingCents)}, ${percentage}% dos gastos do mês`}
+                accessibilityRole="button"
+                key={slice.key}
+                onPress={() => onCategoryPress(slice.categoryId as number)}
+                style={({ pressed }) => [
+                  styles.compositionLegendRow,
+                  pressed && {
+                    backgroundColor: tokens.surfaceSubtle,
+                    borderRadius: tokens.radius.md,
+                  },
+                ]}
+              >
+                {content}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </Card>
+  );
+}
+
+function createCompositionTransition(
+  fromSlices: readonly CategoryCompositionSlice[],
+  toSlices: readonly CategoryCompositionSlice[],
+): readonly TransitionCompositionSlice[] {
+  const fromByKey = new Map(fromSlices.map((slice) => [slice.key, slice]));
+  const toByKey = new Map(toSlices.map((slice) => [slice.key, slice]));
+  const keys = [
+    ...toSlices.map((slice) => slice.key),
+    ...fromSlices.filter((slice) => !toByKey.has(slice.key)).map((slice) => slice.key),
+  ];
+
+  return keys.map((key) => {
+    const from = fromByKey.get(key);
+    const to = toByKey.get(key);
+    const slice = to ?? from;
+    if (!slice) throw new Error('Composition transition slice was not found.');
+
+    return {
+      ...slice,
+      fromEnd: from?.end ?? to?.start ?? 0,
+      fromStart: from?.start ?? to?.start ?? 0,
+      toEnd: to?.end ?? from?.start ?? 0,
+      toStart: to?.start ?? from?.start ?? 0,
+    };
+  });
+}
+
+function useAnimatedCents(targetCents: number, reduceMotion: boolean | null): number {
+  const [animatedValue] = useState(() => new Animated.Value(targetCents));
+  const [displayedCents, setDisplayedCents] = useState(targetCents);
+  const previousTarget = useRef(targetCents);
+
+  useEffect(() => {
+    const startingCents = previousTarget.current;
+    previousTarget.current = targetCents;
+    animatedValue.stopAnimation();
+
+    if (reduceMotion !== false) {
+      animatedValue.setValue(targetCents);
+      return;
+    }
+
+    animatedValue.setValue(startingCents);
+    const listenerId = animatedValue.addListener(({ value }) => {
+      setDisplayedCents(Math.round(value));
+    });
+    const animation = Animated.timing(animatedValue, {
+      duration: COMPOSITION_TRANSITION_DURATION,
+      easing: Easing.out(Easing.cubic),
+      toValue: targetCents,
+      useNativeDriver: false,
+    });
+
+    animation.start();
+    return () => {
+      animation.stop();
+      animatedValue.removeListener(listenerId);
+    };
+  }, [animatedValue, reduceMotion, targetCents]);
+
+  return reduceMotion === false ? displayedCents : targetCents;
 }
 
 function MonthlyRecurringOverview({
@@ -366,6 +689,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
+  },
+  compositionEmpty: {
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  compositionLabel: {
+    flex: 1,
+  },
+  compositionLegend: {
+    gap: 2,
+    marginTop: 14,
+  },
+  compositionLegendRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 44,
+    paddingHorizontal: 6,
+  },
+  compositionMonth: {
+    marginTop: 2,
+  },
+  compositionSwatch: {
+    height: 10,
+    width: 10,
+  },
+  compositionTrack: {
+    height: 20,
+    marginTop: 16,
+    overflow: 'hidden',
+    width: '100%',
   },
   categoryHeader: {
     alignItems: 'center',
