@@ -8,7 +8,6 @@ import {
   Button,
   ChipGroup,
   DatePickerField,
-  FadeSelection,
   Field,
   FormFeedback,
   MoneyField,
@@ -132,18 +131,17 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
 
       <View>
         <Text variant="caption" style={[styles.label, { color: tokens.textMuted }]}>Banco ou instituição</Text>
-        <FadeSelection selectionKey={bank}>
-          <ChipGroup accessibilityLabel="Banco ou instituição">
-            {BANK_OPTIONS.map((option) => (
-              <SelectableChip
-                key={option}
-                label={option}
-                onPress={() => { setBank(option); clearFieldError('institution'); }}
-                selected={bank === option}
-              />
-            ))}
-          </ChipGroup>
-        </FadeSelection>
+        <ChipGroup accessibilityLabel="Banco ou instituição">
+          {BANK_OPTIONS.map((option) => (
+            <SelectableChip
+              animateSelection
+              key={option}
+              label={option}
+              onPress={() => { setBank(option); clearFieldError('institution'); }}
+              selected={bank === option}
+            />
+          ))}
+        </ChipGroup>
         {fieldErrors.institution && bank !== 'Outra instituição' ? <Text tone="negative" variant="caption" style={styles.validation}>{fieldErrors.institution}</Text> : null}
       </View>
 

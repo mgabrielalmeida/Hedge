@@ -7,7 +7,6 @@ import {
   ChipGroup,
   Card,
   DatePickerField,
-  FadeSelection,
   Field,
   FormFeedback,
   getIconDisplayValue,
@@ -267,9 +266,7 @@ export function ExpenseScreen({
             <MoneyField error={showRequiredErrors && amountIsMissing ? 'Informe um valor maior que zero.' : undefined} label="Valor" onChangeText={(value) => { setAmount(value); setShowRequiredErrors(false); }} value={amount} placeholder="0,00" />
             <DatePickerField error={showRequiredErrors && dateIsMissing ? 'Escolha uma data válida que não seja futura.' : undefined} label={recurrenceEnabled ? 'Data inicial' : 'Data'} onChange={(value) => { setDate(value); setShowRequiredErrors(false); }} value={date} />
             <Text tone={showRequiredErrors && accountIsMissing ? 'negative' : 'muted'} variant="caption">Conta</Text>
-            <FadeSelection selectionKey={accountId}>
-              <ChipGroup accessibilityLabel="Conta" error={showRequiredErrors && accountIsMissing}>{accounts.map((account) => <SelectableChip key={account.id} label={account.name} onPress={() => { setAccountId(account.id); setShowRequiredErrors(false); }} selected={accountId === account.id} />)}</ChipGroup>
-            </FadeSelection>
+            <ChipGroup accessibilityLabel="Conta" error={showRequiredErrors && accountIsMissing}>{accounts.map((account) => <SelectableChip animateSelection key={account.id} label={account.name} onPress={() => { setAccountId(account.id); setShowRequiredErrors(false); }} selected={accountId === account.id} />)}</ChipGroup>
             {showRequiredErrors && accountIsMissing ? <Text tone="negative" variant="caption">Selecione uma conta.</Text> : null}
             {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><ChipGroup accessibilityLabel="Categoria" error={showRequiredErrors && categoryIsMissing}>{categories.map((category) => <SelectableChip icon={<IconGlyph size={16} value={getIconDisplayValue(category.iconValue)} />} key={category.id} label={category.name} onPress={() => { setCategoryId(category.id); setShowRequiredErrors(false); }} selected={categoryId === category.id} />)}</ChipGroup>{showRequiredErrors && categoryIsMissing ? <Text tone="negative" variant="caption">Selecione uma categoria.</Text> : null}</> : null}
             <Field label="Descrição (opcional)" onChangeText={setDescription} value={description} placeholder="Adicionar observação" multiline />

@@ -7,7 +7,6 @@ import {
   Card,
   ChipGroup,
   DatePickerField,
-  FadeSelection,
   FormFeedback,
   MoneyField,
   scheduleAfterSecondaryTransition,
@@ -257,21 +256,20 @@ function AccountChoices({
   return (
     <View>
       <Text tone={error ? 'negative' : 'muted'} variant="caption" style={{ marginBottom: tokens.spacing.sm }}>{label}</Text>
-      <FadeSelection selectionKey={selectedId}>
-        <ChipGroup accessibilityLabel={label} error={error}>
-          {accounts.map((account) => {
-            const selected = selectedId === account.id;
-            return (
-              <SelectableChip
-                key={account.id}
-                label={account.name}
-                onPress={() => onSelect(account.id)}
-                selected={selected}
-              />
-            );
-          })}
-        </ChipGroup>
-      </FadeSelection>
+      <ChipGroup accessibilityLabel={label} error={error}>
+        {accounts.map((account) => {
+          const selected = selectedId === account.id;
+          return (
+            <SelectableChip
+              animateSelection
+              key={account.id}
+              label={account.name}
+              onPress={() => onSelect(account.id)}
+              selected={selected}
+            />
+          );
+        })}
+      </ChipGroup>
     </View>
   );
 }

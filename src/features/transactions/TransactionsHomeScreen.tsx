@@ -122,6 +122,7 @@ export function TransactionsHomeScreen({
     .map((rule) => ({ rule, nextChargeDate: getNextRecurringChargeDate(rule, getLocalCivilDate()) }))
     .sort((left, right) => (left.nextChargeDate ?? '9999-12-31').localeCompare(right.nextChargeDate ?? '9999-12-31'));
   const transactionGroups = groupByDate(visibleTransactions.map((item) => ({ date: item.transactionDate, item })));
+  const historySelectionKey = `${historyType}:${selectedAccountId ?? 'all'}:${selectedMonth}`;
   const displayedBalance = selectedAccount
     ? calculateAccountBalance(transactions, selectedAccount.id)
     : calculateConsolidatedBalance(transactions);
@@ -172,7 +173,8 @@ export function TransactionsHomeScreen({
           value={historyType}
         />
         {historyType !== 'recurring' ? <MonthFilter month={selectedMonth} onChange={setSelectedMonth} /> : null}
-        <View style={styles.list}>
+        <FadeSelection selectionKey={historySelectionKey}>
+          <View style={styles.list}>
           {historyType === 'recurring' ? visibleRecurringRules.length === 0 ? (
             <EmptyStateCard message="Nenhuma recorrência configurada para esta conta." />
           ) : (
@@ -208,7 +210,8 @@ export function TransactionsHomeScreen({
               ))}
             </HistoryDateGroup>
           ))}
-        </View>
+          </View>
+        </FadeSelection>
     </ScrollableScreen>
   );
 }
