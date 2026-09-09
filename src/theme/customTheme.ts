@@ -23,9 +23,11 @@ export function createCustomThemeColors(
 ): ThemeColors {
   const primarySeed = parseHsl(definition.primary) ?? parseHsl(DEFAULT_CUSTOM_THEME.primary)!;
   const secondarySeed = parseHsl(definition.secondary) ?? parseHsl(DEFAULT_CUSTOM_THEME.secondary)!;
-  const primarySaturation = clamp(primarySeed.saturation, 45, 88);
-  const secondarySaturation = clamp(secondarySeed.saturation, 35, 82);
-  const neutralSaturation = clamp(secondarySaturation * 0.18, 5, 16);
+  const primarySaturation = resolveThemeSaturation(primarySeed.saturation, 45, 88);
+  const secondarySaturation = resolveThemeSaturation(secondarySeed.saturation, 35, 82);
+  const neutralSaturation = secondarySaturation === 0
+    ? 0
+    : clamp(secondarySaturation * 0.18, 5, 16);
 
   if (appearance === 'dark') {
     const primary = toHex(primarySeed.hue, primarySaturation, 74);
@@ -167,4 +169,8 @@ function alphaColor(hue: number, saturation: number, lightness: number, alpha: n
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
+}
+
+function resolveThemeSaturation(seedSaturation: number, minimum: number, maximum: number): number {
+  return seedSaturation < 2 ? 0 : clamp(seedSaturation, minimum, maximum);
 }

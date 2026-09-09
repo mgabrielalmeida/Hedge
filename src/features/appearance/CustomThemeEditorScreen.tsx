@@ -35,6 +35,16 @@ const HUE_OPTIONS = [
   { label: 'Rosa', value: 335 },
 ] as const;
 
+const NEUTRAL_OPTIONS = [
+  { label: 'Preto', lightness: 0 },
+  { label: 'Cinza grafite', lightness: 18 },
+  { label: 'Cinza escuro', lightness: 35 },
+  { label: 'Cinza médio', lightness: 52 },
+  { label: 'Cinza claro', lightness: 72 },
+  { label: 'Prata', lightness: 86 },
+  { label: 'Branco', lightness: 100 },
+] as const;
+
 export function CustomThemeEditorScreen({ onBack }: CustomThemeEditorScreenProps) {
   const { activateCustomTheme, customTheme, isDark } = useTheme();
   const { showSuccess } = useSuccessFeedback();
@@ -160,7 +170,7 @@ function ColorSeedPicker({
 }) {
   const { tokens } = useTheme();
   const current = hexToHsl(value) ?? { hue: 0, saturation: 65, lightness: 50 };
-  const selectedHue = findClosestHue(current.hue);
+  const selectedHue = current.saturation < 2 ? null : findClosestHue(current.hue);
 
   return (
     <Card>
@@ -168,7 +178,8 @@ function ColorSeedPicker({
       <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.xs }}>
         {description}
       </Text>
-      <View accessibilityLabel={label} accessibilityRole="radiogroup" style={[styles.colorGrid, { marginTop: tokens.spacing.md }]}>
+      <Text variant="caption" style={{ color: tokens.textMuted, marginTop: tokens.spacing.md }}>Cores</Text>
+      <View accessibilityLabel={`${label}: cores`} accessibilityRole="radiogroup" style={[styles.colorGrid, { marginTop: tokens.spacing.sm }]}>
         {HUE_OPTIONS.map((option) => {
           const selected = option.value === selectedHue;
           const swatchColor = hslToHex(option.value, 76, 50);
@@ -189,6 +200,33 @@ function ColorSeedPicker({
                 {
                   backgroundColor: swatchColor,
                   borderColor: selected ? tokens.focusRing : tokens.border,
+                  borderRadius: tokens.radius.pill,
+                  borderWidth: selected ? 4 : 1,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}
+            />
+          );
+        })}
+      </View>
+      <Text variant="caption" style={{ color: tokens.textMuted, marginTop: tokens.spacing.md }}>Neutras</Text>
+      <View accessibilityLabel={`${label}: cores neutras`} accessibilityRole="radiogroup" style={[styles.colorGrid, { marginTop: tokens.spacing.sm }]}>
+        {NEUTRAL_OPTIONS.map((option) => {
+          const selected = current.saturation < 2 && Math.abs(current.lightness - option.lightness) < 0.5;
+          const swatchColor = hslToHex(0, 0, option.lightness);
+
+          return (
+            <Pressable
+              accessibilityLabel={option.label}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              key={option.label}
+              onPress={() => onChange(swatchColor)}
+              style={({ pressed }) => [
+                styles.colorChoice,
+                {
+                  backgroundColor: swatchColor,
+                  borderColor: selected ? tokens.focusRing : tokens.borderStrong,
                   borderRadius: tokens.radius.pill,
                   borderWidth: selected ? 4 : 1,
                   opacity: pressed ? 0.72 : 1,

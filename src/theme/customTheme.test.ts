@@ -28,6 +28,14 @@ describe('custom theme', () => {
     expect(blue.info).not.toBe(violet.info);
   });
 
+  it('keeps a neutral seed neutral instead of forcing it into a colored palette', () => {
+    const palette = createCustomThemeColors({ primary: '#000000', secondary: '#000000' }, 'light');
+
+    expect(palette.background).toBe('#F7F7F7');
+    expect(palette.info).toBe('#616161');
+    expect(palette.primary).toBe('#616161');
+  });
+
   it('accepts only complete hexadecimal definitions', () => {
     expect(isCustomThemeDefinition(DEFAULT_CUSTOM_THEME)).toBe(true);
     expect(isCustomThemeDefinition({ primary: '#123456' })).toBe(false);
