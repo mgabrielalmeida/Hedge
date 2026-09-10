@@ -119,7 +119,7 @@ export function ThemeSelection({
         </View>
 
         <View style={styles.section}>
-          <Text variant="title">Aparência</Text>
+          <Text variant="title">Tema</Text>
           <View style={styles.appearanceChoices}>
             {appearanceOptions.map((option) => {
               const selected = appearance === option.value;

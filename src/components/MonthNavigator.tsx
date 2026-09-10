@@ -18,7 +18,7 @@ export function MonthNavigator({ accessibilityLabel, label, nextDisabled = false
   return (
     <View accessibilityLabel={accessibilityLabel} style={[styles.container, { backgroundColor: tokens.surfaceSubtle, borderColor: tokens.borderStrong, borderRadius: tokens.radius.lg }]}>
       <MonthButton accessibilityLabel="Mês anterior" disabled={previousDisabled} onPress={onPrevious} symbol="‹" />
-      <View style={styles.label}><Text tone="muted" variant="caption">Mês</Text><Text variant="title">{label}</Text></View>
+      <View style={styles.label}><Text variant="title">{label}</Text></View>
       <MonthButton accessibilityLabel="Próximo mês" disabled={nextDisabled} onPress={onNext} symbol="›" />
     </View>
   );
@@ -32,5 +32,5 @@ function MonthButton({ accessibilityLabel, disabled, onPress, symbol }: { access
 const styles = StyleSheet.create({
   button: { alignItems: 'center', borderWidth: 1, height: 44, justifyContent: 'center', width: 44 },
   container: { alignItems: 'center', borderWidth: 1, flexDirection: 'row', gap: 12, padding: 8 },
-  label: { alignItems: 'center', flex: 1, gap: 2 },
+  label: { alignItems: 'center', flex: 1 },
 });

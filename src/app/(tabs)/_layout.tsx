@@ -10,13 +10,13 @@ import {
   type ColorValue,
 } from 'react-native';
 
-import { useReducedMotion } from '@/components';
+import { IconGlyph, useReducedMotion } from '@/components';
 import { useTheme } from '@/theme/ThemeProvider';
 
 type TabIconProps = {
   color: ColorValue;
   focused: boolean;
-  symbol: string;
+  value: string;
 };
 
 const TAB_TRANSITION_DURATION = 240;
@@ -48,7 +48,7 @@ export default function MainTabsLayout() {
         options={{
           tabBarAccessibilityLabel: 'Tela inicial',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon color={color} focused={focused} symbol="⌂" />
+            <TabIcon color={color} focused={focused} value="lucide:house" />
           ),
           title: 'Início',
         }}
@@ -58,7 +58,7 @@ export default function MainTabsLayout() {
         options={{
           tabBarAccessibilityLabel: 'Histórico',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon color={color} focused={focused} symbol="≡" />
+            <TabIcon color={color} focused={focused} value="lucide:receipt-text" />
           ),
           title: 'Histórico',
         }}
@@ -68,7 +68,7 @@ export default function MainTabsLayout() {
         options={{
           tabBarAccessibilityLabel: 'Categorias',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon color={color} focused={focused} symbol="◈" />
+            <TabIcon color={color} focused={focused} value="lucide:folder" />
           ),
           title: 'Categorias',
         }}
@@ -78,7 +78,7 @@ export default function MainTabsLayout() {
         options={{
           tabBarAccessibilityLabel: 'Contas',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon color={color} focused={focused} symbol="▣" />
+            <TabIcon color={color} focused={focused} value="lucide:landmark" />
           ),
           title: 'Contas',
         }}
@@ -88,7 +88,7 @@ export default function MainTabsLayout() {
         options={{
           tabBarAccessibilityLabel: 'Aparência',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon color={color} focused={focused} symbol="◐" />
+            <TabIcon color={color} focused={focused} value="lucide:settings" />
           ),
           title: 'Aparência',
         }}
@@ -212,14 +212,14 @@ function SlidingTabBar({ descriptors, insets, motionEnabled, navigation, state }
   );
 }
 
-function TabIcon({ color, focused, symbol }: TabIconProps) {
+function TabIcon({ color, focused, value }: TabIconProps) {
   return (
-    <NativeText
+    <View
       importantForAccessibility="no"
-      style={[styles.icon, { color, opacity: focused ? 1 : 0.76 }]}
+      style={{ opacity: focused ? 1 : 0.76 }}
     >
-      {symbol}
-    </NativeText>
+      <IconGlyph color={String(color)} size={20} value={value} />
+    </View>
   );
 }
 
@@ -228,10 +228,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     position: 'absolute',
     top: 0,
-  },
-  icon: {
-    fontSize: 20,
-    lineHeight: 22,
   },
   label: {
     fontSize: 11,

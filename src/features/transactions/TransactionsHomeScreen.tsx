@@ -160,9 +160,9 @@ export function TransactionsHomeScreen({
           </FadeSelection>
           <AnimatedMoneyText cents={displayedBalance} hidden={hideBalances} variant="heading" />
           <ChipGroup accessibilityLabel="Conta do histórico">
-            <SelectableChip label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
+            <SelectableChip animateSelection label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
             {accounts.map((account) => (
-              <SelectableChip key={account.id} label={account.name} onPress={() => setSelectedAccountId(account.id)} selected={account.id === selectedAccountId} />
+              <SelectableChip animateSelection key={account.id} label={account.name} onPress={() => setSelectedAccountId(account.id)} selected={account.id === selectedAccountId} />
             ))}
           </ChipGroup>
         </Card>

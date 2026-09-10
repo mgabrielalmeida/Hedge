@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 
@@ -52,7 +52,7 @@ export function SelectableChip({
   const [scale] = useState(() => new Animated.Value(1));
   const previousSelected = useRef(selected);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (previousSelected.current === selected) return;
     previousSelected.current = selected;
 
@@ -86,7 +86,7 @@ export function SelectableChip({
             backgroundColor: selected ? tokens.primary : tokens.surface,
             borderColor: selected ? tokens.primary : tokens.borderStrong,
             borderRadius: tokens.radius.pill,
-            opacity: disabled ? 0.48 : pressed ? 0.76 : 1,
+            opacity: disabled ? 0.48 : pressed && !animateSelection ? 0.76 : 1,
           },
         ]}
       >

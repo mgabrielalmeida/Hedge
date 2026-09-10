@@ -185,6 +185,7 @@ export function DashboardScreen({
 
                   return (
                     <SelectableChip
+                      animateSelection
                       key={account.id}
                       label={account.name}
                       onPress={() => setSelectedAccountId(account.id)}
@@ -583,9 +584,6 @@ function CategoryBudgetCard({
       </View>
 
       <View style={styles.budgetSummary}>
-        <Text tone="muted" variant="caption">
-          Orçamento mensal: {formatBrazilianCurrency(category.monthlyBudgetCents)}
-        </Text>
         <Text
           tone={hasBudget ? undefined : 'muted'}
           variant="caption"
@@ -648,7 +646,7 @@ const styles = StyleSheet.create({
   budgetSummary: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     marginTop: 16,
   },
   compositionEmpty: {
