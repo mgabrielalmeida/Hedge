@@ -39,6 +39,16 @@ function isAppearancePreference(value: string | null): value is AppearancePrefer
   return value === 'light' || value === 'dark' || value === 'system';
 }
 
+export function isThemePreferences(value: unknown): value is ThemePreferences {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as Partial<ThemePreferences>;
+  return isAppearancePreference(candidate.appearance ?? null)
+    && isThemeName(candidate.themeName ?? null)
+    && typeof candidate.hideBalances === 'boolean'
+    && isCustomThemeDefinition(candidate.customTheme);
+}
+
 async function getItemOrNull(
   storage: PreferenceStorage,
   key: string,
@@ -110,6 +120,20 @@ export async function saveCustomTheme(
   }
 
   await storage.setItem(CUSTOM_THEME_KEY, JSON.stringify(customTheme));
+}
+
+export async function saveThemePreferences(
+  preferences: ThemePreferences,
+  storage: PreferenceStorage = AsyncStorage,
+): Promise<void> {
+  if (!isThemePreferences(preferences)) {
+    throw new Error('Invalid theme preferences.');
+  }
+
+  await storage.setItem(THEME_NAME_KEY, preferences.themeName);
+  await storage.setItem(APPEARANCE_KEY, preferences.appearance);
+  await storage.setItem(HIDE_BALANCES_KEY, String(preferences.hideBalances));
+  await storage.setItem(CUSTOM_THEME_KEY, JSON.stringify(preferences.customTheme));
 }
 
 function parseCustomTheme(value: string | null): CustomThemeDefinition {

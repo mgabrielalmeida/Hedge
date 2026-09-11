@@ -584,6 +584,9 @@ function CategoryBudgetCard({
       </View>
 
       <View style={styles.budgetSummary}>
+        <Text tone="muted" variant="caption" style={styles.budgetDescription}>
+          {description}
+        </Text>
         <Text
           tone={hasBudget ? undefined : 'muted'}
           variant="caption"
@@ -617,10 +620,6 @@ function CategoryBudgetCard({
           />
         ) : null}
       </View>
-
-      <Text tone="muted" variant="caption" style={styles.budgetDescription}>
-        {description}
-      </Text>
     </View>
   );
 }
@@ -641,12 +640,12 @@ const styles = StyleSheet.create({
   addChoices: { flexDirection: 'row', gap: 8 },
   balanceHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   budgetDescription: {
-    marginTop: 8,
+    flex: 1,
   },
   budgetSummary: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     marginTop: 16,
   },
   compositionEmpty: {

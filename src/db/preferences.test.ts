@@ -1,11 +1,13 @@
 import {
   DEFAULT_THEME_PREFERENCES,
+  isThemePreferences,
   type PreferenceStorage,
   loadThemePreferences,
   saveAppearancePreference,
   saveBalanceVisibilityPreference,
   saveCustomTheme,
   saveThemeName,
+  saveThemePreferences,
 } from './preferences';
 import { DEFAULT_CUSTOM_THEME } from '@/theme/customTheme';
 
@@ -126,6 +128,31 @@ describe('theme preferences', () => {
       4,
       'preferences.customTheme',
       JSON.stringify({ primary: '#A23E2D', secondary: '#70458A' }),
+    );
+  });
+
+  it('validates and persists a complete preference snapshot', async () => {
+    const storage = createStorage();
+    const preferences = {
+      appearance: 'dark',
+      customTheme: { primary: '#A23E2D', secondary: '#70458A' },
+      hideBalances: true,
+      themeName: 'custom',
+    } as const;
+
+    expect(isThemePreferences(preferences)).toBe(true);
+    expect(isThemePreferences({ ...preferences, hideBalances: 'true' })).toBe(false);
+    expect(isThemePreferences({ ...preferences, themeName: 'unknown' })).toBe(false);
+
+    await saveThemePreferences(preferences, storage);
+
+    expect(storage.setItem).toHaveBeenNthCalledWith(1, 'preferences.themeName', 'custom');
+    expect(storage.setItem).toHaveBeenNthCalledWith(2, 'preferences.appearance', 'dark');
+    expect(storage.setItem).toHaveBeenNthCalledWith(3, 'preferences.hideBalances', 'true');
+    expect(storage.setItem).toHaveBeenNthCalledWith(
+      4,
+      'preferences.customTheme',
+      JSON.stringify(preferences.customTheme),
     );
   });
 

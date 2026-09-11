@@ -86,11 +86,11 @@ export default function MainTabsLayout() {
       <Tabs.Screen
         name="appearance"
         options={{
-          tabBarAccessibilityLabel: 'Aparência',
+          tabBarAccessibilityLabel: 'Configurações',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon color={color} focused={focused} value="lucide:settings" />
           ),
-          title: 'Aparência',
+          title: 'Configurações',
         }}
       />
     </Tabs>

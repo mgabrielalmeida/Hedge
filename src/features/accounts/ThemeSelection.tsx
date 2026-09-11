@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Card, FormFeedback, ScreenHeader, ScrollableScreen, Text, useSuccessFeedback } from '@/components';
@@ -12,6 +12,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 
 type ThemeSelectionProps = {
   actionLabel?: string;
+  additionalSections?: ReactNode;
   onEditCustom: () => void;
   onFinish: () => void;
   showDescription?: boolean;
@@ -30,6 +31,7 @@ const appearanceOptions: readonly {
 
 export function ThemeSelection({
   actionLabel = 'Continuar',
+  additionalSections,
   onEditCustom,
   onFinish,
   showDescription = true,
@@ -157,6 +159,8 @@ export function ThemeSelection({
             })}
           </View>
         </View>
+
+        {additionalSections}
 
         {error ? <FormFeedback message={`${error} Toque novamente na opção desejada para tentar salvar.`} title="A preferência não foi salva" /> : null}
         <Button disabled={isSaving} label={isSaving ? 'Salvando…' : actionLabel} onPress={onFinish} />

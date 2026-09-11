@@ -29,6 +29,7 @@ distribuída.
 | Linguagem | TypeScript com modo estrito |
 | Navegação | Expo Router; pilha JavaScript com `react-native-gesture-handler` compatível com o SDK para transições temporizadas entre telas secundárias |
 | Persistência | `expo-sqlite`, usando sua API diretamente |
+| Backup local | `expo-file-system`, `expo-document-picker` e `expo-sharing` |
 | Estilos | `StyleSheet` do React Native |
 | Estado local | `useState` e `useReducer` |
 | Estado global | React Context apenas para tema e configurações pequenas |
@@ -66,6 +67,7 @@ Hedge/
     ├── features/
     │   ├── accounts/          # Casos de uso e UI específicos de contas
     │   ├── categories/        # Casos de uso e UI específicos de categorias
+    │   ├── settings/          # Configurações e arquivos de backup
     │   └── transactions/      # Casos de uso e UI específicos de lançamentos
     ├── theme/                 # Tokens, temas, provider e hook de tema
     └── utils/                 # Funções pequenas, genéricas e sem estado
@@ -96,7 +98,7 @@ composição das telas. Rotas podem ler parâmetros, coordenar componentes e
 acionar operações de uma funcionalidade.
 
 Uma rota não deve conter SQL, cálculos financeiros nem regras de persistência.
-As áreas principais são Início, Histórico, Categorias, Contas e Aparência; a
+As áreas principais são Início, Histórico, Categorias, Contas e Configurações; a
 navegação entre elas é apresentada pela interface como uma barra inferior
 persistente. Telas de criação e edição ficam fora dessas áreas para manter os
 fluxos focados.
@@ -247,6 +249,37 @@ As demais cores ficam disponíveis exclusivamente em uma roda de tons e
 controles de vivacidade e luminosidade. A escolha visual é convertida para uma
 cor hexadecimal antes da persistência, sem expor esse formato técnico na
 interface.
+
+## Backup e restauração
+
+O backup é iniciado manualmente na área Configurações e funciona inteiramente
+offline. A exportação cria um único arquivo com a extensão `.hedge-backup` e
+abre a folha nativa de compartilhamento, permitindo salvar no dispositivo ou
+em qualquer aplicativo ou provedor de arquivos disponibilizado pelo sistema. A
+restauração usa o seletor nativo de documentos e aceita um arquivo por vez.
+
+O arquivo é um snapshot SQLite consistente, criado pela API de serialização do
+`expo-sqlite`, e contém todas as tabelas financeiras. Uma tabela reservada,
+presente somente no artefato, registra a versão do formato, a versão do schema,
+o instante UTC da exportação e todas as preferências mantidas no
+`expo-sqlite/kv-store`, incluindo tema, aparência, tema Custom e ocultação de
+saldos. Essa tabela é validada e removida antes da restauração; não integra o
+schema normal do aplicativo.
+
+A restauração substitui integralmente os dados e preferências atuais após uma
+confirmação explícita. Antes da substituição, o aplicativo mantém snapshots do
+banco e das preferências em memória e os reaplica se qualquer etapa falhar.
+Backups com schema anterior são atualizados pelas migrações existentes antes de
+serem aplicados. Formatos ou schemas mais recentes que o aplicativo são
+rejeitados, assim como arquivos corrompidos, metadados inválidos e arquivos com
+mais de 100 MB. A extensão é verificada antes da leitura e a integridade SQLite
+é verificada antes de qualquer escrita.
+
+O backup não é criptografado, seguindo a decisão atual de usar SQLite padrão.
+Como o arquivo sai do sandbox e contém dados financeiros, a interface informa
+que ele deve ser guardado em local seguro. Backup automático, sincronização e
+recebimento direto pela folha de compartilhamento de outro aplicativo ficam
+fora deste fluxo inicial.
 
 ## Funcionamento offline
 

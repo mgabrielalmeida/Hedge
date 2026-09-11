@@ -25,7 +25,8 @@ As funcionalidades iniciais são:
 - editar e excluir lançamentos;
 - criar, editar e excluir categorias;
 - criar, consultar, editar e excluir despesas e rendas recorrentes;
-- escolher um tema depois de concluir o primeiro cadastro.
+- escolher um tema depois de concluir o primeiro cadastro;
+- exportar e restaurar manualmente um backup completo dos dados e preferências.
 
 ## Moeda, valores e datas
 
@@ -250,10 +251,20 @@ recebem seus dados e referências temporais por argumento e permanecem puras.
 ## Tema
 
 Após criar a primeira conta, o usuário pode trocar o tema durante o onboarding
-ou pela área Aparência da navegação principal. Tema e aparência continuam sendo
+ou pela área Configurações da navegação principal. Tema e aparência continuam sendo
 preferências separadas, conforme definido na [arquitetura](architecture.md).
 Contas e categorias combinam um ícone com uma cor predefinida ou criada em uma
 roda de tons com controles simples de vivacidade e luminosidade.
+
+## Backup
+
+A área Configurações permite exportar um arquivo `.hedge-backup` pela folha de
+compartilhamento do sistema e selecionar um desses arquivos para restauração.
+O backup inclui contas, categorias, lançamentos, recorrências, tema e demais
+preferências. Restaurar exige confirmação e substitui integralmente o estado
+atual. Arquivos inválidos, corrompidos, maiores que 100 MB ou criados por uma
+versão futura incompatível são recusados antes da substituição. O arquivo não é
+criptografado e deve ser guardado em local seguro.
 
 ## Fora do escopo por enquanto
 

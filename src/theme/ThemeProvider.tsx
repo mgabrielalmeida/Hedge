@@ -33,6 +33,7 @@ type ThemeContextValue = {
   hideBalances: boolean;
   isReady: boolean;
   isDark: boolean;
+  reloadPreferences: () => Promise<void>;
   setAppearance: (appearance: AppearancePreference) => Promise<boolean>;
   setBalancesHidden: (hidden: boolean) => Promise<boolean>;
   setThemeName: (themeName: ThemeName) => Promise<boolean>;
@@ -56,6 +57,16 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     DEFAULT_THEME_PREFERENCES.hideBalances,
   );
   const [isReady, setIsReady] = useState(false);
+
+  const reloadPreferences = useCallback(async () => {
+    const preferences = await loadThemePreferences();
+
+    setThemeName(preferences.themeName);
+    setAppearance(preferences.appearance);
+    setCustomTheme(preferences.customTheme);
+    setHideBalances(preferences.hideBalances);
+    setIsReady(true);
+  }, []);
 
   useEffect(() => {
     async function loadPreferences() {
@@ -127,6 +138,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       hideBalances,
       isDark: resolvedAppearance === 'dark',
       isReady,
+      reloadPreferences,
       setAppearance: updateAppearance,
       setBalancesHidden: updateBalanceVisibility,
       setThemeName: updateThemeName,
@@ -139,6 +151,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       customTheme,
       hideBalances,
       isReady,
+      reloadPreferences,
       resolvedAppearance,
       themeName,
       tokens,
