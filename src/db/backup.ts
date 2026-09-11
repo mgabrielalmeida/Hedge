@@ -1,6 +1,7 @@
 import {
   backupDatabaseAsync,
   deserializeDatabaseAsync,
+  openDatabaseAsync,
   type SQLiteDatabase,
 } from 'expo-sqlite';
 
@@ -53,13 +54,17 @@ export async function createBackupBytes(
   database: SQLiteDatabase,
   createdAt = new Date(),
 ): Promise<Uint8Array> {
-  const [databaseBytes, preferences] = await Promise.all([
-    database.serializeAsync(),
+  const [backupDatabase, preferences] = await Promise.all([
+    openDatabaseAsync(':memory:', { useNewConnection: true }),
     loadThemePreferences(),
   ]);
-  const backupDatabase = await deserializeDatabaseAsync(databaseBytes);
 
   try {
+    await backupDatabaseAsync({
+      destDatabase: backupDatabase,
+      sourceDatabase: database,
+    });
+    await prepareInMemoryDatabaseForWrites(backupDatabase);
     const schemaVersion = await readSchemaVersion(backupDatabase);
 
     await backupDatabase.execAsync(`
@@ -94,14 +99,21 @@ export async function restoreBackupBytes(
   backupBytes: Uint8Array,
 ): Promise<ThemePreferences> {
   const backupDatabase = await openAndValidateBackup(backupBytes);
-  const currentDatabaseBytes = await database.serializeAsync();
-  const currentPreferences = await loadThemePreferences();
+  const [rollbackDatabase, currentPreferences] = await Promise.all([
+    openDatabaseAsync(':memory:', { useNewConnection: true }),
+    loadThemePreferences(),
+  ]);
   let destinationMayHaveChanged = false;
 
   try {
+    await backupDatabaseAsync({
+      destDatabase: rollbackDatabase,
+      sourceDatabase: database,
+    });
     const metadata = await readBackupMetadata(backupDatabase);
     const preferences = parseBackupPreferences(metadata.preferences_json);
 
+    await prepareInMemoryDatabaseForWrites(backupDatabase);
     await backupDatabase.execAsync(`DROP TABLE ${BACKUP_METADATA_TABLE};`);
     await runMigrations(backupDatabase);
 
@@ -117,18 +129,12 @@ export async function restoreBackupBytes(
   } catch (error) {
     if (destinationMayHaveChanged) {
       try {
-        const rollbackDatabase = await deserializeDatabaseAsync(currentDatabaseBytes);
-
-        try {
-          await backupDatabaseAsync({
-            destDatabase: database,
-            sourceDatabase: rollbackDatabase,
-          });
-          await initializeDatabase(database);
-          await saveThemePreferences(currentPreferences);
-        } finally {
-          await rollbackDatabase.closeAsync();
-        }
+        await backupDatabaseAsync({
+          destDatabase: database,
+          sourceDatabase: rollbackDatabase,
+        });
+        await initializeDatabase(database);
+        await saveThemePreferences(currentPreferences);
       } catch {
         throw new BackupError(
           'restore-failed',
@@ -141,6 +147,7 @@ export async function restoreBackupBytes(
     throw new BackupError('restore-failed', 'Não foi possível restaurar o backup.');
   } finally {
     await backupDatabase.closeAsync();
+    await rollbackDatabase.closeAsync();
   }
 }
 
@@ -218,4 +225,13 @@ function parseBackupPreferences(value: string): ThemePreferences {
   }
 
   throw new BackupError('invalid-file', 'As preferências do backup são inválidas.');
+}
+
+async function prepareInMemoryDatabaseForWrites(
+  database: SQLiteDatabase,
+): Promise<void> {
+  // A copied or serialized file can keep WAL in its header. An in-memory
+  // database cannot create the corresponding -wal file, so switch journals
+  // before any write.
+  await database.execAsync('PRAGMA journal_mode = MEMORY;');
 }

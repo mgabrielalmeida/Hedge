@@ -1,4 +1,8 @@
-import { backupDatabaseAsync, deserializeDatabaseAsync } from 'expo-sqlite';
+import {
+  backupDatabaseAsync,
+  deserializeDatabaseAsync,
+  openDatabaseAsync,
+} from 'expo-sqlite';
 
 import { initializeDatabase } from './database';
 import { BackupError, createBackupBytes, restoreBackupBytes } from './backup';
@@ -12,6 +16,7 @@ import {
 jest.mock('expo-sqlite', () => ({
   backupDatabaseAsync: jest.fn(),
   deserializeDatabaseAsync: jest.fn(),
+  openDatabaseAsync: jest.fn(),
 }));
 jest.mock('./database', () => ({ initializeDatabase: jest.fn() }));
 jest.mock('./migrate', () => ({ runMigrations: jest.fn() }));
@@ -33,6 +38,7 @@ const preferences: ThemePreferences = {
 };
 
 const mockedDeserialize = jest.mocked(deserializeDatabaseAsync);
+const mockedOpenDatabase = jest.mocked(openDatabaseAsync);
 const mockedBackup = jest.mocked(backupDatabaseAsync);
 const mockedInitialize = jest.mocked(initializeDatabase);
 const mockedRunMigrations = jest.mocked(runMigrations);
@@ -50,9 +56,8 @@ describe('backup database orchestration', () => {
   });
 
   it('exports a serialized database with versioned metadata and preferences', async () => {
-    const sourceBytes = new Uint8Array([1, 2]);
     const outputBytes = new Uint8Array([3, 4]);
-    const database = { serializeAsync: jest.fn().mockResolvedValue(sourceBytes) };
+    const database = {};
     const backupDatabase = {
       closeAsync: jest.fn().mockResolvedValue(undefined),
       execAsync: jest.fn().mockResolvedValue(undefined),
@@ -60,12 +65,23 @@ describe('backup database orchestration', () => {
       runAsync: jest.fn().mockResolvedValue(undefined),
       serializeAsync: jest.fn().mockResolvedValue(outputBytes),
     };
-    mockedDeserialize.mockResolvedValue(backupDatabase as never);
+    mockedOpenDatabase.mockResolvedValue(backupDatabase as never);
     const createdAt = new Date('2026-09-11T12:00:00.000Z');
 
     await expect(createBackupBytes(database as never, createdAt)).resolves.toBe(outputBytes);
 
-    expect(mockedDeserialize).toHaveBeenCalledWith(sourceBytes);
+    expect(mockedOpenDatabase).toHaveBeenCalledWith(
+      ':memory:',
+      { useNewConnection: true },
+    );
+    expect(mockedBackup).toHaveBeenCalledWith({
+      destDatabase: backupDatabase,
+      sourceDatabase: database,
+    });
+    expect(backupDatabase.execAsync).toHaveBeenNthCalledWith(
+      1,
+      'PRAGMA journal_mode = MEMORY;',
+    );
     expect(backupDatabase.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO __hedge_backup_metadata_v1'),
       'com.hedge.backup',
@@ -79,31 +95,42 @@ describe('backup database orchestration', () => {
 
   it('validates, migrates and restores both database and preferences', async () => {
     const incoming = createIncomingBackup();
-    const currentBytes = new Uint8Array([9]);
-    const database = { serializeAsync: jest.fn().mockResolvedValue(currentBytes) };
+    const rollback = { closeAsync: jest.fn().mockResolvedValue(undefined) };
+    const database = {};
     mockedDeserialize.mockResolvedValue(incoming as never);
+    mockedOpenDatabase.mockResolvedValue(rollback as never);
 
     await expect(restoreBackupBytes(database as never, new Uint8Array([1]))).resolves.toEqual(preferences);
 
-    expect(incoming.execAsync).toHaveBeenCalledWith('DROP TABLE __hedge_backup_metadata_v1;');
+    expect(incoming.execAsync).toHaveBeenNthCalledWith(
+      1,
+      'PRAGMA journal_mode = MEMORY;',
+    );
+    expect(incoming.execAsync).toHaveBeenNthCalledWith(
+      2,
+      'DROP TABLE __hedge_backup_metadata_v1;',
+    );
     expect(mockedRunMigrations).toHaveBeenCalledWith(incoming);
-    expect(mockedBackup).toHaveBeenCalledWith({
+    expect(mockedBackup).toHaveBeenNthCalledWith(1, {
+      destDatabase: rollback,
+      sourceDatabase: database,
+    });
+    expect(mockedBackup).toHaveBeenNthCalledWith(2, {
       destDatabase: database,
       sourceDatabase: incoming,
     });
     expect(mockedInitialize).toHaveBeenCalledWith(database);
     expect(mockedSavePreferences).toHaveBeenCalledWith(preferences);
     expect(incoming.closeAsync).toHaveBeenCalled();
+    expect(rollback.closeAsync).toHaveBeenCalled();
   });
 
   it('restores the previous state when applying preferences fails', async () => {
     const incoming = createIncomingBackup();
     const rollback = { closeAsync: jest.fn().mockResolvedValue(undefined) };
-    const currentBytes = new Uint8Array([9]);
-    const database = { serializeAsync: jest.fn().mockResolvedValue(currentBytes) };
-    mockedDeserialize
-      .mockResolvedValueOnce(incoming as never)
-      .mockResolvedValueOnce(rollback as never);
+    const database = {};
+    mockedDeserialize.mockResolvedValue(incoming as never);
+    mockedOpenDatabase.mockResolvedValue(rollback as never);
     mockedSavePreferences
       .mockRejectedValueOnce(new Error('storage unavailable'))
       .mockResolvedValueOnce();
@@ -112,7 +139,7 @@ describe('backup database orchestration', () => {
       restoreBackupBytes(database as never, new Uint8Array([1])),
     ).rejects.toEqual(expect.objectContaining({ code: 'restore-failed' }));
 
-    expect(mockedBackup).toHaveBeenNthCalledWith(2, {
+    expect(mockedBackup).toHaveBeenNthCalledWith(3, {
       destDatabase: database,
       sourceDatabase: rollback,
     });

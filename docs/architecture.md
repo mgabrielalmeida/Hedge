@@ -258,8 +258,9 @@ abre a folha nativa de compartilhamento, permitindo salvar no dispositivo ou
 em qualquer aplicativo ou provedor de arquivos disponibilizado pelo sistema. A
 restauração usa o seletor nativo de documentos e aceita um arquivo por vez.
 
-O arquivo é um snapshot SQLite consistente, criado pela API de serialização do
-`expo-sqlite`, e contém todas as tabelas financeiras. Uma tabela reservada,
+O arquivo é um snapshot SQLite consistente, criado pelas APIs nativas de backup
+e serialização do `expo-sqlite`, e contém todas as tabelas financeiras. Uma
+tabela reservada,
 presente somente no artefato, registra a versão do formato, a versão do schema,
 o instante UTC da exportação e todas as preferências mantidas no
 `expo-sqlite/kv-store`, incluindo tema, aparência, tema Custom e ocultação de
