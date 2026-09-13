@@ -77,6 +77,7 @@ export function DashboardScreen({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [balanceReplayKey, setBalanceReplayKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -108,9 +109,10 @@ export function DashboardScreen({
     }
   }, [database, onNoAccounts]);
 
-  useFocusEffect(useCallback(() => (
-    scheduleAfterSecondaryTransition(() => void load(), reduceMotion === false)
-  ), [load, reduceMotion]));
+  useFocusEffect(useCallback(() => {
+    setBalanceReplayKey((key) => key + 1);
+    return scheduleAfterSecondaryTransition(() => void load(), reduceMotion === false);
+  }, [load, reduceMotion]));
 
   useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
 
@@ -165,7 +167,12 @@ export function DashboardScreen({
               onPress={() => void setBalancesHidden(!hideBalances)}
             />
           </View>
-          <MoneyText cents={consolidatedBalance} hidden={hideBalances} variant="display" />
+          <AnimatedMoneyText
+            cents={consolidatedBalance}
+            hidden={hideBalances}
+            replayKey={balanceReplayKey}
+            variant="display"
+          />
 
           {selectedAccount ? (
             <>
@@ -177,6 +184,7 @@ export function DashboardScreen({
               <AnimatedMoneyText
                 cents={calculateAccountBalance(transactions, selectedAccount.id)}
                 hidden={hideBalances}
+                replayKey={balanceReplayKey}
                 variant="title"
               />
                <ChipGroup accessibilityLabel="Conta selecionada">

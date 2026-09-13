@@ -75,6 +75,7 @@ export function TransactionsHomeScreen({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [recurringActionError, setRecurringActionError] = useState<string | null>(null);
+  const [balanceReplayKey, setBalanceReplayKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -101,9 +102,10 @@ export function TransactionsHomeScreen({
     }
   }, [db, onNoAccounts]);
 
-  useFocusEffect(useCallback(() => (
-    scheduleAfterSecondaryTransition(() => void load(), screenReduceMotion === false)
-  ), [load, screenReduceMotion]));
+  useFocusEffect(useCallback(() => {
+    setBalanceReplayKey((key) => key + 1);
+    return scheduleAfterSecondaryTransition(() => void load(), screenReduceMotion === false);
+  }, [load, screenReduceMotion]));
   useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
 
   const selectedAccount = selectedAccountId === null
@@ -158,7 +160,12 @@ export function TransactionsHomeScreen({
           <FadeSelection selectionKey={selectedAccountId ?? 'all'}>
             <Text variant="title">{selectedAccount?.name ?? 'Todas as contas'}</Text>
           </FadeSelection>
-          <AnimatedMoneyText cents={displayedBalance} hidden={hideBalances} variant="heading" />
+          <AnimatedMoneyText
+            cents={displayedBalance}
+            hidden={hideBalances}
+            replayKey={balanceReplayKey}
+            variant="heading"
+          />
           <ChipGroup accessibilityLabel="Conta do histórico">
             <SelectableChip animateSelection label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
             {accounts.map((account) => (
