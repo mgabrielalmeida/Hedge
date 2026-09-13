@@ -223,9 +223,9 @@ diretamente: o `ThemeProvider` consome sua API tipada, aplica os padrões para
 nomes e definições Custom inválidos ou indisponíveis e expõe gravações que informam falha sem gerar
 rejeições não observadas. Inicialmente, temas podem alterar cores e propriedades
 visuais pequenas, mas não a estrutura ou o espaçamento fundamental das telas.
-No Android, a barra de navegação nativa permanece visível e acompanha a
-aparência clara ou escura resolvida, para manter contraste coerente com a
-interface sem remover os controles do sistema.
+No Android, a barra de navegação nativa é ocultada nas telas do aplicativo. A
+barra inferior persistente do próprio app concentra a navegação principal e
+mantém o espaço do rodapé consistente entre telas.
 
 Os componentes compartilhados mínimos são `Screen`, `Text`, `Card`, `Field` e
 `Button`. Eles ficam em `src/components`, recebem suas decisões visuais do

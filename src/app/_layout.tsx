@@ -104,7 +104,7 @@ function AppBootstrap() {
 
   return (
     <>
-      <NavigationBar hidden={false} style={isDark ? 'dark' : 'light'} />
+      <NavigationBar hidden style={isDark ? 'dark' : 'light'} />
       <StatusBar style={isDark ? 'light' : 'dark'} />
       {!isDatabaseReady ? (
         <BootstrapScreen
