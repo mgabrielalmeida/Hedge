@@ -55,8 +55,9 @@ export function getNextRecurringChargeDate(rule: RecurringRule, fromDate: CivilD
       next = civilDate(following.year, following.month, Math.min(rule.schedule.chargeDay, daysInMonth(following.year, following.month)));
     }
   } else {
-    next = civilDate(year, rule.schedule.chargeMonth, Math.min(rule.schedule.chargeDay, daysInMonth(year, rule.schedule.chargeMonth)));
-    if (compareCivilDates(next, start) < 0) next = civilDate(year + 1, rule.schedule.chargeMonth, Math.min(rule.schedule.chargeDay, daysInMonth(year + 1, rule.schedule.chargeMonth)));
+    const { chargeDay, chargeMonth } = rule.schedule;
+    next = civilDate(year, chargeMonth, Math.min(chargeDay, daysInMonth(year, chargeMonth)));
+    if (compareCivilDates(next, start) < 0) next = civilDate(year + 1, chargeMonth, Math.min(chargeDay, daysInMonth(year + 1, chargeMonth)));
   }
   return rule.endDate !== null && compareCivilDates(next, rule.endDate) > 0 ? null : next;
 }

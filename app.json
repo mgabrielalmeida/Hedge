@@ -5,6 +5,16 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "hedge",
+    "icon": "./assets/images/icon.png",
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
+        "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
+        "backgroundColor": "#1F6B45"
+      },
+      "package": "com.gabrielmalmeida.hedge",
+      "versionCode": 1
+    },
     "platforms": [
       "ios",
       "android"
@@ -22,8 +32,25 @@
           "enforceContrast": false
         }
       ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#1F6B45",
+          "imageWidth": 192
+        }
+      ],
       "@react-native-community/datetimepicker",
       "expo-sharing"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "expo-navigation-bar": {
+        "enforceContrast": false
+      },
+      "eas": {
+        "projectId": "bb4288c2-65e8-4357-acb4-6811ce8a8626"
+      }
+    }
   }
 }
