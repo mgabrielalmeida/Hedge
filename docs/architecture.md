@@ -66,11 +66,13 @@ Hedge/
     ├── app/                   # Rotas, layouts e composição de telas
     ├── components/            # Componentes visuais compartilhados
     ├── db/
+    │   ├── benchmarks/         # Fixtures e medição reproduzível do SQLite local
     │   ├── migrations/        # Alterações sequenciais do schema
     │   └── repositories/      # Único acesso aos dados financeiros
     ├── domain/
     │   ├── calculations/      # Cálculos financeiros puros
     │   └── models/            # Tipos e conceitos do domínio
+    │   └── sync/              # Contratos puros da sincronização futura
     ├── features/
     │   ├── accounts/          # Casos de uso e UI específicos de contas
     │   ├── categories/        # Casos de uso e UI específicos de categorias
@@ -331,6 +333,15 @@ executor e bancos temporários em arquivo para validar `WAL`, `foreign_keys`,
 migrações e schema real. Essa ferramenta não é importada pelo aplicativo e não
 é uma dependência de runtime. O ambiente de desenvolvimento precisa de Node.js
 22.5 ou superior para executar essa parte da suíte.
+
+## Medição local antes da nuvem
+
+As fixtures e helpers em `src/db/benchmarks` estabelecem datasets determinísticos
+de 1 mil, 10 mil e 50 mil lançamentos sem serem importados pela interface de
+produção. O [protocolo de medição local](local-sync-benchmark.md) define a coleta
+em aparelhos físicos para abertura, commit, memória, rolagem e feedback. Os
+contratos executáveis de comando, recibo, evento, snapshot, conflito e cursor
+ficam em `src/domain/sync`; são puros e não ativam sincronização.
 
 ## Dependências deliberadamente excluídas
 

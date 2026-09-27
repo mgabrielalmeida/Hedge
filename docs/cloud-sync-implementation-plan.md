@@ -53,6 +53,16 @@ matriz de falhas, estados de sessão e critérios de desempenho.
 **Aceite:** referência reproduzível; commit local p95 até 100 ms e feedback até
 200 ms, ou correção planejada antes do próximo marco; contratos não dependem de UI.
 
+**Implementação preparada — 27 de setembro de 2026:** fixtures determinísticas
+para 1 mil, 10 mil e 50 mil lançamentos, seeding transacional e cálculo de p95
+estão em `src/db/benchmarks`; os contratos executáveis e puros estão em
+`src/domain/sync/contracts.ts`; o protocolo, matriz de falhas e estados de
+sessão estão em `local-sync-benchmark.md`. A coleta permanece pendente: este
+ambiente não possui `adb` nem aparelho físico conectado, portanto ainda não há
+medidas reais de abertura, commit, feedback, memória ou rolagem. A Etapa 1 não
+está concluída até essa tabela conter evidências físicas e os limites de 100 ms
+e 200 ms serem atendidos ou receberem correção planejada.
+
 ## Etapa 2 — Isolamento da persistência e desempenho
 
 Concentrar o acesso ao SQLite em `src/db`; retirar imports diretos de telas;
