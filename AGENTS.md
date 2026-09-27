@@ -4,6 +4,9 @@
 
 - Leia `docs/architecture.md` antes de alterar a estrutura ou introduzir uma
   dependência.
+- Para a fase de conta e nuvem, leia também `docs/cloud-sync-implementation-plan.md`.
+  Conclua as etapas locais e o marco de prontidão desse plano antes de iniciar
+  o schema PostgreSQL ou enviar dados financeiros.
 - Atualize `docs/architecture.md` quando uma mudança alterar a stack, os limites
   entre módulos, a política offline, a persistência ou o gerenciamento de
   estado.
@@ -31,6 +34,11 @@
 
 - Trate o SQLite como fonte de verdade. Não mantenha uma cópia global de contas,
   categorias ou lançamentos em Context ou outro store.
+- Grave cada mutação financeira e seu comando de sincronização na mesma
+  transação SQLite. A interface confirma o commit local sem aguardar rede.
+- Preserve IDs locais e acrescente identidades globais imutáveis no protocolo.
+  Use idempotência, versões esperadas, dependências e marcadores de exclusão;
+  não resolva conflitos por timestamps do dispositivo.
 - Use valores monetários inteiros em centavos; não use ponto flutuante para
   dinheiro.
 - Use `YYYY-MM-DD` para datas civis e ISO 8601 em UTC para instantes técnicos.
@@ -56,9 +64,15 @@
 
 ## Offline e dependências
 
-- Preserve o funcionamento inteiramente offline do aplicativo. Não adicione
-  backend, cliente HTTP, autenticação remota, analytics, relatórios remotos de
-  falhas, fontes remotas ou outros recursos carregados em tempo de execução.
+- Preserve operações financeiras offline. A rede não pode bloquear abertura,
+  navegação ou salvamento; autenticação e sincronização são assíncronas.
+- A stack remota aceita nesta fase é Supabase Auth + PostgreSQL, com RPCs
+  transacionais e protocolo próprio. Instalar SDKs não ativa envio de dados.
+- Concentre sessão em `src/auth`, sincronização em `src/sync`, fila e projeção em
+  `src/db/sync`, e backend em `supabase`. Rotas e telas não acessam Supabase.
+- Nunca inclua service role, secret keys, senha de banco, SMTP ou tokens em
+  `EXPO_PUBLIC_*`, backups ou logs. Sessões devem usar armazenamento cifrado.
+- Sincronização em segundo plano é oportunista; não prometa execução imediata.
 - Não configure EAS Update sem uma revisão explícita desta decisão arquitetural.
 - Considere somente Android e iOS; suporte web está fora do escopo inicial.
 - Prefira APIs do React Native, JavaScript e Expo às dependências externas.
@@ -74,4 +88,6 @@
   `.test.tsx`.
 - Priorize testes para cálculos financeiros, conversões monetárias, validações,
   repositórios e migrações.
+- Teste reenvios, interrupções, conflitos, recorrências em dois dispositivos,
+  isolamento de usuários e restauração com clientes antigos antes da liberação.
 - Preserve alterações não relacionadas já existentes no repositório.

@@ -1,7 +1,7 @@
 # Arquitetura do Hedge
 
-**Status:** aceita  
-**Data:** 1 de setembro de 2026
+**Status:** aceita; evolução para conta e nuvem em preparação
+**Atualização:** 27 de setembro de 2026
 
 Este documento registra as decisões iniciais de arquitetura do Hedge. Ele deve
 ser atualizado quando uma decisão estrutural for alterada. O objetivo não é
@@ -10,15 +10,15 @@ que o aplicativo continue compreensível à medida que crescer.
 
 ## Objetivos arquiteturais
 
-1. Manter o desenvolvimento acessível para uma pessoa com pouca experiência.
-2. Fazer todas as funcionalidades do aplicativo operarem sem internet.
+1. Priorizar operações financeiras rápidas executadas no dispositivo.
+2. Permitir leitura e escrita offline, com sincronização posterior.
 3. Usar o menor número razoável de dependências e abstrações.
 4. Preservar a correção dos cálculos e dos dados financeiros.
 5. Permitir múltiplos temas sem acoplar componentes a cores específicas.
 
-Não são objetivos iniciais: versão web, backend, contas de usuário,
-sincronização entre dispositivos, colaboração, plugins ou uma arquitetura
-distribuída.
+Conta de usuário e sincronização passam a fazer parte da arquitetura aceita. A
+implementação ainda não está ativa; o plano define a ordem e os bloqueios.
+Continuam fora do escopo web, colaboração, múltiplas moedas, analytics e EAS Update.
 
 ## Stack decidida
 
@@ -32,14 +32,21 @@ distribuída.
 | Backup local | `expo-file-system`, `expo-document-picker` e `expo-sharing` |
 | Estilos | `StyleSheet` do React Native |
 | Estado local | `useState` e `useReducer` |
-| Estado global | React Context apenas para tema e configurações pequenas |
+| Estado global | React Context apenas para tema, preferências, sessão e resumo de sincronização |
 | Preferências | `expo-sqlite/kv-store` |
 | Entrada de datas | `@react-native-community/datetimepicker`, usando o controle nativo do sistema |
 | Gráficos vetoriais | `react-native-svg` e `react-native-svg-transformer`, para gráficos e ícones SVG locais |
 | Interface do sistema | `expo-status-bar` e `expo-navigation-bar`, acompanhando a aparência resolvida do tema |
 | Testes | Jest com `jest-expo` |
 | Lint | ESLint com `eslint-config-expo` |
-| Dados remotos | Nenhum |
+| Dados remotos | PostgreSQL gerenciado pelo Supabase em São Paulo |
+| Autenticação | Supabase Auth com código de uso único por e-mail |
+| Cliente remoto | `@supabase/supabase-js` e `react-native-url-polyfill`, usando RPCs |
+| Sincronização | Protocolo próprio com fila SQLite, idempotência, versões e cursor incremental |
+| Sessão | AES-GCM com `expo-crypto` e chave em `expo-secure-store` |
+| Conectividade | `expo-network`; tarefas oportunistas com `expo-background-task` |
+| Desenvolvimento nativo | `expo-dev-client` para validar módulos em aparelhos físicos |
+| Backend local | CLI Supabase como devDependency; Docker é requisito externo |
 
 As versões compatíveis devem ser instaladas pelo Expo. Pacotes do ecossistema
 Expo não devem ter versões escolhidas manualmente quando `expo install` puder
@@ -282,11 +289,16 @@ que ele deve ser guardado em local seguro. Backup automático, sincronização e
 recebimento direto pela folha de compartilhamento de outro aplicativo ficam
 fora deste fluxo inicial.
 
-## Funcionamento offline
+## Conta, sincronização e funcionamento offline
 
-O aplicativo instalado não dependerá de conexão de rede. Portanto:
+Operações financeiras com dados locais não dependerão de conexão. Portanto:
 
-- não haverá backend, autenticação remota ou cliente HTTP;
+- login inicial, novo dispositivo e publicação de alterações exigem conexão,
+  mas ausência de rede não bloqueia dados locais;
+- cada mutação grava dados e comando de sincronização na mesma transação local;
+- PostgreSQL recebe operações idempotentes por RPC, com RLS e versões esperadas;
+- conflitos ficam preservados para revisão, sem última escrita por relógio;
+- sincronização em segundo plano é oportunista e retomável;
 - fontes, imagens e demais recursos serão incluídos no pacote;
 - não serão instalados analytics ou relatórios remotos de falhas;
 - o EAS Update não será configurado para atualizações durante a execução;
@@ -302,10 +314,9 @@ tratado como uma decisão de privacidade separada antes da distribuição.
 Na fase inicial será usado o SQLite padrão, protegido pelo sandbox e pelos
 mecanismos do dispositivo. Isso não representa criptografia própria do banco.
 
-Antes de uma distribuição pública, será tomada uma decisão explícita sobre
-SQLCipher e armazenamento da chave com `expo-secure-store`. Essa decisão está
-adiada porque altera o fluxo de build e a gestão de chaves; ela não deve ser
-introduzida silenciosamente durante outra funcionalidade.
+Nesta fase não adotamos SQLCipher nem criptografia ponta a ponta. A sessão será
+cifrada com AES-GCM e a chave ficará no SecureStore; o SQLite continua protegido
+pelo sandbox do dispositivo. RLS, RPCs e isolamento por usuário são obrigatórios.
 
 ## Testes
 

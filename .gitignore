@@ -3,6 +3,11 @@ node_modules/
 coverage/
 dist/
 *.tsbuildinfo
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
 npm-debug.log*
 .env*.local
 /android
