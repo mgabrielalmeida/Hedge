@@ -40,11 +40,11 @@ describe('initialSchemaMigration', () => {
 
   it('seeds the five categories defined by the MVP', () => {
     for (const [category, budget] of [
-      ['Compras', 100_000],
-      ['Assinatura', 10_000],
-      ['Entretenimento', 100_000],
-      ['Alimentação', 100_000],
-      ['Outros', 100_000],
+      ['Compras', 0],
+      ['Assinatura', 0],
+      ['Entretenimento', 0],
+      ['Alimentação', 0],
+      ['Outros', 0],
     ]) {
       expect(INITIAL_SCHEMA_SQL).toContain(`('${category}', ${budget})`);
     }

@@ -10,9 +10,11 @@ tomadas ficam fora deste documento até serem explicitamente aprovadas.
 
 ## Escopo do MVP
 
-O Hedge permitirá ao usuário controlar suas finanças pessoais localmente, em
-BRL, por meio de contas, categorias e lançamentos. O aplicativo não terá
-conta de usuário, servidor ou sincronização.
+O MVP local do Hedge permite ao usuário controlar suas finanças pessoais em
+BRL, por meio de contas, categorias e lançamentos. Ele funciona sem conta ou
+conexão: o SQLite é a fonte de verdade e o caminho de salvar dados financeiros
+não aguarda a rede. Conta, backend e sincronização pertencem a uma fase
+posterior, definida no [plano de implementação de conta, nuvem e sincronização offline](cloud-sync-implementation-plan.md), e ainda não estão ativos.
 
 As funcionalidades iniciais são:
 
@@ -268,5 +270,7 @@ criptografado e deve ser guardado em local seguro.
 
 ## Fora do escopo por enquanto
 
-Este documento não introduz suporte a outras moedas, conversão cambial,
-sincronização, contas de usuário, backend ou acesso à rede.
+Este MVP local não introduz suporte a outras moedas ou conversão cambial. Conta
+de usuário, backend e sincronização não fazem parte deste escopo funcional;
+suas decisões e ordem de implementação estão registradas no
+[plano de conta, nuvem e sincronização offline](cloud-sync-implementation-plan.md).

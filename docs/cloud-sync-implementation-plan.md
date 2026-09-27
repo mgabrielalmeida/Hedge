@@ -1,7 +1,7 @@
 # Plano de implementação: conta, nuvem e sincronização offline
 
 **Data:** 27 de setembro de 2026  
-**Status:** preparação documental; sincronização ainda não implementada
+**Status:** Etapa 0 concluída; sincronização ainda não implementada
 
 Este plano mantém o SQLite como base usada pela interface. PostgreSQL será o
 estado compartilhado confirmado, e a rede jamais participará do caminho crítico
@@ -30,6 +30,18 @@ existentes congeladas; instalar SDKs e registrar variáveis públicas apenas em
 
 **Aceite:** documentação coerente, dependências resolvidas, nenhuma credencial
 versionada, typecheck/lint/testes aprovados e nenhum envio remoto ativado.
+
+**Evidência de conclusão — 27 de setembro de 2026:** `AGENTS.md`,
+`architecture.md`, `mvp.md` e `README.md` descrevem a mesma transição: dados
+financeiros permanecem locais e offline, enquanto conta e sincronização ainda
+não estão ativas. A migração `001_initial_schema.ts` foi restaurada exatamente
+ao contrato publicado, com os orçamentos iniciais das categorias em zero; não
+foi criada uma migração compensatória porque não existe forma segura de
+distinguir um orçamento zero original de uma escolha posterior do usuário. As
+dependências Expo compatíveis foram atualizadas e `npm run check:expo`,
+`npm run typecheck`, `npm run lint` e `npm test -- --runInBand` passaram
+(26 suítes e 128 testes). Apenas `.env.example` é versionado, e nenhum módulo
+de infraestrutura remota é importado pelo aplicativo.
 
 ## Etapa 1 — Medição e contratos locais
 
