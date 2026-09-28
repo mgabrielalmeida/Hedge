@@ -69,7 +69,8 @@ Hedge/
     │   ├── benchmarks/         # Fixtures e medição reproduzível do SQLite local
     │   ├── migrations/        # Alterações sequenciais do schema
     │   ├── localProfiles.ts   # Registro e troca atômica entre bancos de perfil
-    │   └── repositories/      # Único acesso aos dados financeiros
+    │   ├── repositories/      # Único acesso aos dados financeiros
+    │   └── sync/              # Outbox e reconciliação local sem transporte remoto
     ├── domain/
     │   ├── calculations/      # Cálculos financeiros puros
     │   └── models/            # Tipos e conceitos do domínio
@@ -220,6 +221,14 @@ aplicativo cria no diretório do SQLite uma cópia
 `*.pre-global-identity.v8.recovery.db`; uma interrupção reverte a migração e a
 próxima abertura pode retomá-la sem duplicar identidades.
 
+A migração 11 instala, dentro de cada banco de perfil, a outbox, a base remota
+confirmada, recibos, cursor incremental, IDs de eventos aplicados e conflitos.
+Ela também cria comandos iniciais para entidades que já existiam. A projeção
+financeira e seu comando são confirmados na mesma transação do repositório; uma
+falha na fila reverte a mutação. Exclusões de categorias e lançamentos passam a
+usar os tombstones introduzidos pela migração 9 e deixam de participar das
+consultas locais, preservando a proposta para publicação e revisão.
+
 ## Estado da interface
 
 Estado temporário de tela, como campos de formulário e abertura de modais,
@@ -345,6 +354,17 @@ etapa falhar, a seleção e a conexão atuais permanecem inalteradas. O
 conexão depois do commit dessa seleção e expõe criação, listagem e troca aos
 fluxos de identidade futuros, sem manter dados financeiros em Context.
 
+`src/db/sync` implementa a reconciliação local antes da existência do servidor.
+Comandos usam IDs idempotentes, versões esperadas e dependências; leases vencidos
+voltam à fila após reinício. Recibos aceitos atualizam a base confirmada e
+removem o comando, enquanto rejeições mantêm o payload original e geram um
+conflito revisável. Um evento baixado atualiza a projeção somente quando não há
+proposta local pendente para a mesma entidade; caso haja, a base confirmada
+avança e a pendência é rebaseada. Eventos repetidos são ignorados e o cursor do
+lote só é salvo depois da aplicação. O transporte atual existe apenas em memória
+para testar perda, duplicação, reordenação e interrupção; nenhum dado sai do
+dispositivo nesta etapa.
+
 Se “offline” também precisar impedir backups do sistema operacional, isso será
 tratado como uma decisão de privacidade separada antes da distribuição.
 
@@ -378,7 +398,8 @@ de 1 mil, 10 mil e 50 mil lançamentos sem serem importados pela interface de
 produção. O [protocolo de medição local](local-sync-benchmark.md) define a coleta
 em aparelhos físicos para abertura, commit, memória, rolagem e feedback. Os
 contratos executáveis de comando, recibo, evento, snapshot, conflito e cursor
-ficam em `src/domain/sync`; são puros e não ativam sincronização.
+ficam em `src/domain/sync`; são puros. A Etapa 4 usa esses contratos apenas no
+SQLite e em um transporte simulado, sem ativar sincronização remota.
 
 ## Dependências deliberadamente excluídas
 

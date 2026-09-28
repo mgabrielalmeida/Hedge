@@ -3,6 +3,7 @@ import type { Cents, CivilDate, EntityId, Transaction, YearMonth } from '@/domai
 
 import { type Clock, type RepositoryDatabase, systemClock } from './database';
 import { mapTransaction, type TransactionRow } from './rows';
+import { enqueueEntityMutation } from '../sync/outbox';
 
 const transactionColumns = 'id, kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at';
 
@@ -54,16 +55,23 @@ export type AccountMonthlyCategorySpending = {
 export async function createTransaction(db: RepositoryDatabase, input: TransactionInput, clock: Clock = systemClock): Promise<Transaction> {
   const transaction = normalized(input); const timestamp = clock();
   await assertActiveAccounts(db, transaction.accountId, transaction.destinationAccountId);
-  const row = await db.getFirstAsync<TransactionRow>(
-    `INSERT INTO transactions (kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING ${transactionColumns};`,
-    transaction.kind, transaction.accountId, transaction.destinationAccountId, transaction.categoryId, transaction.name, transaction.description, transaction.amountCents, transaction.transactionDate, timestamp, timestamp,
-  );
-  if (!row) throw new Error('Created transaction was not found.'); return mapTransaction(row);
+  let created: Transaction | null = null;
+  await db.withExclusiveTransactionAsync(async (session) => {
+    const row = await session.getFirstAsync<TransactionRow>(
+      `INSERT INTO transactions (kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING ${transactionColumns};`,
+      transaction.kind, transaction.accountId, transaction.destinationAccountId, transaction.categoryId, transaction.name, transaction.description, transaction.amountCents, transaction.transactionDate, timestamp, timestamp,
+    );
+    if (!row) throw new Error('Created transaction was not found.');
+    created = mapTransaction(row);
+    await enqueueEntityMutation(session, 'transaction', row.id, timestamp);
+  });
+  if (!created) throw new Error('Transaction creation did not complete.');
+  return created;
 }
 
 export async function listTransactions(db: RepositoryDatabase): Promise<readonly Transaction[]> {
-  const rows = await db.getAllAsync<TransactionRow>(`SELECT t.${transactionColumns.replaceAll(', ', ', t.')} FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 LEFT JOIN accounts d ON d.id = t.destination_account_id WHERE t.destination_account_id IS NULL OR d.is_archived = 0 ORDER BY t.transaction_date DESC, t.id DESC;`);
+  const rows = await db.getAllAsync<TransactionRow>(`SELECT t.${transactionColumns.replaceAll(', ', ', t.')} FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 AND a.deleted_at IS NULL LEFT JOIN accounts d ON d.id = t.destination_account_id WHERE t.deleted_at IS NULL AND (t.destination_account_id IS NULL OR (d.is_archived = 0 AND d.deleted_at IS NULL)) ORDER BY t.transaction_date DESC, t.id DESC;`);
   return rows.map(mapTransaction);
 }
 
@@ -75,7 +83,7 @@ export async function listTransactionsPage(db: RepositoryDatabase, query: Transa
   if (query.cursor && (!validId(query.cursor.id) || !parseCivilDate(query.cursor.transactionDate).ok)) throw new Error('Invalid transaction page cursor.');
 
   const parameters: (string | number | null)[] = [`${query.month}-01`, nextMonth(query.month)];
-  const conditions = ['t.transaction_date >= ?', 't.transaction_date < ?'];
+  const conditions = ['t.deleted_at IS NULL', 't.transaction_date >= ?', 't.transaction_date < ?'];
   if (query.kind === 'transfers') conditions.push("t.kind = 'transfer'");
   else conditions.push("t.kind IN ('expense', 'income')");
   if (query.accountId !== undefined && query.accountId !== null) {
@@ -90,9 +98,9 @@ export async function listTransactionsPage(db: RepositoryDatabase, query: Transa
   const rows = await db.getAllAsync<TransactionRow>(
     `SELECT t.${transactionColumns.replaceAll(', ', ', t.')}
      FROM transactions t
-     JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0
+     JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 AND a.deleted_at IS NULL
      LEFT JOIN accounts d ON d.id = t.destination_account_id
-     WHERE (t.destination_account_id IS NULL OR d.is_archived = 0)
+     WHERE (t.destination_account_id IS NULL OR (d.is_archived = 0 AND d.deleted_at IS NULL))
        AND ${conditions.join(' AND ')}
      ORDER BY t.transaction_date DESC, t.id DESC
      LIMIT ?;`,
@@ -110,9 +118,9 @@ export async function getFinancialBalances(db: RepositoryDatabase): Promise<Fina
   const rows = await db.getAllAsync<{ account_id: number; balance_cents: number }>(
     `WITH visible_transactions AS (
        SELECT t.* FROM transactions t
-       JOIN accounts source ON source.id = t.account_id AND source.is_archived = 0
+       JOIN accounts source ON source.id = t.account_id AND source.is_archived = 0 AND source.deleted_at IS NULL
        LEFT JOIN accounts destination ON destination.id = t.destination_account_id
-       WHERE t.destination_account_id IS NULL OR destination.is_archived = 0
+       WHERE t.deleted_at IS NULL AND (t.destination_account_id IS NULL OR (destination.is_archived = 0 AND destination.deleted_at IS NULL))
      ), effects AS (
        SELECT account_id, amount_cents AS amount_cents FROM visible_transactions
        UNION ALL
@@ -120,7 +128,7 @@ export async function getFinancialBalances(db: RepositoryDatabase): Promise<Fina
      )
      SELECT a.id AS account_id, COALESCE(SUM(e.amount_cents), 0) AS balance_cents
      FROM accounts a LEFT JOIN effects e ON e.account_id = a.id
-     WHERE a.is_archived = 0
+     WHERE a.is_archived = 0 AND a.deleted_at IS NULL
      GROUP BY a.id ORDER BY a.id;`,
   );
   const byAccountId = new Map<EntityId, Cents>();
@@ -138,8 +146,8 @@ export async function listCategoryMonthlySpending(db: RepositoryDatabase, month:
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Invalid spending month.');
   const rows = await db.getAllAsync<{ category_id: number; spending_cents: number }>(
     `SELECT t.category_id, -SUM(t.amount_cents) AS spending_cents
-     FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0
-     WHERE t.kind = 'expense' AND t.category_id IS NOT NULL
+     FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 AND a.deleted_at IS NULL
+     WHERE t.deleted_at IS NULL AND t.kind = 'expense' AND t.category_id IS NOT NULL
        AND t.transaction_date >= ? AND t.transaction_date < ?
      GROUP BY t.category_id ORDER BY t.category_id;`,
     `${month}-01`, nextMonth(month),
@@ -155,9 +163,9 @@ export async function getConsolidatedBalanceThroughDate(db: RepositoryDatabase, 
   const row = await db.getFirstAsync<{ balance_cents: number }>(
     `SELECT COALESCE(SUM(CASE WHEN t.kind = 'transfer' THEN 0 ELSE t.amount_cents END), 0) AS balance_cents
      FROM transactions t
-     JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0
+     JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 AND a.deleted_at IS NULL
      LEFT JOIN accounts d ON d.id = t.destination_account_id
-     WHERE (t.destination_account_id IS NULL OR d.is_archived = 0) AND t.transaction_date <= ?;`,
+     WHERE t.deleted_at IS NULL AND (t.destination_account_id IS NULL OR (d.is_archived = 0 AND d.deleted_at IS NULL)) AND t.transaction_date <= ?;`,
     date,
   );
   const balance = row?.balance_cents ?? 0;
@@ -171,8 +179,8 @@ export async function listTransactionsForRecurringOccurrencesMonth(db: Repositor
     `SELECT t.${transactionColumns.replaceAll(', ', ', t.')}
      FROM recurring_occurrences o
      JOIN transactions t ON t.id = o.transaction_id
-     JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0
-     WHERE o.scheduled_date >= ? AND o.scheduled_date < ?
+     JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 AND a.deleted_at IS NULL
+     WHERE o.deleted_at IS NULL AND t.deleted_at IS NULL AND o.scheduled_date >= ? AND o.scheduled_date < ?
      ORDER BY o.scheduled_date, o.id;`,
     `${month}-01`, nextMonth(month),
   );
@@ -196,8 +204,8 @@ export async function listCategoryExpensesPage(
   parameters.push(limit + 1);
   const rows = await db.getAllAsync<TransactionRow>(
     `SELECT t.${transactionColumns.replaceAll(', ', ', t.')}
-     FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0
-     WHERE t.kind = 'expense' AND t.category_id = ? AND t.transaction_date >= ? AND t.transaction_date < ? ${cursorCondition}
+     FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 AND a.deleted_at IS NULL
+     WHERE t.deleted_at IS NULL AND t.kind = 'expense' AND t.category_id = ? AND t.transaction_date >= ? AND t.transaction_date < ? ${cursorCondition}
      ORDER BY t.transaction_date DESC, t.id DESC LIMIT ?;`,
     ...parameters,
   );
@@ -217,8 +225,8 @@ export async function listCategorySpendingByAccount(
   const firstMonth = shiftMonth(endingMonth, -(monthCount - 1));
   const rows = await db.getAllAsync<{ account_id: number; month: string; spending_cents: number }>(
     `SELECT t.account_id, substr(t.transaction_date, 1, 7) AS month, -SUM(t.amount_cents) AS spending_cents
-     FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0
-     WHERE t.kind = 'expense' AND t.category_id = ? AND t.transaction_date >= ? AND t.transaction_date < ?
+     FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 AND a.deleted_at IS NULL
+     WHERE t.deleted_at IS NULL AND t.kind = 'expense' AND t.category_id = ? AND t.transaction_date >= ? AND t.transaction_date < ?
      GROUP BY t.account_id, substr(t.transaction_date, 1, 7) ORDER BY month, t.account_id;`,
     categoryId, `${firstMonth}-01`, nextMonth(endingMonth),
   );
@@ -244,7 +252,7 @@ function shiftMonth(month: YearMonth, offset: number): YearMonth {
 }
 
 export async function findTransactionById(db: RepositoryDatabase, id: number): Promise<Transaction | null> {
-  const row = await db.getFirstAsync<TransactionRow>(`SELECT t.${transactionColumns.replaceAll(', ', ', t.')} FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 LEFT JOIN accounts d ON d.id = t.destination_account_id WHERE t.id = ? AND (t.destination_account_id IS NULL OR d.is_archived = 0);`, id);
+  const row = await db.getFirstAsync<TransactionRow>(`SELECT t.${transactionColumns.replaceAll(', ', ', t.')} FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 AND a.deleted_at IS NULL LEFT JOIN accounts d ON d.id = t.destination_account_id WHERE t.id = ? AND t.deleted_at IS NULL AND (t.destination_account_id IS NULL OR (d.is_archived = 0 AND d.deleted_at IS NULL));`, id);
   return row ? mapTransaction(row) : null;
 }
 
@@ -252,21 +260,33 @@ export async function updateTransaction(db: RepositoryDatabase, id: number, inpu
   if (!await findTransactionById(db, id)) return null;
   const transaction = normalized(input);
   await assertActiveAccounts(db, transaction.accountId, transaction.destinationAccountId);
-  await db.runAsync(
-    `UPDATE transactions SET kind = ?, account_id = ?, destination_account_id = ?, category_id = ?, name = ?, description = ?, amount_cents = ?, transaction_date = ?, updated_at = ? WHERE id = ?;`,
-    transaction.kind, transaction.accountId, transaction.destinationAccountId, transaction.categoryId, transaction.name, transaction.description, transaction.amountCents, transaction.transactionDate, clock(), id,
-  );
+  const timestamp = clock();
+  await db.withExclusiveTransactionAsync(async (session) => {
+    await session.runAsync(
+      `UPDATE transactions SET kind = ?, account_id = ?, destination_account_id = ?, category_id = ?, name = ?, description = ?, amount_cents = ?, transaction_date = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL;`,
+      transaction.kind, transaction.accountId, transaction.destinationAccountId, transaction.categoryId, transaction.name, transaction.description, transaction.amountCents, transaction.transactionDate, timestamp, id,
+    );
+    await enqueueEntityMutation(session, 'transaction', id, timestamp);
+  });
   return findTransactionById(db, id);
 }
 async function assertActiveAccounts(db: RepositoryDatabase, accountId: number, destinationAccountId: number | null): Promise<void> {
-  const accounts = await db.getAllAsync<{ id: number }>('SELECT id FROM accounts WHERE is_archived = 0 AND (id = ? OR id = ?);', accountId, destinationAccountId);
+  const accounts = await db.getAllAsync<{ id: number }>('SELECT id FROM accounts WHERE is_archived = 0 AND deleted_at IS NULL AND (id = ? OR id = ?);', accountId, destinationAccountId);
   const expected = destinationAccountId === null ? 1 : 2;
   if (accounts.length !== expected) throw new Error('Archived or missing account cannot receive transactions.');
 }
 
-export async function deleteTransaction(db: RepositoryDatabase, id: number): Promise<boolean> {
+export async function deleteTransaction(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
   if (!await findTransactionById(db, id)) return false;
-  await db.runAsync('DELETE FROM transactions WHERE id = ?;', id); return true;
+  const timestamp = clock();
+  await db.withExclusiveTransactionAsync(async (session) => {
+    const occurrences = await session.getAllAsync<{ id: number }>('SELECT id FROM recurring_occurrences WHERE transaction_id = ? AND deleted_at IS NULL;', id);
+    await session.runAsync('UPDATE recurring_occurrences SET transaction_id = NULL WHERE transaction_id = ?;', id);
+    for (const occurrence of occurrences) await enqueueEntityMutation(session, 'recurring_occurrence', occurrence.id, timestamp);
+    await session.runAsync('UPDATE transactions SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL;', timestamp, timestamp, id);
+    await enqueueEntityMutation(session, 'transaction', id, timestamp);
+  });
+  return true;
 }
 
 function normalized(input: TransactionInput): Required<Omit<TransactionInput, 'destinationAccountId' | 'categoryId' | 'description'>> & { destinationAccountId: EntityId | null; categoryId: EntityId | null; description: string | null } {

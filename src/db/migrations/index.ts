@@ -8,6 +8,7 @@ import { defaultCategoryColorsMigration } from './007_default_category_colors';
 import { queryPerformanceIndexesMigration } from './008_query_performance_indexes';
 import { globalIdentityMigration } from './009_global_identity';
 import { localProfileMigration } from './010_local_profile';
+import { syncOutboxMigration } from './011_sync_outbox';
 import type { Migration } from './migration';
 
 export const migrations: readonly Migration[] = [
@@ -21,4 +22,5 @@ export const migrations: readonly Migration[] = [
   queryPerformanceIndexesMigration,
   globalIdentityMigration,
   localProfileMigration,
+  syncOutboxMigration,
 ];

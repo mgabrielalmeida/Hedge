@@ -3,6 +3,7 @@ import type { Account, Cents, CivilDate, ThemeColorIndex } from '@/domain';
 
 import { type Clock, type RepositoryDatabase, type RepositorySession, systemClock } from './database';
 import { mapAccount, type AccountRow } from './rows';
+import { enqueueEntityMutation } from '../sync/outbox';
 
 const accountColumns = 'id, name, institution_name, icon_value, color_value, theme_color_index, is_archived, archived_at, created_at, updated_at';
 
@@ -47,23 +48,26 @@ export async function createAccount(db: RepositoryDatabase, input: CreateAccount
     );
     if (!row) throw new Error('Created account was not found.');
     account = mapAccount(row);
-    await transaction.runAsync(
+    await enqueueEntityMutation(transaction, 'account', account.id, timestamp);
+    const openingBalance = await transaction.getFirstAsync<{ id: number }>(
       `INSERT INTO transactions (kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at)
-       VALUES ('opening_balance', ?, NULL, NULL, ?, ?, ?, ?, ?, ?);`,
+       VALUES ('opening_balance', ?, NULL, NULL, ?, ?, ?, ?, ?, ?) RETURNING id;`,
       account.id, 'Saldo inicial', description, input.initialBalanceCents, input.openingBalanceDate, timestamp, timestamp,
     );
+    if (!openingBalance) throw new Error('Opening balance was not found.');
+    await enqueueEntityMutation(transaction, 'transaction', openingBalance.id, timestamp);
   });
   if (!account) throw new Error('Account creation did not complete.');
   return account;
 }
 
 export async function listAccounts(db: RepositoryDatabase): Promise<readonly Account[]> {
-  const rows = await db.getAllAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE is_archived = 0 ORDER BY id ASC;`);
+  const rows = await db.getAllAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE is_archived = 0 AND deleted_at IS NULL ORDER BY id ASC;`);
   return rows.map(mapAccount);
 }
 
 export async function findAccountById(db: RepositoryDatabase, id: number): Promise<Account | null> {
-  const row = await db.getFirstAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0;`, id);
+  const row = await db.getFirstAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0 AND deleted_at IS NULL;`, id);
   return row ? mapAccount(row) : null;
 }
 
@@ -79,7 +83,13 @@ export async function updateAccount(db: RepositoryDatabase, id: number, input: U
   const colorValue = required(input.colorValue, 'account color value');
   const themeColorIndex = input.themeColorIndex ?? null;
   validateThemeColorIndex(themeColorIndex);
-  await db.runAsync('UPDATE accounts SET name = ?, institution_name = ?, visual_type = \'icon\', visual_value = ?, icon_value = ?, color_value = ?, theme_color_index = ?, updated_at = ? WHERE id = ? AND is_archived = 0;', name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, clock(), id);
+  const timestamp = clock();
+  await db.withExclusiveTransactionAsync(async (transaction) => {
+    const existing = await transaction.getFirstAsync<{ id: number }>('SELECT id FROM accounts WHERE id = ? AND is_archived = 0 AND deleted_at IS NULL;', id);
+    if (!existing) return;
+    await transaction.runAsync('UPDATE accounts SET name = ?, institution_name = ?, visual_type = \'icon\', visual_value = ?, icon_value = ?, color_value = ?, theme_color_index = ?, updated_at = ? WHERE id = ?;', name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, timestamp, id);
+    await enqueueEntityMutation(transaction, 'account', id, timestamp);
+  });
   return findAccountById(db, id);
 }
 
@@ -102,7 +112,7 @@ export async function updateAccountWithBalance(
   let account: Account | null = null;
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const existing = await transaction.getFirstAsync<AccountRow>(
-      `SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0;`,
+      `SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0 AND deleted_at IS NULL;`,
       id,
     );
     if (!existing) return;
@@ -114,15 +124,16 @@ export async function updateAccountWithBalance(
       `UPDATE accounts
        SET name = ?, institution_name = ?, visual_type = 'icon', visual_value = ?, icon_value = ?,
            color_value = ?, theme_color_index = ?, updated_at = ?
-       WHERE id = ? AND is_archived = 0;`,
+       WHERE id = ? AND is_archived = 0 AND deleted_at IS NULL;`,
       name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, timestamp, id,
     );
+    await enqueueEntityMutation(transaction, 'account', id, timestamp);
 
     if (differenceCents !== 0) {
-      await transaction.runAsync(
+      const adjustment = await transaction.getFirstAsync<{ id: number }>(
         `INSERT INTO transactions
           (kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at)
-         VALUES (?, ?, NULL, NULL, 'Retífica de saldo', NULL, ?, ?, ?, ?);`,
+         VALUES (?, ?, NULL, NULL, 'Retífica de saldo', NULL, ?, ?, ?, ?) RETURNING id;`,
         differenceCents > 0 ? 'income' : 'expense',
         id,
         differenceCents,
@@ -130,10 +141,12 @@ export async function updateAccountWithBalance(
         timestamp,
         timestamp,
       );
+      if (!adjustment) throw new Error('Balance adjustment was not found.');
+      await enqueueEntityMutation(transaction, 'transaction', adjustment.id, timestamp);
     }
 
     const updated = await transaction.getFirstAsync<AccountRow>(
-      `SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0;`,
+      `SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0 AND deleted_at IS NULL;`,
       id,
     );
     if (!updated) throw new Error('Updated account was not found.');
@@ -147,7 +160,7 @@ export async function archiveAccount(db: RepositoryDatabase, id: number, clock: 
   let archived = false;
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const existing = await transaction.getFirstAsync<{ id: number }>(
-      'SELECT id FROM accounts WHERE id = ? AND is_archived = 0;',
+      'SELECT id FROM accounts WHERE id = ? AND is_archived = 0 AND deleted_at IS NULL;',
       id,
     );
     if (!existing) return;
@@ -155,10 +168,15 @@ export async function archiveAccount(db: RepositoryDatabase, id: number, clock: 
       'UPDATE accounts SET is_archived = 1, archived_at = ?, updated_at = ? WHERE id = ?;',
       timestamp, timestamp, id,
     );
+    await enqueueEntityMutation(transaction, 'account', id, timestamp);
+    const rules = await transaction.getAllAsync<{ id: number }>(
+      'SELECT id FROM recurring_rules WHERE account_id = ? AND is_active = 1;', id,
+    );
     await transaction.runAsync(
       'UPDATE recurring_rules SET is_active = 0, deleted_at = ?, updated_at = ? WHERE account_id = ? AND is_active = 1;',
       timestamp, timestamp, id,
     );
+    for (const rule of rules) await enqueueEntityMutation(transaction, 'recurring_rule', rule.id, timestamp);
     archived = true;
   });
   return archived;
@@ -174,7 +192,7 @@ async function readAccountBalance(db: RepositorySession, id: number): Promise<Ce
        END
      ), 0) AS balance_cents
      FROM transactions
-     WHERE account_id = ? OR destination_account_id = ?;`,
+     WHERE deleted_at IS NULL AND (account_id = ? OR destination_account_id = ?);`,
     id, id, id, id,
   );
   const balance = row?.balance_cents ?? 0;

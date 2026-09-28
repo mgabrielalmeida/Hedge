@@ -1,7 +1,7 @@
 # Plano de implementação: conta, nuvem e sincronização offline
 
 **Data:** 27 de setembro de 2026  
-**Status:** Etapas 0, 2 e 3 concluídas; Etapa 1 concluída provisoriamente sem evidências físicas; sincronização ainda não implementada
+**Status:** Etapas 0, 2, 3 e 4 concluídas; Etapa 1 concluída provisoriamente sem evidências físicas; transporte remoto ainda não implementado
 
 Este plano mantém o SQLite como base usada pela interface. PostgreSQL será o
 estado compartilhado confirmado, e a rede jamais participará do caminho crítico
@@ -137,6 +137,28 @@ simulado que perca, duplique, reordene e interrompa mensagens.
 **Aceite:** reinício não perde comandos; downloads não sobrescrevem pendências;
 reenvio não duplica efeitos; rejeições preservam a proposta e não bloqueiam
 operações independentes.
+
+**Evidência de conclusão — 28 de setembro de 2026:** a migração sequencial 11
+cria a outbox persistente, base confirmada, recibos, cursor, registro idempotente
+de eventos e conflitos por perfil SQLite. Entidades existentes são transformadas
+em comandos iniciais com versões e dependências; uma interrupção reverte schema
+e preenchimento juntos. As mutações de contas, categorias, lançamentos, regras e
+ocorrências agora confirmam a projeção local e o comando na mesma transação.
+Exclusões sincronizáveis usam tombstones, sem voltar a participar de saldos ou
+consultas visíveis.
+
+O coordenador local adquire leases expirantes, reenvia comandos com o mesmo ID,
+persiste recibos, mantém propostas rejeitadas, registra conflitos e rebaseia a
+versão esperada das pendências sobre a base confirmada sem substituir a projeção
+local. Eventos repetidos são ignorados pelo ID; o cursor autoritativo do lote só
+avança depois da aplicação. O transporte em memória simula resposta perdida,
+duplicação, reordenação e interrupção. Testes cobrem reabertura do arquivo,
+recuperação de lease, rollback da mutação quando a outbox falha, dependências de
+transferência e recorrência, reenvio idempotente, evento remoto concorrente e
+rejeição que não bloqueia comando independente. `npm run check:expo`,
+`npm run typecheck`, `npm run lint`, `npm test -- --runInBand` (37 suítes e 161
+testes) e `git diff --check` passaram. Nenhum servidor, cliente Supabase ou envio
+de rede foi ativado.
 
 ## Etapa 5 — Recorrências e conflitos financeiros
 
