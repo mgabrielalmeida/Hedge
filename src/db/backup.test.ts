@@ -20,7 +20,7 @@ jest.mock('expo-sqlite', () => ({
 }));
 jest.mock('./database', () => ({ initializeDatabase: jest.fn() }));
 jest.mock('./migrate', () => ({ runMigrations: jest.fn() }));
-jest.mock('./migrations', () => ({ migrations: Array.from({ length: 7 }) }));
+jest.mock('./migrations', () => ({ migrations: Array.from({ length: 10 }) }));
 jest.mock('./preferences', () => {
   const actual = jest.requireActual('./preferences');
   return {
@@ -61,7 +61,7 @@ describe('backup database orchestration', () => {
     const backupDatabase = {
       closeAsync: jest.fn().mockResolvedValue(undefined),
       execAsync: jest.fn().mockResolvedValue(undefined),
-      getFirstAsync: jest.fn().mockResolvedValue({ user_version: 7 }),
+      getFirstAsync: jest.fn().mockResolvedValue({ user_version: 10 }),
       runAsync: jest.fn().mockResolvedValue(undefined),
       serializeAsync: jest.fn().mockResolvedValue(outputBytes),
     };
@@ -87,7 +87,7 @@ describe('backup database orchestration', () => {
       'com.hedge.backup',
       1,
       createdAt.toISOString(),
-      7,
+      10,
       JSON.stringify(preferences),
     );
     expect(backupDatabase.closeAsync).toHaveBeenCalled();
@@ -166,7 +166,7 @@ function createIncomingBackup(overrides: Partial<Record<string, unknown>> = {}) 
     format: 'com.hedge.backup',
     format_version: 1,
     preferences_json: JSON.stringify(preferences),
-    schema_version: 7,
+    schema_version: 8,
     ...overrides,
   };
 
@@ -175,7 +175,7 @@ function createIncomingBackup(overrides: Partial<Record<string, unknown>> = {}) 
     execAsync: jest.fn().mockResolvedValue(undefined),
     getFirstAsync: jest.fn(async (source: string) => {
       if (source.includes('quick_check')) return { quick_check: 'ok' };
-      if (source.includes('user_version')) return { user_version: 7 };
+      if (source.includes('user_version')) return { user_version: 8 };
       return metadata;
     }),
   };

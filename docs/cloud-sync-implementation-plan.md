@@ -1,7 +1,7 @@
 # Plano de implementação: conta, nuvem e sincronização offline
 
 **Data:** 27 de setembro de 2026  
-**Status:** Etapas 0 e 2 concluídas; Etapa 1 concluída provisoriamente sem evidências físicas; sincronização ainda não implementada
+**Status:** Etapas 0, 2 e 3 concluídas; Etapa 1 concluída provisoriamente sem evidências físicas; sincronização ainda não implementada
 
 Este plano mantém o SQLite como base usada pela interface. PostgreSQL será o
 estado compartilhado confirmado, e a rede jamais participará do caminho crítico
@@ -102,6 +102,29 @@ e tornar troca de perfil atômica.
 
 **Aceite:** bases antigas migram sem duplicar IDs; valores, relações e saldos são
 preservados; interrupção e retomada são seguras; backups v1 continuam importáveis.
+
+**Evidência de conclusão — 28 de setembro de 2026:** as migrações sequenciais 9
+e 10 acrescentam `sync_id` imutável, `sync_version` e tombstone às cinco
+entidades sincronizáveis, além do singleton `local_profile` com `profile_id`,
+`ledger_id` e `generation`. O preenchimento ocorre uma única vez dentro da
+transação da migração; ocorrências existentes e futuras usam identidade
+determinística por regra e data. Antes de migrar uma base entre as versões 1 e
+8, a inicialização grava no diretório SQLite uma cópia
+`*.pre-global-identity.v8.recovery.db`. Testes executam a migração sobre dados
+legados relacionados, comparam o saldo antes e depois, simulam interrupção com
+rollback e retomada e verificam a imutabilidade e unicidade dos IDs.
+
+O arquivo legado `hedge.db` é registrado como primeiro perfil. Novos perfis usam
+arquivos SQLite separados; o registro local valida perfil, ledger e geração. A
+troca prepara, verifica a integridade e confere a identidade do banco de destino
+antes de persistir a seleção ativa,
+mantendo o perfil anterior quando a abertura, migração ou validação falha. O
+`DatabaseProvider` remonta a conexão somente após essa confirmação. O fluxo de
+restauração continua aceitando backups no formato 1 com schema anterior e aplica
+as novas migrações antes da substituição. `npm run check:expo`,
+`npm run typecheck`, `npm run lint`, `npm test -- --runInBand` (35 suítes e 152
+testes) e `git diff --check` passaram.
+Nenhum módulo remoto ou envio de dados foi ativado.
 
 ## Etapa 4 — Outbox e reconciliação sem servidor
 

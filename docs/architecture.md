@@ -68,6 +68,7 @@ Hedge/
     ├── db/
     │   ├── benchmarks/         # Fixtures e medição reproduzível do SQLite local
     │   ├── migrations/        # Alterações sequenciais do schema
+    │   ├── localProfiles.ts   # Registro e troca atômica entre bancos de perfil
     │   └── repositories/      # Único acesso aos dados financeiros
     ├── domain/
     │   ├── calculations/      # Cálculos financeiros puros
@@ -138,9 +139,10 @@ retornam modelos do domínio, e não detalhes internos do driver SQLite.
 `DatabaseProvider` e `useDatabase` são as únicas portas de React para a conexão
 Expo SQLite. Rotas e funcionalidades não importam o driver nem executam SQL.
 
-Também abriga adaptadores pequenos para armazenamento local auxiliar. O
-`preferences.ts` encapsula o `expo-sqlite/kv-store`; nenhum outro módulo acessa
-esse storage diretamente.
+Também abriga adaptadores pequenos para armazenamento local auxiliar.
+`preferences.ts` encapsula preferências visuais e `localProfiles.ts` mantém o
+registro dos arquivos de perfil no `expo-sqlite/kv-store`; nenhum módulo fora de
+`src/db` acessa esse storage diretamente.
 
 ### `src/components`
 
@@ -206,6 +208,17 @@ interface só atualiza seus saldos depois que o processamento completo termina;
 ela bloqueia a abertura até essa etapa concluir ou exibe uma recuperação
 explícita em caso de falha. A migração 1 não deve ser
 alterada depois de aplicada; mudanças futuras exigem novas migrações.
+
+As migrações 9 e 10 preparam a identidade local para sincronização sem mudar as
+chaves inteiras usadas pela interface. Contas, categorias, regras, lançamentos e
+ocorrências recebem `sync_id` imutável, `sync_version` e marcador de exclusão;
+as ocorrências usam a identidade determinística formada pela identidade da regra
+e pela data civil. Cada banco também contém exatamente um `local_profile`, com
+`profile_id`, `ledger_id` e `generation`. Bancos anteriores recebem esses valores
+uma única vez dentro da transação da migração. Antes dessa primeira migração, o
+aplicativo cria no diretório do SQLite uma cópia
+`*.pre-global-identity.v8.recovery.db`; uma interrupção reverte a migração e a
+próxima abertura pode retomá-la sem duplicar identidades.
 
 ## Estado da interface
 
@@ -320,6 +333,17 @@ Operações financeiras com dados locais não dependerão de conexão. Portanto:
 - gráficos financeiros serão renderizados no dispositivo com `react-native-svg`;
 - builds e publicação podem usar internet, mas o aplicativo produzido deve
   continuar funcional sem ela.
+
+Cada perfil local usa um arquivo SQLite próprio. O arquivo legado `hedge.db`
+torna-se o primeiro perfil sem mover os dados existentes; novos perfis recebem
+nomes internos aleatórios que não incorporam entrada do usuário. Um registro
+mínimo no `expo-sqlite/kv-store` relaciona os IDs de perfil aos arquivos e indica
+qual está ativo. A troca só grava a nova seleção depois que o arquivo de destino
+foi aberto, migrado, verificado e teve sua identidade conferida; se qualquer
+etapa falhar, a seleção e a conexão atuais permanecem inalteradas. O
+`DatabaseProvider` remonta a
+conexão depois do commit dessa seleção e expõe criação, listagem e troca aos
+fluxos de identidade futuros, sem manter dados financeiros em Context.
 
 Se “offline” também precisar impedir backups do sistema operacional, isso será
 tratado como uma decisão de privacidade separada antes da distribuição.
