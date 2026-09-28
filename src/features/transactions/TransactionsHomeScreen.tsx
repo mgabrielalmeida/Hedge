@@ -1,10 +1,10 @@
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Card,
+  Button,
   AnimatedMoneyText,
   BalanceVisibilityButton,
   ChipGroup,
@@ -14,17 +14,18 @@ import {
   MonthNavigator,
   PressableCard,
   scheduleAfterSecondaryTransition,
+  Screen,
   ScreenHeader,
   ScreenState,
-  ScrollableScreen,
   SelectableChip,
   SegmentedControl,
   Text,
   useReducedMotion,
   useSuccessFeedback,
 } from '@/components';
-import { listAccounts, listCategories, listRecurringRules, listTransactions, pauseRecurringRule, resumeRecurringRule } from '@/db/repositories';
-import { calculateAccountBalance, calculateConsolidatedBalance, formatBrazilianCurrency, formatCivilDate, getNextRecurringChargeDate } from '@/domain';
+import { getFinancialBalances, listAccounts, listCategories, listRecurringRules, listTransactionsPage, pauseRecurringRule, resumeRecurringRule, type TransactionPageCursor } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
+import { formatBrazilianCurrency, formatCivilDate, getNextRecurringChargeDate } from '@/domain';
 import type { Account, Category, RecurringRule, Transaction, TransferTransaction, YearMonth } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
@@ -46,25 +47,19 @@ type TransactionsHomeScreenProps = {
   onNoAccounts: () => void;
 };
 
-type DatedItem<T> = {
-  readonly date: string;
-  readonly item: T;
-};
-
-type DateGroup<T> = {
-  readonly date: string;
-  readonly items: readonly T[];
-};
+type HistoryRow =
+  | { readonly type: 'transaction'; readonly transaction: Transaction }
+  | { readonly type: 'recurring'; readonly rule: RecurringRule; readonly nextChargeDate: string | null };
 
 export function TransactionsHomeScreen({
   onEditRecurringRule,
   onEditTransaction,
   onNoAccounts,
 }: TransactionsHomeScreenProps) {
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const screenReduceMotion = useReducedMotion();
   const { showSuccess } = useSuccessFeedback();
-  const { hideBalances, setBalancesHidden } = useTheme();
+  const { hideBalances, setBalancesHidden, tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
@@ -76,14 +71,20 @@ export function TransactionsHomeScreen({
   const [isLoading, setIsLoading] = useState(true);
   const [recurringActionError, setRecurringActionError] = useState<string | null>(null);
   const [balanceReplayKey, setBalanceReplayKey] = useState(0);
+  const [balances, setBalances] = useState<ReadonlyMap<number, number>>(new Map());
+  const [consolidatedBalance, setConsolidatedBalance] = useState(0);
+  const [pageCursor, setPageCursor] = useState<TransactionPageCursor | null>(null);
+  const [nextCursor, setNextCursor] = useState<TransactionPageCursor | null>(null);
+  const [previousCursors, setPreviousCursors] = useState<readonly (TransactionPageCursor | null)[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [loadedAccounts, loadedTransactions, loadedCategories, loadedRecurringRules] = await Promise.all([
+      const [loadedAccounts, transactionPage, loadedCategories, loadedRecurringRules, loadedBalances] = await Promise.all([
         listAccounts(db),
-        listTransactions(db),
+        listTransactionsPage(db, { accountId: selectedAccountId, cursor: pageCursor, kind: historyType === 'transfers' ? 'transfers' : 'points', month: selectedMonth }),
         listCategories(db),
         listRecurringRules(db),
+        getFinancialBalances(db),
       ]);
       if (loadedAccounts.length === 0) {
         onNoAccounts();
@@ -91,43 +92,48 @@ export function TransactionsHomeScreen({
       }
       setAccounts(loadedAccounts);
       setSelectedAccountId((id) => id !== null && loadedAccounts.some((account) => account.id === id) ? id : null);
-      setTransactions(loadedTransactions);
+      setTransactions(transactionPage.items);
+      setNextCursor(transactionPage.nextCursor);
       setCategories(loadedCategories);
       setRecurringRules(loadedRecurringRules);
+      setBalances(loadedBalances.byAccountId);
+      setConsolidatedBalance(loadedBalances.consolidatedCents);
       setError(null);
     } catch {
       setError('Não foi possível carregar o histórico.');
     } finally {
       setIsLoading(false);
     }
-  }, [db, onNoAccounts]);
+  }, [db, historyType, onNoAccounts, pageCursor, selectedAccountId, selectedMonth]);
+
+  function resetPagination() {
+    setPageCursor(null);
+    setPreviousCursors([]);
+  }
 
   useFocusEffect(useCallback(() => {
     setBalanceReplayKey((key) => key + 1);
     return scheduleAfterSecondaryTransition(() => void load(), screenReduceMotion === false);
   }, [load, screenReduceMotion]));
-  useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
+  useEffect(() => subscribeToRecurringProcessing((result) => {
+    const affectsSelectedAccount = selectedAccountId === null
+      || result.affectedAccountIds.includes(selectedAccountId);
+    if (affectsSelectedAccount) void load();
+  }), [load, selectedAccountId]);
 
   const selectedAccount = selectedAccountId === null
     ? null
     : accounts.find((item) => item.id === selectedAccountId) ?? null;
-  const visibleTransactions = transactions.filter((item) => {
-    const hasSelectedAccount = selectedAccountId === null || item.accountId === selectedAccountId ||
-      (item.kind === 'transfer' && item.destinationAccountId === selectedAccountId);
-    if (!hasSelectedAccount || item.transactionDate.slice(0, 7) !== selectedMonth) return false;
-    return historyType === 'transfers'
-      ? item.kind === 'transfer'
-      : item.kind === 'expense' || item.kind === 'income';
-  });
+  const visibleTransactions = transactions;
   const visibleRecurringRules = recurringRules
     .filter((rule) => rule.deletedAt === null && (selectedAccountId === null || rule.accountId === selectedAccountId))
     .map((rule) => ({ rule, nextChargeDate: getNextRecurringChargeDate(rule, getLocalCivilDate()) }))
     .sort((left, right) => (left.nextChargeDate ?? '9999-12-31').localeCompare(right.nextChargeDate ?? '9999-12-31'));
-  const transactionGroups = groupByDate(visibleTransactions.map((item) => ({ date: item.transactionDate, item })));
+  const historyRows: readonly HistoryRow[] = historyType === 'recurring'
+    ? visibleRecurringRules.map(({ nextChargeDate, rule }) => ({ nextChargeDate, rule, type: 'recurring' }))
+    : visibleTransactions.map((transaction) => ({ transaction, type: 'transaction' }));
   const historySelectionKey = `${historyType}:${selectedAccountId ?? 'all'}:${selectedMonth}`;
-  const displayedBalance = selectedAccount
-    ? calculateAccountBalance(transactions, selectedAccount.id)
-    : calculateConsolidatedBalance(transactions);
+  const displayedBalance = selectedAccount ? balances.get(selectedAccount.id) ?? 0 : consolidatedBalance;
 
   if (isLoading) return <ScreenState message="Buscando lançamentos e recorrências…" status="loading" title="Carregando histórico" />;
   if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
@@ -147,7 +153,34 @@ export function TransactionsHomeScreen({
   }
 
   return (
-    <ScrollableScreen>
+    <Screen>
+      <FlatList
+        contentContainerStyle={{ paddingBottom: tokens.spacing.xl, paddingTop: tokens.spacing.xl }}
+        data={historyRows}
+        ItemSeparatorComponent={() => <View style={{ height: tokens.spacing.sm }} />}
+        keyboardShouldPersistTaps="handled"
+        keyExtractor={(row) => row.type === 'transaction' ? `transaction-${row.transaction.id}` : `recurring-${row.rule.id}`}
+        ListEmptyComponent={<EmptyStateCard message={historyType === 'recurring'
+          ? 'Nenhuma recorrência configurada para esta conta.'
+          : historyType === 'transfers'
+            ? 'Nenhuma transferência registrada neste mês.'
+            : 'Nenhum lançamento registrado neste mês.'} />}
+        ListFooterComponent={historyType !== 'recurring' && (previousCursors.length > 0 || nextCursor) ? (
+          <View style={[styles.pagination, { marginTop: tokens.spacing.lg }]}>
+            <Button disabled={previousCursors.length === 0} label="Anterior" onPress={() => {
+              const previous = previousCursors.at(-1) ?? null;
+              setPreviousCursors((items) => items.slice(0, -1));
+              setPageCursor(previous);
+            }} variant="secondary" />
+            <Button disabled={!nextCursor} label="Próxima" onPress={() => {
+              if (!nextCursor) return;
+              setPreviousCursors((items) => [...items, pageCursor]);
+              setPageCursor(nextCursor);
+            }} variant="secondary" />
+          </View>
+        ) : null}
+        ListHeaderComponent={(
+          <View style={[styles.header, { gap: tokens.spacing.xl, marginBottom: tokens.spacing.xl }]}>
         <ScreenHeader title="Histórico e recorrências" />
         <Card>
           <View style={styles.balanceHeader}>
@@ -167,59 +200,62 @@ export function TransactionsHomeScreen({
             variant="heading"
           />
           <ChipGroup accessibilityLabel="Conta do histórico">
-            <SelectableChip animateSelection label="Todas" onPress={() => setSelectedAccountId(null)} selected={selectedAccountId === null} />
+            <SelectableChip animateSelection label="Todas" onPress={() => { resetPagination(); setSelectedAccountId(null); }} selected={selectedAccountId === null} />
             {accounts.map((account) => (
-              <SelectableChip animateSelection key={account.id} label={account.name} onPress={() => setSelectedAccountId(account.id)} selected={account.id === selectedAccountId} />
+              <SelectableChip animateSelection key={account.id} label={account.name} onPress={() => { resetPagination(); setSelectedAccountId(account.id); }} selected={account.id === selectedAccountId} />
             ))}
           </ChipGroup>
         </Card>
         <SegmentedControl
           accessibilityLabel="Tipo de histórico"
-          onChange={setHistoryType}
+          onChange={(value) => { resetPagination(); setHistoryType(value); }}
           options={HISTORY_TYPES}
           value={historyType}
         />
-        {historyType !== 'recurring' ? <MonthFilter month={selectedMonth} onChange={setSelectedMonth} /> : null}
-        <FadeSelection selectionKey={historySelectionKey}>
-          <View style={styles.list}>
-          {historyType === 'recurring' ? visibleRecurringRules.length === 0 ? (
-            <EmptyStateCard message="Nenhuma recorrência configurada para esta conta." />
-          ) : (
-            <>
-              {recurringActionError ? <FormFeedback message={recurringActionError} title="Não foi possível alterar a recorrência" /> : null}
-              {visibleRecurringRules.map(({ nextChargeDate, rule }) => (
+        {historyType !== 'recurring' ? <MonthFilter month={selectedMonth} onChange={(month) => { resetPagination(); setSelectedMonth(month); }} /> : null}
+        {historyType === 'recurring' && recurringActionError ? <FormFeedback message={recurringActionError} title="Não foi possível alterar a recorrência" /> : null}
+          </View>
+        )}
+        renderItem={({ index, item }) => {
+          if (item.type === 'recurring') {
+            return (
+              <FadeSelection selectionKey={`${historySelectionKey}:${item.rule.id}`}>
                 <RecurringRuleCenterCard
                   accounts={accounts}
                   categories={categories}
-                  key={rule.id}
-                  nextChargeDate={nextChargeDate}
-                  onEdit={rule.isActive ? () => onEditRecurringRule(rule.id) : undefined}
-                  onToggle={() => void toggleRecurringRule(rule)}
-                  rule={rule}
+                  nextChargeDate={item.nextChargeDate}
+                  onEdit={item.rule.isActive ? () => onEditRecurringRule(item.rule.id) : undefined}
+                  onToggle={() => void toggleRecurringRule(item.rule)}
+                  rule={item.rule}
                 />
-              ))}
-            </>
-          ) : visibleTransactions.length === 0 ? (
-            <EmptyStateCard message={historyType === 'transfers' ? 'Nenhuma transferência registrada neste mês.' : 'Nenhum lançamento registrado neste mês.'} />
-          ) : transactionGroups.map((group) => (
-            <HistoryDateGroup date={group.date} key={group.date}>
-              {group.items.map((transaction) => (
-                <PressableCard accessibilityLabel={`Editar lançamento ${transaction.name}`} key={transaction.id} onPress={() => onEditTransaction(transaction.id)}>
-                  {transaction.kind === 'transfer' ? (
-                    <TransferCard accounts={accounts} transaction={transaction} />
-                  ) : transaction.kind === 'expense' || transaction.kind === 'income' ? (
+              </FadeSelection>
+            );
+          }
+
+          const previousRow = index > 0 ? historyRows[index - 1] : null;
+          const showDate = previousRow?.type !== 'transaction'
+            || previousRow.transaction.transactionDate !== item.transaction.transactionDate;
+          return (
+            <FadeSelection selectionKey={`${historySelectionKey}:${item.transaction.id}`}>
+              <View style={styles.dateGroup}>
+                {showDate ? <Text tone="muted" variant="caption" style={styles.dateHeading}>{formatCivilDate(item.transaction.transactionDate)}</Text> : null}
+                <PressableCard accessibilityLabel={`Editar lançamento ${item.transaction.name}`} onPress={() => onEditTransaction(item.transaction.id)}>
+                  {item.transaction.kind === 'transfer' ? (
+                    <TransferCard accounts={accounts} transaction={item.transaction} />
+                  ) : item.transaction.kind === 'expense' || item.transaction.kind === 'income' ? (
                     <TransactionCard
-                      category={categories.find((item) => item.id === transaction.categoryId) ?? null}
-                      transaction={transaction}
+                      category={categories.find((category) => category.id === item.transaction.categoryId) ?? null}
+                      transaction={item.transaction}
                     />
                   ) : null}
                 </PressableCard>
-              ))}
-            </HistoryDateGroup>
-          ))}
-          </View>
-        </FadeSelection>
-    </ScrollableScreen>
+              </View>
+            </FadeSelection>
+          );
+        }}
+        showsVerticalScrollIndicator={false}
+      />
+    </Screen>
   );
 }
 
@@ -229,29 +265,6 @@ function MonthFilter({ month, onChange }: { month: YearMonth; onChange: (month: 
   const nextMonth = month === currentMonth ? null : shiftYearMonth(month, 1);
 
   return <MonthNavigator accessibilityLabel={`Mês selecionado: ${formatYearMonth(month)}`} label={formatYearMonth(month)} nextDisabled={nextMonth === null} onNext={() => nextMonth && onChange(nextMonth)} onPrevious={() => previousMonth && onChange(previousMonth)} previousDisabled={previousMonth === null} />;
-}
-
-function HistoryDateGroup({ children, date }: { children: ReactNode; date: string }) {
-  return (
-    <View style={styles.dateGroup}>
-      <Text tone="muted" variant="caption" style={styles.dateHeading}>{formatCivilDate(date)}</Text>
-      <View style={styles.dateGroupItems}>{children}</View>
-    </View>
-  );
-}
-
-function groupByDate<T>(items: readonly DatedItem<T>[]): readonly DateGroup<T>[] {
-  const groups = new Map<string, T[]>();
-
-  for (const { date, item } of items) {
-    const group = groups.get(date);
-    if (group) group.push(item);
-    else groups.set(date, [item]);
-  }
-
-  return [...groups.entries()]
-    .sort(([left], [right]) => right.localeCompare(left))
-    .map(([date, groupedItems]) => ({ date, items: groupedItems }));
 }
 
 function TransactionCard({ category, transaction }: { category: Category | null; transaction: Transaction }) {
@@ -354,9 +367,9 @@ function formatRecurringSchedule(rule: RecurringRule): string {
 const styles = StyleSheet.create({
   balanceHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   dateGroup: { gap: 8 },
-  dateGroupItems: { gap: 10 },
   dateHeading: { fontWeight: '600', paddingHorizontal: 4 },
-  list: { gap: 10 },
+  header: {},
+  pagination: { flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   recurringAction: { alignItems: 'center', borderWidth: 1, justifyContent: 'center', minHeight: 40, minWidth: 64, paddingHorizontal: 10 },
   recurringDetails: { flex: 1, minWidth: 0 },
   recurringHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 10 },

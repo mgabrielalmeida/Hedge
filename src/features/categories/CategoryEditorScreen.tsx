@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
@@ -20,6 +19,7 @@ import {
   resolveThemeColorValue,
 } from '@/components';
 import { createCategory, deleteCategory, findCategoryById, updateCategory } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import { parseMoneyInput, validateRequiredText } from '@/domain';
 import type { Category, ThemeColorIndex } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -30,7 +30,7 @@ type CategoryEditorScreenProps = {
 };
 
 export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScreenProps) {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const reduceMotion = useReducedMotion();
   const { tokens } = useTheme();
   const { showSuccess } = useSuccessFeedback();

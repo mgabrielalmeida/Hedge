@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
@@ -33,6 +32,7 @@ import {
   updateRecurringRule,
   updateTransaction,
 } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import {
   formatBrazilianMoneyInput,
   getCivilDateParts,
@@ -71,7 +71,7 @@ export function ExpenseScreen({
   recurringRuleId,
   transactionId,
 }: ExpenseScreenProps) {
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const reduceMotion = useReducedMotion();
   const { showSuccess } = useSuccessFeedback();
   const initialDate = getLocalCivilDate();

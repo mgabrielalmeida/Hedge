@@ -33,6 +33,8 @@ export type DueOccurrence = {
 };
 
 export type RecurringProcessingResult = {
+  readonly affectedAccountIds: readonly EntityId[];
+  readonly affectedCategoryIds: readonly EntityId[];
   readonly generated: readonly DueOccurrence[];
 };
 
@@ -45,9 +47,14 @@ export async function listRecurringOccurrencesForMonth(
   month: YearMonth,
 ): Promise<readonly RecurringOccurrence[]> {
   if (!parseCivilDate(`${month}-01`).ok) throw new Error('Invalid year month.');
+  const [year, monthNumber] = month.split('-').map(Number);
+  const nextMonth = monthNumber === 12
+    ? `${String(year + 1).padStart(4, '0')}-01-01`
+    : `${String(year).padStart(4, '0')}-${String(monthNumber + 1).padStart(2, '0')}-01`;
   const rows = await db.getAllAsync<RecurringOccurrenceRow>(
-    'SELECT id, recurring_rule_id, scheduled_date, transaction_id, created_at FROM recurring_occurrences WHERE substr(scheduled_date, 1, 7) = ? ORDER BY scheduled_date, id;',
-    month,
+    'SELECT id, recurring_rule_id, scheduled_date, transaction_id, created_at FROM recurring_occurrences WHERE scheduled_date >= ? AND scheduled_date < ? ORDER BY scheduled_date, id;',
+    `${month}-01`,
+    nextMonth,
   );
   return rows.map(mapRecurringOccurrence);
 }
@@ -58,8 +65,7 @@ export async function findRecurringRuleById(db: RepositoryDatabase, id: number):
 export async function createRecurringRule(db: RepositoryDatabase, input: RecurringRuleInput, clock: Clock = systemClock): Promise<RecurringRule> {
   const rule = normalized(input); const timestamp = clock();
   await assertActiveAccount(db, rule.accountId);
-  await db.runAsync(`INSERT INTO recurring_rules (kind, account_id, category_id, name, description, amount_cents, frequency, charge_day, charge_month, start_date, end_date, is_active, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?);`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, rule.frequency, rule.chargeDay, rule.chargeMonth, rule.startDate, rule.endDate, timestamp, timestamp);
-  const row = await db.getFirstAsync<RecurringRuleRow>(`SELECT ${ruleColumns} FROM recurring_rules WHERE id = last_insert_rowid();`);
+  const row = await db.getFirstAsync<RecurringRuleRow>(`INSERT INTO recurring_rules (kind, account_id, category_id, name, description, amount_cents, frequency, charge_day, charge_month, start_date, end_date, is_active, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?) RETURNING ${ruleColumns};`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, rule.frequency, rule.chargeDay, rule.chargeMonth, rule.startDate, rule.endDate, timestamp, timestamp);
   if (!row) throw new Error('Created recurring rule was not found.'); return mapRecurringRule(row);
 }
 export async function updateRecurringRule(db: RepositoryDatabase, id: number, input: RecurringRuleInput, clock: Clock = systemClock): Promise<RecurringRule | null> {
@@ -112,31 +118,38 @@ export async function processDueRecurringRules(
   db: RepositoryDatabase,
   scheduledDate: CivilDate,
   clock: Clock = systemClock,
+  batchSize = 100,
 ): Promise<RecurringProcessingResult> {
   if (!parseCivilDate(scheduledDate).ok) throw new Error('Invalid recurring processing date.');
+  if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 500) throw new Error('Invalid recurring processing batch size.');
 
-  const generated: DueOccurrence[] = [];
-  await db.withExclusiveTransactionAsync(async (session) => {
-    const rows = await session.getAllAsync<RecurringRuleRow>(
-      `SELECT r.${ruleColumns.replaceAll(', ', ', r.')}
-       FROM recurring_rules r
-       JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0
-       WHERE r.is_active = 1
-         AND r.start_date <= ?
-       ORDER BY r.id;`,
-      scheduledDate,
-    );
-
-    for (const row of rows) {
-      const rule = mapRecurringRule(row);
-      for (const occurrenceDate of listRecurringRuleDatesDueBy(rule, scheduledDate)) {
-        if (await findOccurrence(session, rule.id, occurrenceDate)) continue;
-        generated.push(await insertDueOccurrence(session, rule, occurrenceDate, clock()));
-      }
-    }
+  const rows = await db.getAllAsync<RecurringRuleRow>(
+    `SELECT r.${ruleColumns.replaceAll(', ', ', r.')}
+     FROM recurring_rules r
+     JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0
+     WHERE r.is_active = 1 AND r.start_date <= ? ORDER BY r.id;`,
+    scheduledDate,
+  );
+  const pending = rows.flatMap((row) => {
+    const rule = mapRecurringRule(row);
+    return listRecurringRuleDatesDueBy(rule, scheduledDate).map((occurrenceDate) => ({ occurrenceDate, rule }));
   });
+  const generated: DueOccurrence[] = [];
+  for (let offset = 0; offset < pending.length; offset += batchSize) {
+    const batch = pending.slice(offset, offset + batchSize);
+    await db.withExclusiveTransactionAsync(async (session) => {
+      for (const item of batch) {
+        if (await findOccurrence(session, item.rule.id, item.occurrenceDate)) continue;
+        generated.push(await insertDueOccurrence(session, item.rule, item.occurrenceDate, clock()));
+      }
+    });
+  }
 
-  return { generated };
+  return {
+    affectedAccountIds: [...new Set(pending.map((item) => item.rule.accountId))],
+    affectedCategoryIds: [...new Set(pending.flatMap((item) => item.rule.categoryId === null ? [] : [item.rule.categoryId]))],
+    generated,
+  };
 }
 
 async function findOccurrence(
@@ -160,9 +173,9 @@ async function insertDueOccurrence(
   scheduledDate: CivilDate,
   timestamp: string,
 ): Promise<DueOccurrence> {
-  await session.runAsync(
+  const transactionRow = await session.getFirstAsync<TransactionRow>(
     `INSERT INTO transactions (kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at)
-     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?);`,
+     VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?) RETURNING ${transactionColumns};`,
     rule.kind,
     rule.accountId,
     rule.categoryId,
@@ -173,21 +186,15 @@ async function insertDueOccurrence(
     timestamp,
     timestamp,
   );
-  const transactionRow = await session.getFirstAsync<TransactionRow>(
-    `SELECT ${transactionColumns} FROM transactions WHERE id = last_insert_rowid();`,
-  );
   if (!transactionRow) throw new Error('Generated transaction was not found.');
   const transaction = mapTransaction(transactionRow);
 
-  await session.runAsync(
-    'INSERT INTO recurring_occurrences (recurring_rule_id, scheduled_date, transaction_id, created_at) VALUES (?, ?, ?, ?);',
+  const occurrenceRow = await session.getFirstAsync<RecurringOccurrenceRow>(
+    'INSERT INTO recurring_occurrences (recurring_rule_id, scheduled_date, transaction_id, created_at) VALUES (?, ?, ?, ?) RETURNING id, recurring_rule_id, scheduled_date, transaction_id, created_at;',
     rule.id,
     scheduledDate,
     transaction.id,
     timestamp,
-  );
-  const occurrenceRow = await session.getFirstAsync<RecurringOccurrenceRow>(
-    'SELECT id, recurring_rule_id, scheduled_date, transaction_id, created_at FROM recurring_occurrences WHERE id = last_insert_rowid();',
   );
   if (!occurrenceRow) throw new Error('Generated recurring occurrence was not found.');
 

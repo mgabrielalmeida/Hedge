@@ -1,6 +1,6 @@
 import type { Transaction } from '@/domain';
 
-import { buildCategorySpendingHistory } from './categorySpendingHistory';
+import { buildCategorySpendingHistory, buildCategorySpendingHistoryFromTotals } from './categorySpendingHistory';
 
 const timestamp = '2026-09-06T12:00:00.000Z';
 
@@ -50,5 +50,18 @@ describe('category spending history', () => {
     expect(buildCategorySpendingHistory([], [1], 7, '2026-02', 3).months)
       .toEqual(['2025-12', '2026-01', '2026-02']);
     expect(() => buildCategorySpendingHistory([], [], 7, '2026-02', 0)).toThrow(RangeError);
+  });
+
+  it('builds the same chart shape from repository aggregates', () => {
+    expect(buildCategorySpendingHistoryFromTotals([
+      { accountId: 1, month: '2026-08', spendingCents: 1_000 },
+      { accountId: 2, month: '2026-09', spendingCents: 750 },
+    ], [1, 2], '2026-09', 2)).toEqual({
+      months: ['2026-08', '2026-09'],
+      series: [
+        { accountId: 1, spendingByMonth: [1_000, 0] },
+        { accountId: 2, spendingByMonth: [0, 750] },
+      ],
+    });
   });
 });

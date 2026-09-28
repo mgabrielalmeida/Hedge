@@ -12,11 +12,10 @@ export async function seedBenchmarkFixture(
 ): Promise<number> {
   let accountId: number | null = null;
   await database.withExclusiveTransactionAsync(async (transaction) => {
-    await transaction.runAsync(
-      'INSERT INTO accounts (name, institution_name, visual_type, visual_value, icon_value, color_value, theme_color_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+    const account = await transaction.getFirstAsync<{ id: number }>(
+      'INSERT INTO accounts (name, institution_name, visual_type, visual_value, icon_value, color_value, theme_color_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id;',
       'Benchmark account', 'Benchmark bank', 'icon', 'wallet', 'wallet', '#276749', 0, timestamp, timestamp,
     );
-    const account = await transaction.getFirstAsync<{ id: number }>('SELECT last_insert_rowid() AS id;');
     if (!account) throw new Error('Benchmark account was not created.');
     accountId = account.id;
 

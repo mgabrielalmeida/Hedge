@@ -47,3 +47,12 @@ export function buildMonthlyCategorySpendingComposition(
     totalSpendingCents,
   };
 }
+
+export function buildMonthlyCategorySpendingCompositionFromTotals(
+  items: readonly MonthlyCategorySpendingItem[],
+): MonthlyCategorySpendingComposition {
+  return {
+    items,
+    totalSpendingCents: items.reduce<Cents>((total, item) => addCents(total, item.spendingCents), 0),
+  };
+}

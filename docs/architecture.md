@@ -1,7 +1,7 @@
 # Arquitetura do Hedge
 
 **Status:** aceita; evolução para conta e nuvem em preparação
-**Atualização:** 27 de setembro de 2026
+**Atualização:** 28 de setembro de 2026
 
 Este documento registra as decisões iniciais de arquitetura do Hedge. Ele deve
 ser atualizado quando uma decisão estrutural for alterada. O objetivo não é
@@ -135,6 +135,9 @@ Centraliza a conexão, inicialização, migrações e consultas ao SQLite. Somen
 repositórios podem executar consultas relacionadas aos dados financeiros. Eles
 retornam modelos do domínio, e não detalhes internos do driver SQLite.
 
+`DatabaseProvider` e `useDatabase` são as únicas portas de React para a conexão
+Expo SQLite. Rotas e funcionalidades não importam o driver nem executam SQL.
+
 Também abriga adaptadores pequenos para armazenamento local auxiliar. O
 `preferences.ts` encapsula o `expo-sqlite/kv-store`; nenhum outro módulo acessa
 esse storage diretamente.
@@ -161,8 +164,10 @@ ou no domínio.
 
 O SQLite é a fonte de verdade. Não haverá uma cópia de todas as contas e
 transações em um estado global. As telas consultarão o banco ao entrar em foco
-e atualizarão o resultado após uma escrita relevante. Uma solução de cache ou
-reatividade só será adicionada se esse modelo demonstrar uma limitação real.
+e atualizarão o resultado após uma escrita relevante. Eventos locais de
+recorrência carregam as ocorrências alteradas para que telas não afetadas não
+refaçam consultas. Uma solução de cache ou reatividade só será adicionada se
+esse modelo demonstrar uma limitação real.
 
 As seguintes regras foram decididas:
 
@@ -173,13 +178,18 @@ As seguintes regras foram decididas:
 - chaves estrangeiras serão ativadas com `PRAGMA foreign_keys = ON`;
 - o banco usará `PRAGMA journal_mode = WAL`;
 - consultas receberão valores por parâmetros, nunca por concatenação de texto;
+- históricos usarão paginação por cursor e listas virtualizadas; telas não
+  materializarão toda a tabela de lançamentos para uma página;
+- saldos, gastos por categoria e séries mensais serão agregados no SQLite e
+  validados como inteiros seguros antes de chegar à interface;
 - operações com várias escritas relacionadas usarão transações;
 - o schema evoluirá por migrações pequenas, sequenciais e versionadas;
 - as migrações serão executadas durante o `onInit` do `SQLiteProvider`.
 
 O [schema v1](database-schema-v1.md) está congelado na primeira migração. Ele
 usa tabelas `STRICT` para contas, categorias, lançamentos, regras recorrentes e
-ocorrências recorrentes. Identificadores são inteiros locais, saldos são
+ocorrências recorrentes. A migração 8 acrescenta somente índices para paginação,
+agregações e busca de ocorrências. Identificadores são inteiros locais, saldos são
 derivados dos lançamentos e transferências são representadas por uma única
 linha com conta de origem e destino.
 
@@ -189,9 +199,12 @@ telas e não podem receber novas escritas. Arquivar uma conta desativa suas
 regras recorrentes ativas na mesma transação. Regras recorrentes usam exclusão lógica para preservar procedência e podem ser pausadas sem exclusão; regras pausadas não geram novas ocorrências até serem retomadas. Uma tabela
 de ocorrências registra cada data processada mesmo depois da exclusão do
 lançamento gerado, evitando geração duplicada. Ao inicializar ou retornar ao
-primeiro plano, o repositório gera em uma transação todas as datas vencidas e
-ainda não registradas de regras ativas; a interface bloqueia a abertura até
-essa etapa concluir ou exibe uma recuperação explícita em caso de falha. A migração 1 não deve ser
+primeiro plano, o repositório gera as datas vencidas de regras ativas em lotes
+transacionais independentes e idempotentes. Uma interrupção preserva os lotes já
+confirmados, e a próxima execução continua pelas ocorrências ausentes. A
+interface só atualiza seus saldos depois que o processamento completo termina;
+ela bloqueia a abertura até essa etapa concluir ou exibe uma recuperação
+explícita em caso de falha. A migração 1 não deve ser
 alterada depois de aplicada; mudanças futuras exigem novas migrações.
 
 ## Estado da interface

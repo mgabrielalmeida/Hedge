@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -18,6 +17,7 @@ import {
   useSuccessFeedback,
 } from '@/components';
 import { createAccount, updateAccountWithBalance } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import { formatBrazilianMoneyInput, parseMoneyInput, validateRequiredText } from '@/domain';
 import type { Account, Cents, ThemeColorIndex } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -42,7 +42,7 @@ type AccountFormProps = {
 };
 
 export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel }: AccountFormProps) {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const { tokens } = useTheme();
   const { showSuccess } = useSuccessFeedback();
   const initialBank = getInitialBank(account);

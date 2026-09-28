@@ -1,11 +1,10 @@
-import { SQLiteProvider } from 'expo-sqlite';
 import { NavigationBar } from 'expo-navigation-bar';
 import { Stack } from 'expo-router/js-stack';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import { Easing } from 'react-native';
 
-import { DATABASE_NAME, initializeDatabase } from '@/db/database';
+import { DatabaseProvider } from '@/db/DatabaseProvider';
 import {
   BootstrapScreen,
   SECONDARY_SCREEN_TRANSITION_DURATION,
@@ -115,14 +114,12 @@ function AppBootstrap() {
           tokens={tokens}
         />
       ) : null}
-      <SQLiteProvider
+      <DatabaseProvider
         key={databaseAttempt}
-        databaseName={DATABASE_NAME}
         onError={handleDatabaseError}
-        onInit={initializeDatabase}
       >
         <DatabaseContent onReady={markDatabaseReady} />
-      </SQLiteProvider>
+      </DatabaseProvider>
     </>
   );
 }

@@ -39,11 +39,12 @@ export async function createAccount(db: RepositoryDatabase, input: CreateAccount
   const timestamp = clock();
   let account: Account | null = null;
   await db.withExclusiveTransactionAsync(async (transaction) => {
-    await transaction.runAsync(
-      'INSERT INTO accounts (name, institution_name, visual_type, visual_value, icon_value, color_value, theme_color_index, created_at, updated_at) VALUES (?, ?, \'icon\', ?, ?, ?, ?, ?, ?);',
+    const row = await transaction.getFirstAsync<AccountRow>(
+      `INSERT INTO accounts (name, institution_name, visual_type, visual_value, icon_value, color_value, theme_color_index, created_at, updated_at)
+       VALUES (?, ?, 'icon', ?, ?, ?, ?, ?, ?)
+       RETURNING ${accountColumns};`,
       name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, timestamp, timestamp,
     );
-    const row = await transaction.getFirstAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE id = last_insert_rowid();`);
     if (!row) throw new Error('Created account was not found.');
     account = mapAccount(row);
     await transaction.runAsync(

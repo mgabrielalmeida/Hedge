@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 
 import {
   Card,
+  Button,
   EmptyStateCard,
   EntityVisual,
   getIconDisplayValue,
@@ -19,13 +19,14 @@ import {
   Text,
   useReducedMotion,
 } from '@/components';
-import { findCategoryById, listAccounts, listTransactions } from '@/db/repositories';
-import { calculateCategoryMonthlySpending, formatBrazilianCurrency, formatCivilDate } from '@/domain';
-import type { Account, Category, ExpenseTransaction, Transaction, YearMonth } from '@/domain';
+import { findCategoryById, listAccounts, listCategoryExpensesPage, listCategorySpendingByAccount, type TransactionPageCursor } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
+import { formatBrazilianCurrency, formatCivilDate } from '@/domain';
+import type { Account, Category, ExpenseTransaction, YearMonth } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
 import {
-  buildCategorySpendingHistory,
+  buildCategorySpendingHistoryFromTotals,
   type CategorySpendingHistory,
 } from './categorySpendingHistory';
 import { formatYearMonth } from './monthNavigation';
@@ -41,7 +42,15 @@ type CategorySpendingScreenProps = {
 type LoadedData = {
   readonly accounts: readonly Account[];
   readonly category: Category;
-  readonly transactions: readonly Transaction[];
+  readonly expenses: readonly ExpenseTransaction[];
+  readonly history: CategorySpendingHistory;
+  readonly selectedMonthSpending: number;
+};
+
+type PaginationState = {
+  readonly cursor: TransactionPageCursor | null;
+  readonly previousCursors: readonly (TransactionPageCursor | null)[];
+  readonly scope: string;
 };
 
 const chartMonthCount = 6;
@@ -54,11 +63,17 @@ export function CategorySpendingScreen({
   onEditExpense,
   selectedMonth,
 }: CategorySpendingScreenProps) {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const screenReduceMotion = useReducedMotion();
   const { tokens } = useTheme();
   const [data, setData] = useState<LoadedData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<TransactionPageCursor | null>(null);
+  const paginationScope = `${categoryId ?? 'missing'}:${selectedMonth ?? 'missing'}`;
+  const [pagination, setPagination] = useState<PaginationState>({ cursor: null, previousCursors: [], scope: paginationScope });
+  const activePagination = pagination.scope === paginationScope
+    ? pagination
+    : { cursor: null, previousCursors: [], scope: paginationScope };
 
   const load = useCallback(async () => {
     if (categoryId === undefined || selectedMonth === undefined) {
@@ -68,10 +83,11 @@ export function CategorySpendingScreen({
     }
 
     try {
-      const [category, accounts, transactions] = await Promise.all([
+      const [category, accounts, expensePage, historyTotals] = await Promise.all([
         findCategoryById(database, categoryId),
         listAccounts(database),
-        listTransactions(database),
+        listCategoryExpensesPage(database, categoryId, selectedMonth, activePagination.cursor),
+        listCategorySpendingByAccount(database, categoryId, selectedMonth, chartMonthCount),
       ]);
 
       if (!category) {
@@ -80,41 +96,31 @@ export function CategorySpendingScreen({
         return;
       }
 
-      setData({ accounts, category, transactions });
+      const history = buildCategorySpendingHistoryFromTotals(historyTotals, accounts.map((account) => account.id), selectedMonth, chartMonthCount);
+      const selectedMonthSpending = historyTotals.filter((item) => item.month === selectedMonth).reduce((total, item) => total + item.spendingCents, 0);
+      setData({ accounts, category, expenses: expensePage.items as readonly ExpenseTransaction[], history, selectedMonthSpending });
+      setNextCursor(expensePage.nextCursor);
       setError(null);
     } catch {
       setData(null);
       setError('Não foi possível carregar as despesas da categoria.');
     }
-  }, [categoryId, database, selectedMonth]);
+  }, [activePagination.cursor, categoryId, database, selectedMonth]);
 
   useFocusEffect(useCallback(() => (
     scheduleAfterSecondaryTransition(() => void load(), screenReduceMotion === false)
   ), [load, screenReduceMotion]));
-  useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
+  useEffect(() => subscribeToRecurringProcessing((result) => {
+    const affectsCategory = categoryId !== undefined && result.affectedCategoryIds.includes(categoryId);
+    if (affectsCategory) void load();
+  }), [categoryId, load]);
 
   const categoryColor = data
     ? resolveThemeColorValue(data.category.colorValue, data.category.themeColorIndex, tokens.primary)
     : tokens.primary;
-  const expenses = data && selectedMonth
-    ? data.transactions.filter((transaction): transaction is ExpenseTransaction => (
-      transaction.kind === 'expense' &&
-      transaction.categoryId === data.category.id &&
-      transaction.transactionDate.slice(0, 7) === selectedMonth
-    ))
-    : [];
-  const history = data && selectedMonth
-    ? buildCategorySpendingHistory(
-      data.transactions,
-      data.accounts.map((account) => account.id),
-      data.category.id,
-      selectedMonth,
-      chartMonthCount,
-    )
-    : null;
-  const selectedMonthSpending = data && selectedMonth
-    ? calculateCategoryMonthlySpending(data.transactions, data.category.id, selectedMonth)
-    : 0;
+  const expenses = data?.expenses ?? [];
+  const history = data?.history ?? null;
+  const selectedMonthSpending = data?.selectedMonthSpending ?? 0;
 
   if (error) {
     const canRetry = error === 'Não foi possível carregar as despesas da categoria.';
@@ -145,6 +151,16 @@ export function CategorySpendingScreen({
       <View style={styles.expenseList}>
         {expenses.length === 0 ? <EmptyStateCard message="Nenhuma despesa nesta categoria durante o mês." /> : expenses.map((expense) => <ExpenseCard accounts={data.accounts} expense={expense} key={expense.id} onEdit={() => onEditExpense(expense.id)} />)}
       </View>
+      {(activePagination.previousCursors.length > 0 || nextCursor) ? <View style={styles.pagination}>
+        <Button disabled={activePagination.previousCursors.length === 0} label="Anterior" onPress={() => {
+          const previous = activePagination.previousCursors.at(-1) ?? null;
+          setPagination({ cursor: previous, previousCursors: activePagination.previousCursors.slice(0, -1), scope: paginationScope });
+        }} variant="secondary" />
+        <Button disabled={!nextCursor} label="Próxima" onPress={() => {
+          if (!nextCursor) return;
+          setPagination({ cursor: nextCursor, previousCursors: [...activePagination.previousCursors, activePagination.cursor], scope: paginationScope });
+        }} variant="secondary" />
+      </View> : null}
     </ScrollableScreen>
   );
 }
@@ -467,6 +483,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
   },
+  pagination: { flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
   legendAccount: { alignItems: 'center', flexDirection: 'row', gap: 4 },
   sectionHeading: {
     alignItems: 'flex-end',

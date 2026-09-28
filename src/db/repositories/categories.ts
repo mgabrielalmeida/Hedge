@@ -23,8 +23,7 @@ export async function findCategoryById(db: RepositoryDatabase, id: number): Prom
 }
 export async function createCategory(db: RepositoryDatabase, input: CategoryInput, clock: Clock = systemClock): Promise<Category> {
   const category = validated(input); const timestamp = clock();
-  await db.runAsync('INSERT INTO categories (name, monthly_budget_cents, visual_type, visual_value, icon_value, color_value, theme_color_index, created_at, updated_at) VALUES (?, ?, \'icon\', ?, ?, ?, ?, ?, ?);', category.name, category.monthlyBudgetCents, category.iconValue, category.iconValue, category.colorValue, category.themeColorIndex, timestamp, timestamp);
-  const row = await db.getFirstAsync<CategoryRow>(`SELECT ${categoryColumns} FROM categories WHERE id = last_insert_rowid();`);
+  const row = await db.getFirstAsync<CategoryRow>(`INSERT INTO categories (name, monthly_budget_cents, visual_type, visual_value, icon_value, color_value, theme_color_index, created_at, updated_at) VALUES (?, ?, 'icon', ?, ?, ?, ?, ?, ?) RETURNING ${categoryColumns};`, category.name, category.monthlyBudgetCents, category.iconValue, category.iconValue, category.colorValue, category.themeColorIndex, timestamp, timestamp);
   if (!row) throw new Error('Created category was not found.'); return mapCategory(row);
 }
 export async function updateCategory(db: RepositoryDatabase, id: number, input: CategoryInput, clock: Clock = systemClock): Promise<Category | null> {

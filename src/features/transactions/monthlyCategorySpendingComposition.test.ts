@@ -1,6 +1,6 @@
 import type { Transaction } from '@/domain';
 
-import { buildMonthlyCategorySpendingComposition } from './monthlyCategorySpendingComposition';
+import { buildMonthlyCategorySpendingComposition, buildMonthlyCategorySpendingCompositionFromTotals } from './monthlyCategorySpendingComposition';
 
 const timestamp = '2026-09-09T12:00:00.000Z';
 
@@ -69,5 +69,18 @@ describe('monthly category spending composition', () => {
 
     expect(buildMonthlyCategorySpendingComposition([income], [1], '2026-09'))
       .toEqual({ items: [{ categoryId: 1, spendingCents: 0 }], totalSpendingCents: 0 });
+  });
+
+  it('preserves repository totals without rematerializing transactions', () => {
+    expect(buildMonthlyCategorySpendingCompositionFromTotals([
+      { categoryId: 1, spendingCents: 1_000 },
+      { categoryId: 2, spendingCents: 2_500 },
+    ])).toEqual({
+      items: [
+        { categoryId: 1, spendingCents: 1_000 },
+        { categoryId: 2, spendingCents: 2_500 },
+      ],
+      totalSpendingCents: 3_500,
+    });
   });
 });

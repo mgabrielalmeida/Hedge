@@ -74,4 +74,16 @@ describe('projectMonthEndBalance', () => {
     expect(result.availableBalanceCents).toBe(2_000);
     expect(result.items).toEqual([]);
   });
+
+  it('accepts a database aggregate as the registered balance', () => {
+    const result = projectMonthEndBalance(
+      '2026-09',
+      [],
+      [rule(1, -1_000, 10)],
+      [],
+      5_000,
+    );
+
+    expect(result.availableBalanceCents).toBe(4_000);
+  });
 });

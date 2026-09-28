@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Button,
@@ -17,6 +16,7 @@ import {
   useReducedMotion,
 } from '@/components';
 import { listAccounts } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import type { Account } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -27,7 +27,7 @@ type AccountsHomeScreenProps = {
 };
 
 export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccounts }: AccountsHomeScreenProps) {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const reduceMotion = useReducedMotion();
   const [accounts, setAccounts] = useState<readonly Account[] | null>(null);
   const [error, setError] = useState(false);

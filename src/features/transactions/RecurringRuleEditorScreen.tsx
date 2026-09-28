@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import {
   scheduleAfterSecondaryTransition,
@@ -6,12 +5,13 @@ import {
   useReducedMotion,
 } from '@/components';
 import { findRecurringRuleById } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import type { RecurringRule } from '@/domain';
 
 import { ExpenseScreen } from './ExpenseScreen';
 
 export function RecurringRuleEditorScreen({ onDone, recurringRuleId }: { onDone: () => void; recurringRuleId: number }) {
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const reduceMotion = useReducedMotion();
   const [rule, setRule] = useState<RecurringRule | null>(null);
   const [isLoading, setIsLoading] = useState(true);

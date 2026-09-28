@@ -1,7 +1,7 @@
 # Plano de implementação: conta, nuvem e sincronização offline
 
 **Data:** 27 de setembro de 2026  
-**Status:** Etapa 0 concluída; sincronização ainda não implementada
+**Status:** Etapas 0 e 2 concluídas; Etapa 1 concluída provisoriamente sem evidências físicas; sincronização ainda não implementada
 
 Este plano mantém o SQLite como base usada pela interface. PostgreSQL será o
 estado compartilhado confirmado, e a rede jamais participará do caminho crítico
@@ -53,15 +53,15 @@ matriz de falhas, estados de sessão e critérios de desempenho.
 **Aceite:** referência reproduzível; commit local p95 até 100 ms e feedback até
 200 ms, ou correção planejada antes do próximo marco; contratos não dependem de UI.
 
-**Implementação preparada — 27 de setembro de 2026:** fixtures determinísticas
+**Conclusão excepcional sem evidência física — 27 de setembro de 2026:** fixtures determinísticas
 para 1 mil, 10 mil e 50 mil lançamentos, seeding transacional e cálculo de p95
 estão em `src/db/benchmarks`; os contratos executáveis e puros estão em
 `src/domain/sync/contracts.ts`; o protocolo, matriz de falhas e estados de
-sessão estão em `local-sync-benchmark.md`. A coleta permanece pendente: este
-ambiente não possui `adb` nem aparelho físico conectado, portanto ainda não há
-medidas reais de abertura, commit, feedback, memória ou rolagem. A Etapa 1 não
-está concluída até essa tabela conter evidências físicas e os limites de 100 ms
-e 200 ms serem atendidos ou receberem correção planejada.
+sessão estão em `local-sync-benchmark.md`. Por decisão explícita, a Etapa 1 é
+considerada concluída provisoriamente sem a coleta física. A pendência permanece
+aberta: este ambiente não possui `adb` nem aparelho físico conectado, portanto
+ainda não há medidas reais de abertura, commit, feedback, memória ou rolagem.
+Essas evidências devem ser preenchidas antes do Marco A.
 
 ## Etapa 2 — Isolamento da persistência e desempenho
 
@@ -72,6 +72,26 @@ afetados. Processar recorrências em lotes recuperáveis sem exibir saldo parcia
 
 **Aceite:** resultados financeiros equivalentes, nenhuma tela carrega toda a base
 para uma página, e operações locais não dependem de rede.
+
+**Evidência de conclusão — 28 de setembro de 2026:** `DatabaseProvider` e
+`useDatabase` passaram a ser as únicas portas React para o SQLite; não há
+imports de `expo-sqlite`, SQL ou API direta do driver em `src/app` ou
+`src/features`. O histórico usa `FlatList` virtualizada e páginas de até 50
+lançamentos por cursor composto de data e ID. Dashboard e detalhe de categoria
+usam agregações e recortes SQL, sem materializar a tabela inteira para calcular
+saldos, gastos ou projeções. A migração sequencial
+`008_query_performance_indexes.ts` acrescenta índices para essas leituras sem
+alterar as migrações publicadas. O uso de `last_insert_rowid()` foi eliminado em
+favor de `INSERT ... RETURNING`; entradas e cursores são validados nos
+repositórios. Recorrências são confirmadas em lotes transacionais retomáveis; a
+interface só é notificada ao fim de uma execução bem-sucedida, portanto uma
+interrupção não publica um saldo intermediário. A notificação inclui as
+ocorrências geradas, permitindo que telas sem contas ou categorias afetadas
+ignorem a invalidação. Testes cobrem paginação,
+equivalência de saldos com transferências, agregações, índices, interrupção e
+retomada idempotente. `npm run typecheck`, `npm run lint`,
+`npm test -- --runInBand` (31 suítes e 141 testes) e `git diff --check`
+passaram. Nenhum módulo remoto participa dessas operações.
 
 ## Etapa 3 — Identidade global e perfis locais
 

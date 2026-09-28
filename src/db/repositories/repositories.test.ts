@@ -236,10 +236,10 @@ describe('SQLite repositories', () => {
       'Not today:2026-07-03',
       'Not today:2026-08-03',
     ]);
-    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [] });
+    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual(expect.objectContaining({ generated: [] }));
 
     await deleteTransaction(database, firstProcessing.generated[0].transaction.id);
-    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [] });
+    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual(expect.objectContaining({ generated: [] }));
     await expect(listRecurringOccurrencesForMonth(database, '2026-09')).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({ scheduledDate: '2026-09-02' }),
     ]));
@@ -258,5 +258,23 @@ describe('SQLite repositories', () => {
 
     expect(result.generated.map((item) => item.transaction.transactionDate)).toEqual(['2026-01-15', '2026-02-15']);
     expect(result.generated.every((item) => item.transaction.name === 'Limited subscription')).toBe(true);
+  });
+
+  it('commits recurrence batches independently and resumes without duplicating completed batches', async () => {
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-01' }, () => createdAt);
+    await createRecurringRule(database, { kind: 'income', accountId: account.id, name: 'First batch', amountCents: 1_000, frequency: 'monthly', chargeDay: 2, startDate: '2026-09-01' }, () => createdAt);
+    await createRecurringRule(database, { kind: 'income', accountId: account.id, name: 'Failing batch', amountCents: 2_000, frequency: 'monthly', chargeDay: 2, startDate: '2026-09-01' }, () => createdAt);
+    await database.execAsync("CREATE TRIGGER reject_failing_batch BEFORE INSERT ON transactions WHEN NEW.name = 'Failing batch' BEGIN SELECT RAISE(ABORT, 'simulated batch interruption'); END;");
+
+    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt, 1)).rejects.toThrow('simulated batch interruption');
+    expect((await listTransactions(database)).filter((item) => item.name === 'First batch')).toHaveLength(1);
+    expect((await listTransactions(database)).filter((item) => item.name === 'Failing batch')).toHaveLength(0);
+
+    await database.execAsync('DROP TRIGGER reject_failing_batch;');
+    const resumed = await processDueRecurringRules(database, '2026-09-02', () => updatedAt, 1);
+    expect(resumed.generated.map((item) => item.transaction.name)).toEqual(['Failing batch']);
+    expect(resumed.affectedAccountIds).toEqual([account.id]);
+    expect((await listTransactions(database)).filter((item) => item.name === 'First batch')).toHaveLength(1);
+    expect((await listTransactions(database)).filter((item) => item.name === 'Failing batch')).toHaveLength(1);
   });
 });

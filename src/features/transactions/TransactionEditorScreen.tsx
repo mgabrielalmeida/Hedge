@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import {
   scheduleAfterSecondaryTransition,
@@ -6,13 +5,14 @@ import {
   useReducedMotion,
 } from '@/components';
 import { findTransactionById } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import type { Transaction } from '@/domain';
 
 import { ExpenseScreen } from './ExpenseScreen';
 import { TransferScreen } from './TransferScreen';
 
 export function TransactionEditorScreen({ onDone, transactionId }: { onDone: () => void; transactionId: number }) {
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const reduceMotion = useReducedMotion();
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [isLoading, setIsLoading] = useState(true);

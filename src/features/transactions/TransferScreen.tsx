@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
@@ -25,6 +24,7 @@ import {
   listAccounts,
   updateTransaction,
 } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import {
   formatBrazilianMoneyInput,
   parseCivilDate,
@@ -42,7 +42,7 @@ type TransferScreenProps = {
 };
 
 export function TransferScreen({ deferInitialLoad = true, onDone, transactionId }: TransferScreenProps) {
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const reduceMotion = useReducedMotion();
   const { showSuccess } = useSuccessFeedback();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);

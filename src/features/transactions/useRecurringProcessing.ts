@@ -1,13 +1,14 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { processDueRecurringRules } from '@/db/repositories';
+import type { RecurringProcessingResult } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
-const completionListeners = new Set<() => void>();
+const completionListeners = new Set<(result: RecurringProcessingResult) => void>();
 
-export function subscribeToRecurringProcessing(listener: () => void): () => void {
+export function subscribeToRecurringProcessing(listener: (result: RecurringProcessingResult) => void): () => void {
   completionListeners.add(listener);
   return () => completionListeners.delete(listener);
 }
@@ -19,7 +20,7 @@ export type RecurringProcessingState = {
 };
 
 export function useRecurringProcessing(): RecurringProcessingState {
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const isProcessing = useRef(false);
   const [isInitialProcessingComplete, setIsInitialProcessingComplete] = useState(false);
   const [hasFailed, setHasFailed] = useState(false);
@@ -29,7 +30,7 @@ export function useRecurringProcessing(): RecurringProcessingState {
     isProcessing.current = true;
     try {
       const result = await processDueRecurringRules(db, getLocalCivilDate());
-      if (result.generated.length > 0) completionListeners.forEach((listener) => listener());
+      if (result.generated.length > 0) completionListeners.forEach((listener) => listener(result));
       setHasFailed(false);
     } catch {
       setHasFailed(true);

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 
 import { BootstrapScreen } from '@/components';
 import { listAccounts } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import { FirstAccessScreen } from '@/features/accounts/FirstAccessScreen';
 import { useTheme } from '@/theme/ThemeProvider';
 
 export default function OnboardingRoute() {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const router = useRouter();
   const { isDark, tokens } = useTheme();
   const [hasExistingAccount, setHasExistingAccount] = useState<boolean | null>(null);

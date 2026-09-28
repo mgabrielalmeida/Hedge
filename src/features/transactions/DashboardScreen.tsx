@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 import Svg, { Rect } from 'react-native-svg';
 
 import {
@@ -25,13 +24,12 @@ import {
   Text,
   useReducedMotion,
 } from '@/components';
-import { listAccounts, listCategories, listRecurringOccurrencesForMonth, listRecurringRules, listTransactions } from '@/db/repositories';
+import { getConsolidatedBalanceThroughDate, getFinancialBalances, listAccounts, listCategories, listCategoryMonthlySpending, listRecurringOccurrencesForMonth, listRecurringRules, listTransactionsForRecurringOccurrencesMonth } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import {
-  calculateAccountBalance,
-  calculateCategoryMonthlySpending,
-  calculateConsolidatedBalance,
   formatBrazilianCurrency,
   formatCivilDate,
+  daysInMonth,
   projectMonthEndBalance,
 } from '@/domain';
 import type { Account, Category, RecurringOccurrence, RecurringRule, Transaction } from '@/domain';
@@ -41,7 +39,7 @@ import { getLocalCivilDate } from '@/utils/localCivilDate';
 import { calculateCategoryBudgetProgress } from './categoryBudgetProgress';
 import { formatYearMonth, shiftYearMonth } from './monthNavigation';
 import {
-  buildMonthlyCategorySpendingComposition,
+  buildMonthlyCategorySpendingCompositionFromTotals,
   type MonthlyCategorySpendingComposition,
 } from './monthlyCategorySpendingComposition';
 import { subscribeToRecurringProcessing } from './useRecurringProcessing';
@@ -64,7 +62,7 @@ export function DashboardScreen({
   onNewTransfer,
   onNoAccounts,
 }: DashboardScreenProps) {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const reduceMotion = useReducedMotion();
   const { hideBalances, setBalancesHidden, tokens } = useTheme();
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
@@ -78,16 +76,25 @@ export function DashboardScreen({
   const [error, setError] = useState<string | null>(null);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [balanceReplayKey, setBalanceReplayKey] = useState(0);
+  const [balances, setBalances] = useState<ReadonlyMap<number, number>>(new Map());
+  const [consolidatedBalance, setConsolidatedBalance] = useState(0);
+  const [categorySpending, setCategorySpending] = useState<ReadonlyMap<number, number>>(new Map());
+  const [registeredBalanceAtMonthEnd, setRegisteredBalanceAtMonthEnd] = useState(0);
 
   const load = useCallback(async () => {
     try {
       const month = getLocalCivilDate().slice(0, 7);
-      const [loadedAccounts, loadedCategories, loadedOccurrences, loadedRecurringRules, loadedTransactions] = await Promise.all([
+      const [year, monthNumber] = month.split('-').map(Number);
+      const monthEndDate = `${month}-${String(daysInMonth(year, monthNumber)).padStart(2, '0')}`;
+      const [loadedAccounts, loadedCategories, loadedOccurrences, loadedRecurringRules, loadedTransactions, loadedBalances, loadedSpending, loadedMonthEndBalance] = await Promise.all([
         listAccounts(database),
         listCategories(database),
         listRecurringOccurrencesForMonth(database, month),
         listRecurringRules(database),
-        listTransactions(database),
+        listTransactionsForRecurringOccurrencesMonth(database, month),
+        getFinancialBalances(database),
+        listCategoryMonthlySpending(database, selectedMonth),
+        getConsolidatedBalanceThroughDate(database, monthEndDate),
       ]);
 
       if (loadedAccounts.length === 0) {
@@ -100,6 +107,10 @@ export function DashboardScreen({
       setRecurringOccurrences(loadedOccurrences);
       setRecurringRules(loadedRecurringRules);
       setTransactions(loadedTransactions);
+      setBalances(loadedBalances.byAccountId);
+      setConsolidatedBalance(loadedBalances.consolidatedCents);
+      setCategorySpending(new Map(loadedSpending.map((item) => [item.categoryId, item.spendingCents])));
+      setRegisteredBalanceAtMonthEnd(loadedMonthEndBalance);
       setSelectedAccountId((accountId) => accountId ?? loadedAccounts[0].id);
       setError(null);
     } catch {
@@ -107,7 +118,7 @@ export function DashboardScreen({
     } finally {
       setIsLoading(false);
     }
-  }, [database, onNoAccounts]);
+  }, [database, onNoAccounts, selectedMonth]);
 
   useFocusEffect(useCallback(() => {
     setBalanceReplayKey((key) => key + 1);
@@ -118,7 +129,6 @@ export function DashboardScreen({
 
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
   const currentMonth = getLocalCivilDate().slice(0, 7);
-  const consolidatedBalance = calculateConsolidatedBalance(transactions);
   const previousMonth = shiftYearMonth(selectedMonth, -1);
   const nextMonth = selectedMonth === currentMonth ? null : shiftYearMonth(selectedMonth, 1);
   const recurringProjection = projectMonthEndBalance(
@@ -126,14 +136,13 @@ export function DashboardScreen({
     transactions,
     recurringRules,
     recurringOccurrences,
+    registeredBalanceAtMonthEnd,
   );
   const categorySpendingComposition = useMemo(
-    () => buildMonthlyCategorySpendingComposition(
-      transactions,
-      categories.map((category) => category.id),
-      selectedMonth,
+    () => buildMonthlyCategorySpendingCompositionFromTotals(
+      categories.map((category) => ({ categoryId: category.id, spendingCents: categorySpending.get(category.id) ?? 0 })),
     ),
-    [categories, selectedMonth, transactions],
+    [categories, categorySpending],
   );
 
   if (isLoading) return <ScreenState message="Atualizando seus saldos e orçamentos…" status="loading" title="Carregando visão financeira" />;
@@ -182,7 +191,7 @@ export function DashboardScreen({
                 </Text>
               </FadeSelection>
               <AnimatedMoneyText
-                cents={calculateAccountBalance(transactions, selectedAccount.id)}
+                cents={balances.get(selectedAccount.id) ?? 0}
                 hidden={hideBalances}
                 replayKey={balanceReplayKey}
                 variant="title"
@@ -230,11 +239,7 @@ export function DashboardScreen({
             >
               <CategoryBudgetCard
                 category={category}
-                spendingCents={calculateCategoryMonthlySpending(
-                  transactions,
-                  category.id,
-                  selectedMonth,
-                )}
+                spendingCents={categorySpending.get(category.id) ?? 0}
               />
             </PressableCard>
           ))}

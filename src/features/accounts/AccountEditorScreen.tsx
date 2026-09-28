@@ -1,4 +1,3 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
@@ -14,6 +13,7 @@ import {
   useSuccessFeedback,
 } from '@/components';
 import { archiveAccount, findAccountById, getAccountBalance } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import type { Account, Cents } from '@/domain';
 
 import { AccountForm } from './AccountForm';
@@ -29,7 +29,7 @@ type AccountEditorData = {
 };
 
 export function AccountEditorScreen({ accountId, onDone }: AccountEditorScreenProps) {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const reduceMotion = useReducedMotion();
   const { showSuccess } = useSuccessFeedback();
   const [data, setData] = useState<AccountEditorData | null>(null);

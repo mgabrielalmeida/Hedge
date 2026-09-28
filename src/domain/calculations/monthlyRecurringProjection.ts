@@ -41,6 +41,7 @@ export function projectMonthEndBalance(
   transactions: readonly Transaction[],
   rules: readonly RecurringRule[],
   occurrences: readonly RecurringOccurrence[],
+  registeredBalanceOverride?: Cents,
 ): MonthlyRecurringProjection {
   const parsedMonth = parseYearMonth(month);
   if (!parsedMonth.ok) throw new RangeError('Expected a valid year month.');
@@ -86,7 +87,7 @@ export function projectMonthEndBalance(
     }
   }
 
-  const registeredBalanceAtMonthEnd = calculateConsolidatedBalance(
+  const registeredBalanceAtMonthEnd = registeredBalanceOverride ?? calculateConsolidatedBalance(
     transactions.filter((transaction) => compareCivilDates(transaction.transactionDate, monthEndDate) <= 0),
   );
   const pendingAmount = items

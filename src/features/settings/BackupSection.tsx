@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';
 
 import { Button, Card, FormFeedback, Text, useSuccessFeedback } from '@/components';
 import { BackupError, createBackupBytes, restoreBackupBytes } from '@/db/backup';
+import { useDatabase } from '@/db/DatabaseProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 
 import { pickBackupFile, shareBackupFile } from './backupFiles';
 
 export function BackupSection() {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const { showSuccess } = useSuccessFeedback();
   const { reloadPreferences, tokens } = useTheme();
   const [error, setError] = useState<string | null>(null);

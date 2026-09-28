@@ -13,6 +13,12 @@ export type CategorySpendingHistory = {
   readonly series: readonly AccountCategorySpendingSeries[];
 };
 
+export type CategorySpendingTotal = {
+  readonly accountId: EntityId;
+  readonly month: YearMonth;
+  readonly spendingCents: Cents;
+};
+
 export function buildCategorySpendingHistory(
   transactions: readonly Transaction[],
   accountIds: readonly EntityId[],
@@ -48,6 +54,26 @@ export function buildCategorySpendingHistory(
       spendingByMonth: spendingByAccount.get(accountId) ?? [],
     })),
   };
+}
+
+export function buildCategorySpendingHistoryFromTotals(
+  totals: readonly CategorySpendingTotal[],
+  accountIds: readonly EntityId[],
+  endingMonth: YearMonth,
+  monthCount = 6,
+): CategorySpendingHistory {
+  if (!Number.isInteger(monthCount) || monthCount < 1) {
+    throw new RangeError('Month count must be a positive integer.');
+  }
+  const months = getTrailingMonths(endingMonth, monthCount);
+  const monthIndexes = new Map(months.map((month, index) => [month, index]));
+  const spendingByAccount = new Map(accountIds.map((accountId) => [accountId, Array<Cents>(months.length).fill(0)]));
+  for (const total of totals) {
+    const monthIndex = monthIndexes.get(total.month);
+    const spending = spendingByAccount.get(total.accountId);
+    if (monthIndex !== undefined && spending) spending[monthIndex] = total.spendingCents;
+  }
+  return { months, series: accountIds.map((accountId) => ({ accountId, spendingByMonth: spendingByAccount.get(accountId) ?? [] })) };
 }
 
 function getTrailingMonths(endingMonth: YearMonth, monthCount: number): readonly YearMonth[] {

@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Button,
@@ -19,6 +18,7 @@ import {
   useReducedMotion,
 } from '@/components';
 import { listCategories } from '@/db/repositories';
+import { useDatabase } from '@/db/DatabaseProvider';
 import type { Category } from '@/domain';
 import { formatBrazilianCurrency } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -38,7 +38,7 @@ export function CategoriesScreen({
   onboardingProgress,
   showDescription = true,
 }: CategoriesScreenProps) {
-  const database = useSQLiteContext();
+  const database = useDatabase();
   const reduceMotion = useReducedMotion();
   const [categories, setCategories] = useState<readonly Category[] | null>(null);
   const [error, setError] = useState<string | null>(null);
