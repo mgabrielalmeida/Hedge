@@ -9,6 +9,7 @@ import { queryPerformanceIndexesMigration } from './008_query_performance_indexe
 import { globalIdentityMigration } from './009_global_identity';
 import { localProfileMigration } from './010_local_profile';
 import { syncOutboxMigration } from './011_sync_outbox';
+import { financialConflictsMigration } from './012_financial_conflicts';
 import type { Migration } from './migration';
 
 export const migrations: readonly Migration[] = [
@@ -23,4 +24,5 @@ export const migrations: readonly Migration[] = [
   globalIdentityMigration,
   localProfileMigration,
   syncOutboxMigration,
+  financialConflictsMigration,
 ];

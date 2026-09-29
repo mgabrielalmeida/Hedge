@@ -27,7 +27,7 @@ describe('sync outbox migration', () => {
     await runMigrations(database);
 
     await expect(database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;'))
-      .resolves.toEqual({ user_version: 11 });
+      .resolves.toEqual({ user_version: 12 });
     const commands = await database.getAllAsync<{
       entity_kind: string; depends_on_json: string; expected_version: number;
     }>(`SELECT entity_kind, depends_on_json, expected_version FROM sync_outbox

@@ -1,8 +1,11 @@
 import {
   asSyncIdentifier,
+  isSyncCommand,
   isSyncEvent,
   isSyncReceipt,
   type SyncCommand,
+  type SyncConflictResolution,
+  type SyncConflictReviewKind,
   type SyncEntityKind,
   type SyncEvent,
   type SyncOperation,
@@ -254,7 +257,7 @@ export async function applySyncEvent(
     );
     const pending = await transaction.getFirstAsync<{ count: number }>(
       `SELECT COUNT(*) AS count FROM sync_outbox
-       WHERE entity_kind = ? AND entity_sync_id = ? AND state IN ('pending', 'leased');`,
+       WHERE entity_kind = ? AND entity_sync_id = ? AND state IN ('pending', 'leased', 'rejected');`,
       event.entity.kind,
       event.entity.syncId,
     );
@@ -278,8 +281,9 @@ export async function recordSyncConflict(
 ): Promise<void> {
   await db.runAsync(
     `INSERT INTO sync_conflicts (
-       command_id, entity_kind, entity_sync_id, reason, command_json, current_event_json, created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?)
+       command_id, entity_kind, entity_sync_id, reason, command_json, current_event_json,
+       review_kind, created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(command_id) DO NOTHING;`,
     command.commandId,
     command.entity.kind,
@@ -287,8 +291,108 @@ export async function recordSyncConflict(
     reason,
     JSON.stringify(command),
     JSON.stringify(current),
+    classifyConflictReview(command, current),
     createdAt,
   );
+}
+
+export type SyncConflictReview = {
+  readonly id: number;
+  readonly command: SyncCommand;
+  readonly current: SyncEvent;
+  readonly reason: 'version_mismatch' | 'dependency_rejected' | 'generation_closed';
+  readonly reviewKind: SyncConflictReviewKind;
+  readonly createdAt: string;
+};
+
+export async function listSyncConflictReviews(db: RepositorySession): Promise<readonly SyncConflictReview[]> {
+  const rows = await db.getAllAsync<{
+    id: number;
+    reason: SyncConflictReview['reason'];
+    command_json: string;
+    current_event_json: string;
+    review_kind: SyncConflictReviewKind;
+    created_at: string;
+  }>(
+    `SELECT id, reason, command_json, current_event_json, review_kind, created_at
+     FROM sync_conflicts WHERE resolved_at IS NULL ORDER BY created_at, id;`,
+  );
+  return rows.map((row) => {
+    const command = JSON.parse(row.command_json) as unknown;
+    const current = JSON.parse(row.current_event_json) as unknown;
+    if (!isSyncCommand(command) || !isSyncEvent(current)) throw new Error('Invalid persisted sync conflict.');
+    return {
+      id: row.id,
+      command,
+      current,
+      reason: row.reason,
+      reviewKind: row.review_kind,
+      createdAt: row.created_at,
+    };
+  });
+}
+
+export async function resolveSyncConflict(
+  db: RepositoryDatabase,
+  conflictId: number,
+  resolution: SyncConflictResolution,
+  resolvedAt: string,
+): Promise<void> {
+  if (!Number.isSafeInteger(conflictId) || conflictId <= 0) throw new Error('Invalid sync conflict id.');
+  await db.withExclusiveTransactionAsync(async (transaction) => {
+    const row = await transaction.getFirstAsync<{
+      command_id: string;
+      command_json: string;
+      current_event_json: string;
+    }>('SELECT command_id, command_json, current_event_json FROM sync_conflicts WHERE id = ? AND resolved_at IS NULL;', conflictId);
+    if (!row) throw new Error('Sync conflict is unavailable for review.');
+    const command = JSON.parse(row.command_json) as unknown;
+    const current = JSON.parse(row.current_event_json) as unknown;
+    if (!isSyncCommand(command) || !isSyncEvent(current)) throw new Error('Invalid persisted sync conflict.');
+
+    if (resolution === 'accept_remote') {
+      await transaction.runAsync('DELETE FROM sync_outbox WHERE command_id = ?;', row.command_id);
+      await rewriteOutboxDependencies(transaction, row.command_id, null);
+      await projectConfirmedEvent(transaction, current, resolvedAt);
+    } else if (resolution === 'keep_local') {
+      const persisted = await transaction.getFirstAsync<OutboxRow & { created_at: string }>(
+        `SELECT command_id, entity_kind, entity_sync_id, operation, expected_version,
+          depends_on_json, payload_json, created_at
+         FROM sync_outbox WHERE command_id = ? AND state = 'rejected';`,
+        row.command_id,
+      );
+      if (!persisted) throw new Error('Rejected local proposal is unavailable.');
+      const identity = await transaction.getFirstAsync<{ command_id: string }>(
+        'SELECT lower(hex(randomblob(16))) AS command_id;',
+      );
+      if (!identity) throw new Error('Could not create a replacement sync command.');
+      await transaction.runAsync(
+        `INSERT INTO sync_outbox (
+           command_id, entity_kind, entity_sync_id, operation, expected_version,
+           depends_on_json, payload_json, state, attempt_count, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?);`,
+        identity.command_id,
+        persisted.entity_kind,
+        persisted.entity_sync_id,
+        persisted.operation,
+        current.version,
+        persisted.depends_on_json,
+        persisted.payload_json,
+        persisted.created_at,
+        resolvedAt,
+      );
+      await rewriteOutboxDependencies(transaction, row.command_id, identity.command_id);
+      await transaction.runAsync('DELETE FROM sync_outbox WHERE command_id = ?;', row.command_id);
+    } else {
+      throw new Error('Invalid sync conflict resolution.');
+    }
+    await transaction.runAsync(
+      'UPDATE sync_conflicts SET resolution = ?, resolved_at = ? WHERE id = ?;',
+      resolution,
+      resolvedAt,
+      conflictId,
+    );
+  });
 }
 
 export async function updateSyncCursor(
@@ -317,6 +421,43 @@ async function resolveDependencies(db: RepositorySession, syncIds: readonly stri
   return dependencies;
 }
 
+function classifyConflictReview(command: SyncCommand, current: SyncEvent): SyncConflictReviewKind {
+  if (command.operation === 'tombstone' || current.operation === 'tombstone') return 'concurrent_delete';
+  if (
+    command.entity.kind === 'account'
+    && command.payload.isArchived !== current.payload.isArchived
+  ) return 'concurrent_archive';
+  if (
+    (command.entity.kind === 'transaction' || command.entity.kind === 'recurring_rule')
+    && command.payload.categorySyncId !== current.payload.categorySyncId
+  ) return 'concurrent_category';
+  return 'concurrent_edit';
+}
+
+async function rewriteOutboxDependencies(
+  db: RepositorySession,
+  oldCommandId: string,
+  replacementCommandId: string | null,
+): Promise<void> {
+  const rows = await db.getAllAsync<{ command_id: string; depends_on_json: string }>(
+    'SELECT command_id, depends_on_json FROM sync_outbox WHERE depends_on_json LIKE ?;',
+    `%${oldCommandId}%`,
+  );
+  for (const row of rows) {
+    const dependencies = JSON.parse(row.depends_on_json) as unknown;
+    if (!Array.isArray(dependencies)) throw new Error('Invalid persisted outbox dependency.');
+    const rewritten = dependencies.flatMap((dependency) => {
+      if (dependency !== oldCommandId) return [dependency];
+      return replacementCommandId === null ? [] : [replacementCommandId];
+    });
+    await db.runAsync(
+      'UPDATE sync_outbox SET depends_on_json = ? WHERE command_id = ?;',
+      JSON.stringify([...new Set(rewritten)]),
+      row.command_id,
+    );
+  }
+}
+
 async function readEntitySnapshot(
   db: RepositorySession,
   kind: SyncEntityKind,
@@ -326,12 +467,14 @@ async function readEntitySnapshot(
     case 'account': {
       const row = await db.getFirstAsync<Record<string, string | number | null>>(
         `SELECT sync_id, sync_version, deleted_at, name, institution_name, icon_value, color_value,
-          theme_color_index, is_archived, archived_at, created_at, updated_at FROM accounts WHERE id = ?;`, id,
+          theme_color_index, is_archived, archived_at, financial_version, created_at, updated_at
+         FROM accounts WHERE id = ?;`, id,
       );
       return row && snapshot(row, [], {
         name: row.name, institutionName: row.institution_name, iconValue: row.icon_value,
         colorValue: row.color_value, themeColorIndex: row.theme_color_index,
         isArchived: row.is_archived, archivedAt: row.archived_at,
+        financialVersion: row.financial_version,
         createdAt: row.created_at, updatedAt: row.updated_at,
       });
     }
@@ -550,6 +693,10 @@ async function projectConfirmedEvent(db: RepositorySession, event: SyncEvent, ti
         p.description as string | null, p.amountCents as number, p.frequency as string,
         p.chargeDay as number, p.chargeMonth as number | null, p.startDate as string,
         p.endDate as string | null, asBooleanInteger(p.isActive), p.createdAt as string, p.updatedAt as string,
+      );
+      await db.runAsync(
+        'DELETE FROM recurrence_processing_checkpoints WHERE recurring_rule_sync_id = ?;',
+        syncId,
       );
       return;
     }

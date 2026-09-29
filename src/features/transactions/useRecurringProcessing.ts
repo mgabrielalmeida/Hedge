@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { processDueRecurringRules } from '@/db/repositories';
+import { processDueRecurringRulesAt } from '@/db/repositories';
 import type { RecurringProcessingResult } from '@/db/repositories';
 import { useDatabase } from '@/db/DatabaseProvider';
-import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 const completionListeners = new Set<(result: RecurringProcessingResult) => void>();
 
@@ -29,7 +28,7 @@ export function useRecurringProcessing(): RecurringProcessingState {
     if (isProcessing.current) return;
     isProcessing.current = true;
     try {
-      const result = await processDueRecurringRules(db, getLocalCivilDate());
+      const result = await processDueRecurringRulesAt(db, new Date());
       if (result.generated.length > 0) completionListeners.forEach((listener) => listener(result));
       setHasFailed(false);
     } catch {

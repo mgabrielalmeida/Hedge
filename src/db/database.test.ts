@@ -23,7 +23,7 @@ describe('initializeDatabase', () => {
     ).resolves.toEqual({ journal_mode: 'wal' });
     await expect(
       database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;'),
-    ).resolves.toEqual({ user_version: 11 });
+    ).resolves.toEqual({ user_version: 12 });
     await expect(
       database.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name;",
@@ -32,6 +32,8 @@ describe('initializeDatabase', () => {
       { name: 'accounts' },
       { name: 'categories' },
       { name: 'local_profile' },
+      { name: 'recurrence_processing_batches' },
+      { name: 'recurrence_processing_checkpoints' },
       { name: 'recurring_occurrences' },
       { name: 'recurring_rules' },
       { name: 'sync_applied_events' },
@@ -50,6 +52,8 @@ describe('initializeDatabase', () => {
       { name: 'accounts', strict: 1 },
       { name: 'categories', strict: 1 },
       { name: 'local_profile', strict: 1 },
+      { name: 'recurrence_processing_batches', strict: 1 },
+      { name: 'recurrence_processing_checkpoints', strict: 1 },
       { name: 'recurring_occurrences', strict: 1 },
       { name: 'recurring_rules', strict: 1 },
       { name: 'sync_applied_events', strict: 1 },
@@ -87,7 +91,7 @@ describe('initializeDatabase', () => {
     ).resolves.toEqual({ count: 5 });
     await expect(
       database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;'),
-    ).resolves.toEqual({ user_version: 11 });
+    ).resolves.toEqual({ user_version: 12 });
   });
 
   it('enforces the financial, referential, and recurring invariants of schema v1', async () => {

@@ -1,5 +1,11 @@
 export type SyncEntityKind = 'account' | 'category' | 'transaction' | 'recurring_rule' | 'recurring_occurrence';
 export type SyncOperation = 'upsert' | 'tombstone';
+export type SyncConflictReviewKind =
+  | 'concurrent_edit'
+  | 'concurrent_delete'
+  | 'concurrent_archive'
+  | 'concurrent_category';
+export type SyncConflictResolution = 'keep_local' | 'accept_remote';
 
 declare const syncIdentifierBrand: unique symbol;
 export type SyncIdentifier = string & { readonly [syncIdentifierBrand]: true };

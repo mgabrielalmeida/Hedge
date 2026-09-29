@@ -2,10 +2,11 @@ import { addCents, assertSafeCents, normalizeOptionalText, parseCivilDate, valid
 import type { Account, Cents, CivilDate, ThemeColorIndex } from '@/domain';
 
 import { type Clock, type RepositoryDatabase, type RepositorySession, systemClock } from './database';
+import { enqueueFinancialAccountMutations } from './financialVersions';
 import { mapAccount, type AccountRow } from './rows';
 import { enqueueEntityMutation } from '../sync/outbox';
 
-const accountColumns = 'id, name, institution_name, icon_value, color_value, theme_color_index, is_archived, archived_at, created_at, updated_at';
+const accountColumns = 'id, name, institution_name, icon_value, color_value, theme_color_index, is_archived, archived_at, financial_version, created_at, updated_at';
 
 export type CreateAccountInput = {
   readonly name: string;
@@ -23,7 +24,15 @@ export type UpdateAccountInput = Omit<CreateAccountInput, 'initialBalanceCents' 
 export type UpdateAccountWithBalanceInput = UpdateAccountInput & {
   readonly currentBalanceCents: Cents;
   readonly adjustmentDate: CivilDate;
+  readonly expectedFinancialVersion: number;
 };
+
+export class StaleBalanceAdjustmentError extends Error {
+  public constructor() {
+    super('Account balance changed after it was loaded.');
+    this.name = 'StaleBalanceAdjustmentError';
+  }
+}
 
 type BalanceRow = { balance_cents: number };
 
@@ -55,7 +64,14 @@ export async function createAccount(db: RepositoryDatabase, input: CreateAccount
       account.id, 'Saldo inicial', description, input.initialBalanceCents, input.openingBalanceDate, timestamp, timestamp,
     );
     if (!openingBalance) throw new Error('Opening balance was not found.');
+    await enqueueFinancialAccountMutations(transaction, [account.id], timestamp);
     await enqueueEntityMutation(transaction, 'transaction', openingBalance.id, timestamp);
+    const updatedAccount = await transaction.getFirstAsync<AccountRow>(
+      `SELECT ${accountColumns} FROM accounts WHERE id = ?;`,
+      account.id,
+    );
+    if (!updatedAccount) throw new Error('Created account was not found after opening balance.');
+    account = mapAccount(updatedAccount);
   });
   if (!account) throw new Error('Account creation did not complete.');
   return account;
@@ -106,6 +122,9 @@ export async function updateAccountWithBalance(
   const themeColorIndex = input.themeColorIndex ?? null;
   validateThemeColorIndex(themeColorIndex);
   assertSafeCents(input.currentBalanceCents);
+  if (!Number.isSafeInteger(input.expectedFinancialVersion) || input.expectedFinancialVersion < 0) {
+    throw new Error('Invalid expected financial version.');
+  }
   if (!parseCivilDate(input.adjustmentDate).ok) throw new Error('Invalid balance adjustment date.');
 
   const timestamp = clock();
@@ -116,6 +135,9 @@ export async function updateAccountWithBalance(
       id,
     );
     if (!existing) return;
+    if (existing.financial_version !== input.expectedFinancialVersion) {
+      throw new StaleBalanceAdjustmentError();
+    }
 
     const previousBalanceCents = await readAccountBalance(transaction, id);
     const differenceCents = addCents(input.currentBalanceCents, -previousBalanceCents);
@@ -142,6 +164,7 @@ export async function updateAccountWithBalance(
         timestamp,
       );
       if (!adjustment) throw new Error('Balance adjustment was not found.');
+      await enqueueFinancialAccountMutations(transaction, [id], timestamp);
       await enqueueEntityMutation(transaction, 'transaction', adjustment.id, timestamp);
     }
 

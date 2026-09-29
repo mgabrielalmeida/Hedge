@@ -18,7 +18,10 @@ import {
   listRecurringOccurrencesForMonth,
   listRecurringRules,
   listTransactions,
+  pauseRecurringRule,
   processDueRecurringRules,
+  resumeRecurringRule,
+  StaleBalanceAdjustmentError,
   updateAccount,
   updateAccountWithBalance,
   updateCategory,
@@ -90,21 +93,26 @@ describe('SQLite repositories', () => {
     }, () => createdAt);
 
     await expect(getAccountBalance(database, account.id)).resolves.toBe(3_000);
-    await expect(updateAccountWithBalance(database, account.id, {
+    const accountAfterTransfer = await findAccountById(database, account.id);
+    const firstAdjustment = await updateAccountWithBalance(database, account.id, {
       name: 'Emergency reserve', institutionName: 'Bank C', iconValue: 'safe', colorValue: '#123456',
       themeColorIndex: 1, currentBalanceCents: 5_000, adjustmentDate: '2026-09-03',
-    }, () => updatedAt)).resolves.toEqual(expect.objectContaining({
+      expectedFinancialVersion: accountAfterTransfer!.financialVersion,
+    }, () => updatedAt);
+    expect(firstAdjustment).toEqual(expect.objectContaining({
       name: 'Emergency reserve', institutionName: 'Bank C', updatedAt,
     }));
     await expect(getAccountBalance(database, account.id)).resolves.toBe(5_000);
 
-    await updateAccountWithBalance(database, account.id, {
+    const secondAdjustment = await updateAccountWithBalance(database, account.id, {
       name: 'Emergency reserve', institutionName: 'Bank C', iconValue: 'safe', colorValue: '#123456',
       themeColorIndex: 1, currentBalanceCents: 4_500, adjustmentDate: '2026-09-04',
+      expectedFinancialVersion: firstAdjustment!.financialVersion,
     }, () => updatedAt);
     await updateAccountWithBalance(database, account.id, {
       name: 'Reserve fund', institutionName: 'Bank C', iconValue: 'safe', colorValue: '#123456',
       themeColorIndex: 1, currentBalanceCents: 4_500, adjustmentDate: '2026-09-05',
+      expectedFinancialVersion: secondAdjustment!.financialVersion,
     }, () => updatedAt);
 
     const adjustments = (await listTransactions(database)).filter((item) => item.name === 'Retífica de saldo');
@@ -132,10 +140,31 @@ describe('SQLite repositories', () => {
     await expect(updateAccountWithBalance(database, account.id, {
       name: 'Changed', institutionName: 'Other bank', iconValue: 'wallet', colorValue: '#123456',
       currentBalanceCents: 2_000, adjustmentDate: '2026-09-03',
+      expectedFinancialVersion: account.financialVersion,
     }, () => updatedAt)).rejects.toThrow('balance adjustment rejected');
 
     await expect(findAccountById(database, account.id)).resolves.toEqual(account);
     await expect(getAccountBalance(database, account.id)).resolves.toBe(1_000);
+  });
+
+  it('rejects a stale balance rectification after another movement', async () => {
+    const account = await createAccount(database, {
+      name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749',
+      initialBalanceCents: 1_000, openingBalanceDate: '2026-09-02',
+    }, () => createdAt);
+    await createTransaction(database, {
+      kind: 'income', accountId: account.id, name: 'Concurrent income',
+      amountCents: 500, transactionDate: '2026-09-03',
+    }, () => updatedAt);
+
+    await expect(updateAccountWithBalance(database, account.id, {
+      name: 'Stale edit', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749',
+      currentBalanceCents: 2_000, adjustmentDate: '2026-09-03',
+      expectedFinancialVersion: account.financialVersion,
+    }, () => updatedAt)).rejects.toBeInstanceOf(StaleBalanceAdjustmentError);
+
+    await expect(getAccountBalance(database, account.id)).resolves.toBe(1_500);
+    await expect(findAccountById(database, account.id)).resolves.toEqual(expect.objectContaining({ name: 'Main' }));
   });
 
   it('updates categories and deactivates affected rules before deleting a category', async () => {
@@ -260,6 +289,33 @@ describe('SQLite repositories', () => {
     expect(result.generated.every((item) => item.transaction.name === 'Limited subscription')).toBe(true);
   });
 
+  it('preserves pause, resume, month-end, and leap-year recurrence semantics', async () => {
+    const account = await createAccount(database, {
+      name: 'Calendar', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749',
+      initialBalanceCents: 0, openingBalanceDate: '2026-01-01',
+    }, () => createdAt);
+    const monthly = await createRecurringRule(database, {
+      kind: 'income', accountId: account.id, name: 'Month end', amountCents: 100,
+      frequency: 'monthly', chargeDay: 31, startDate: '2026-01-01',
+    }, () => createdAt);
+    await createRecurringRule(database, {
+      kind: 'income', accountId: account.id, name: 'Leap day', amountCents: 200,
+      frequency: 'yearly', chargeDay: 29, chargeMonth: 2, startDate: '2026-01-01',
+    }, () => createdAt);
+
+    await processDueRecurringRules(database, '2027-02-28', () => updatedAt);
+    await pauseRecurringRule(database, monthly.id, () => updatedAt);
+    await expect(processDueRecurringRules(database, '2027-03-31', () => updatedAt))
+      .resolves.toEqual(expect.objectContaining({ generated: [] }));
+    await resumeRecurringRule(database, monthly.id, () => updatedAt);
+    const resumed = await processDueRecurringRules(database, '2028-02-29', () => updatedAt);
+
+    expect(resumed.generated.filter((item) => item.transaction.name === 'Month end').map((item) => item.transaction.transactionDate))
+      .toEqual(['2027-03-31', '2027-04-30', '2027-05-31', '2027-06-30', '2027-07-31', '2027-08-31', '2027-09-30', '2027-10-31', '2027-11-30', '2027-12-31', '2028-01-31', '2028-02-29']);
+    expect((await listTransactions(database)).filter((item) => item.name === 'Leap day').map((item) => item.transactionDate))
+      .toEqual(expect.arrayContaining(['2026-02-28', '2027-02-28', '2028-02-29']));
+  });
+
   it('commits recurrence batches independently and resumes without duplicating completed batches', async () => {
     const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-01' }, () => createdAt);
     await createRecurringRule(database, { kind: 'income', accountId: account.id, name: 'First batch', amountCents: 1_000, frequency: 'monthly', chargeDay: 2, startDate: '2026-09-01' }, () => createdAt);
@@ -269,6 +325,13 @@ describe('SQLite repositories', () => {
     await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt, 1)).rejects.toThrow('simulated batch interruption');
     expect((await listTransactions(database)).filter((item) => item.name === 'First batch')).toHaveLength(1);
     expect((await listTransactions(database)).filter((item) => item.name === 'Failing batch')).toHaveLength(0);
+    const interrupted = await database.getFirstAsync<{ batch_id: string; state: string }>(
+      `SELECT batch_id, state FROM recurrence_processing_batches WHERE processing_date = '2026-09-02';`,
+    );
+    expect(interrupted?.state).toBe('interrupted');
+    await expect(database.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM recurrence_processing_checkpoints;',
+    )).resolves.toEqual({ count: 1 });
 
     await database.execAsync('DROP TRIGGER reject_failing_batch;');
     const resumed = await processDueRecurringRules(database, '2026-09-02', () => updatedAt, 1);
@@ -276,5 +339,8 @@ describe('SQLite repositories', () => {
     expect(resumed.affectedAccountIds).toEqual([account.id]);
     expect((await listTransactions(database)).filter((item) => item.name === 'First batch')).toHaveLength(1);
     expect((await listTransactions(database)).filter((item) => item.name === 'Failing batch')).toHaveLength(1);
+    await expect(database.getFirstAsync<{ batch_id: string; state: string }>(
+      `SELECT batch_id, state FROM recurrence_processing_batches WHERE processing_date = '2026-09-02';`,
+    )).resolves.toEqual({ batch_id: interrupted!.batch_id, state: 'completed' });
   });
 });

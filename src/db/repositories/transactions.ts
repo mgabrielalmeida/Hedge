@@ -2,6 +2,7 @@ import { normalizeOptionalText, parseCivilDate, validateRequiredText } from '@/d
 import type { Cents, CivilDate, EntityId, Transaction, YearMonth } from '@/domain';
 
 import { type Clock, type RepositoryDatabase, systemClock } from './database';
+import { enqueueFinancialAccountMutations } from './financialVersions';
 import { mapTransaction, type TransactionRow } from './rows';
 import { enqueueEntityMutation } from '../sync/outbox';
 
@@ -64,6 +65,7 @@ export async function createTransaction(db: RepositoryDatabase, input: Transacti
     );
     if (!row) throw new Error('Created transaction was not found.');
     created = mapTransaction(row);
+    await enqueueFinancialAccountMutations(session, [row.account_id, row.destination_account_id], timestamp);
     await enqueueEntityMutation(session, 'transaction', row.id, timestamp);
   });
   if (!created) throw new Error('Transaction creation did not complete.');
@@ -262,9 +264,19 @@ export async function updateTransaction(db: RepositoryDatabase, id: number, inpu
   await assertActiveAccounts(db, transaction.accountId, transaction.destinationAccountId);
   const timestamp = clock();
   await db.withExclusiveTransactionAsync(async (session) => {
+    const previous = await session.getFirstAsync<{ account_id: number; destination_account_id: number | null }>(
+      'SELECT account_id, destination_account_id FROM transactions WHERE id = ? AND deleted_at IS NULL;',
+      id,
+    );
+    if (!previous) return;
     await session.runAsync(
       `UPDATE transactions SET kind = ?, account_id = ?, destination_account_id = ?, category_id = ?, name = ?, description = ?, amount_cents = ?, transaction_date = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL;`,
       transaction.kind, transaction.accountId, transaction.destinationAccountId, transaction.categoryId, transaction.name, transaction.description, transaction.amountCents, transaction.transactionDate, timestamp, id,
+    );
+    await enqueueFinancialAccountMutations(
+      session,
+      [previous.account_id, previous.destination_account_id, transaction.accountId, transaction.destinationAccountId],
+      timestamp,
     );
     await enqueueEntityMutation(session, 'transaction', id, timestamp);
   });
@@ -280,10 +292,16 @@ export async function deleteTransaction(db: RepositoryDatabase, id: number, cloc
   if (!await findTransactionById(db, id)) return false;
   const timestamp = clock();
   await db.withExclusiveTransactionAsync(async (session) => {
+    const previous = await session.getFirstAsync<{ account_id: number; destination_account_id: number | null }>(
+      'SELECT account_id, destination_account_id FROM transactions WHERE id = ? AND deleted_at IS NULL;',
+      id,
+    );
+    if (!previous) return;
     const occurrences = await session.getAllAsync<{ id: number }>('SELECT id FROM recurring_occurrences WHERE transaction_id = ? AND deleted_at IS NULL;', id);
     await session.runAsync('UPDATE recurring_occurrences SET transaction_id = NULL WHERE transaction_id = ?;', id);
     for (const occurrence of occurrences) await enqueueEntityMutation(session, 'recurring_occurrence', occurrence.id, timestamp);
     await session.runAsync('UPDATE transactions SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL;', timestamp, timestamp, id);
+    await enqueueFinancialAccountMutations(session, [previous.account_id, previous.destination_account_id], timestamp);
     await enqueueEntityMutation(session, 'transaction', id, timestamp);
   });
   return true;

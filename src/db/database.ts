@@ -6,6 +6,7 @@ import {
 
 import { runMigrations } from './migrate';
 import type { MigrationExecutorDatabase } from './migrations/migration';
+import { resolveSystemTimeZone } from '@/utils/financialTimeZone';
 
 export const DATABASE_NAME = 'hedge.db';
 export const GLOBAL_IDENTITY_SCHEMA_VERSION = 9;
@@ -34,6 +35,20 @@ export async function initializeDatabase(
     await createPreIdentityRecoveryCopy(db as SQLiteDatabase, options.databaseName);
   }
   await runMigrations(db);
+  await ensureFinancialTimeZone(db);
+}
+
+async function ensureFinancialTimeZone(db: MigrationExecutorDatabase): Promise<void> {
+  const profile = await db.getFirstAsync<{ financial_timezone: string | null }>(
+    'SELECT financial_timezone FROM local_profile WHERE id = 1;',
+  );
+  if (!profile) throw new Error('Local profile is unavailable.');
+  if (profile.financial_timezone !== null) return;
+  await db.runAsync(
+    'UPDATE local_profile SET financial_timezone = ?, updated_at = ? WHERE id = 1 AND financial_timezone IS NULL;',
+    resolveSystemTimeZone(),
+    new Date().toISOString(),
+  );
 }
 
 export function recoveryDatabaseName(databaseName: string): string {

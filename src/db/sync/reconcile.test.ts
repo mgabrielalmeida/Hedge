@@ -2,15 +2,21 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { asSyncIdentifier, type SyncEvent } from '@/domain/sync/contracts';
+import { asSyncIdentifier, type SyncCommand, type SyncEvent } from '@/domain/sync/contracts';
 
 import { initializeDatabase } from '../database';
 import { createAccount, updateAccount } from '../repositories/accounts';
 import { createCategory, updateCategory } from '../repositories/categories';
-import { createRecurringRule, createDueOccurrence } from '../repositories/recurring';
+import { createRecurringRule, createDueOccurrence, processDueRecurringRules } from '../repositories/recurring';
 import { createTransaction, deleteTransaction } from '../repositories/transactions';
 import { TestDatabase, createTestDatabase } from '../testDatabase';
-import { acquireOutboxLease, applySyncEvent } from './outbox';
+import {
+  acquireOutboxLease,
+  applySyncEvent,
+  listSyncConflictReviews,
+  recordSyncConflict,
+  resolveSyncConflict,
+} from './outbox';
 import { reconcileOnce } from './reconcile';
 import { SimulatedSyncTransport } from './simulatedTransport';
 
@@ -176,6 +182,108 @@ describe('local outbox and reconciliation', () => {
     )).resolves.toEqual({ count: 0 });
     await expect(database.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM sync_conflicts;'))
       .resolves.toEqual({ count: 1 });
+    await expect(database.getFirstAsync<{ name: string }>('SELECT name FROM categories WHERE id = ?;', firstCategory.id))
+      .resolves.toEqual({ name: 'Conflicting local' });
+
+    const [review] = await listSyncConflictReviews(database);
+    expect(review).toEqual(expect.objectContaining({ reviewKind: 'concurrent_edit' }));
+    await resolveSyncConflict(database, review.id, 'accept_remote', '2026-09-28T10:04:00.000Z');
+    await expect(database.getFirstAsync<{ name: string }>('SELECT name FROM categories WHERE id = ?;', firstCategory.id))
+      .resolves.toEqual({ name: 'Conflicting' });
+    await expect(listSyncConflictReviews(database)).resolves.toEqual([]);
+  });
+
+  it('retries a reviewed local proposal with the current remote version', async () => {
+    const category = await createCategory(database, { name: 'Remote base', monthlyBudgetCents: 100 }, () => first);
+    const transport = new SimulatedSyncTransport();
+    await reconcileOnce(database, transport, () => second);
+    await updateCategory(database, category.id, { name: 'Keep local', monthlyBudgetCents: 200 }, () => third);
+    await database.runAsync(
+      `UPDATE sync_outbox SET expected_version = 0
+       WHERE entity_kind = 'category' AND payload_json LIKE '%Keep local%';`,
+    );
+    await reconcileOnce(database, transport, () => '2026-09-28T10:03:00.000Z');
+
+    const [review] = await listSyncConflictReviews(database);
+    await resolveSyncConflict(database, review.id, 'keep_local', '2026-09-28T10:04:00.000Z');
+    await expect(database.getFirstAsync<{ expected_version: number; state: string }>(
+      `SELECT expected_version, state FROM sync_outbox
+       WHERE entity_kind = 'category' AND payload_json LIKE '%Keep local%';`,
+    )).resolves.toEqual({ expected_version: 1, state: 'pending' });
+    await expect(reconcileOnce(database, transport, () => '2026-09-28T10:05:00.000Z'))
+      .resolves.toEqual(expect.objectContaining({ conflicts: 0 }));
+    await expect(listSyncConflictReviews(database)).resolves.toEqual([]);
+  });
+
+  it('classifies edit, deletion, archive, and category conflicts for explicit review', async () => {
+    const cases: readonly [SyncCommand, SyncEvent][] = [
+      conflictPair('edit', 'category', 'upsert', { name: 'Local' }, 'upsert', { name: 'Remote' }),
+      conflictPair('delete', 'transaction', 'tombstone', {}, 'upsert', { name: 'Remote' }),
+      conflictPair('archive', 'account', 'upsert', { isArchived: 1 }, 'upsert', { isArchived: 0 }),
+      conflictPair(
+        'category',
+        'transaction',
+        'upsert',
+        { categorySyncId: 'category-local' },
+        'upsert',
+        { categorySyncId: 'category-remote' },
+      ),
+    ];
+    for (const [command, current] of cases) {
+      await recordSyncConflict(database, command, current, 'version_mismatch', third);
+    }
+
+    expect((await listSyncConflictReviews(database)).map((review) => review.reviewKind)).toEqual([
+      'concurrent_edit',
+      'concurrent_delete',
+      'concurrent_archive',
+      'concurrent_category',
+    ]);
+  });
+
+  it('deduplicates an occurrence generated independently by two simulated devices', async () => {
+    const other = createTestDatabase();
+    try {
+      await initializeDatabase(other);
+      for (const target of [database, other]) {
+        await target.runAsync("DELETE FROM sync_outbox WHERE entity_kind = 'category';");
+        await target.runAsync(
+          `INSERT INTO accounts (
+             id, sync_id, name, institution_name, visual_type, visual_value, icon_value, color_value
+           ) VALUES (100, 'shared-account', 'Shared', 'Bank', 'icon', 'bank', 'bank', '#123456');`,
+        );
+        await target.runAsync(
+          `INSERT INTO recurring_rules (
+             id, sync_id, kind, account_id, name, amount_cents, frequency, charge_day, start_date
+           ) VALUES (100, 'shared-rule', 'income', 100, 'Shared recurrence', 500, 'monthly', 29, '2026-09-01');`,
+        );
+        await processDueRecurringRules(target, '2026-09-29', () => third);
+      }
+
+      const identities = await Promise.all([database, other].map((target) => target.getFirstAsync<{
+        occurrence_sync_id: string;
+        transaction_sync_id: string;
+      }>(
+        `SELECT o.sync_id AS occurrence_sync_id, t.sync_id AS transaction_sync_id
+         FROM recurring_occurrences o JOIN transactions t ON t.id = o.transaction_id
+         WHERE o.recurring_rule_id = 100;`,
+      )));
+      expect(identities[0]).toEqual(identities[1]);
+      expect(identities[0]).toEqual({
+        occurrence_sync_id: 'shared-rule:2026-09-29',
+        transaction_sync_id: 'shared-rule:2026-09-29:transaction',
+      });
+
+      const transport = new SimulatedSyncTransport();
+      await reconcileOnce(database, transport, () => '2026-09-28T10:03:00.000Z');
+      await reconcileOnce(other, transport, () => '2026-09-28T10:04:00.000Z');
+      const server = await transport.pull(null);
+      expect(server.events.filter((event) => event.entity.kind === 'recurring_occurrence')).toHaveLength(1);
+      expect(server.events.filter((event) => event.entity.kind === 'transaction'
+        && event.entity.syncId === 'shared-rule:2026-09-29:transaction')).toHaveLength(1);
+    } finally {
+      other.close();
+    }
   });
 });
 
@@ -184,4 +292,30 @@ function accountInput(name: string, initialBalanceCents: number) {
     name, institutionName: 'Bank', iconValue: 'bank', colorValue: '#123456', themeColorIndex: null,
     initialBalanceCents, openingBalanceDate: '2026-09-28',
   } as const;
+}
+
+function conflictPair(
+  id: string,
+  kind: SyncCommand['entity']['kind'],
+  localOperation: SyncCommand['operation'],
+  localPayload: SyncCommand['payload'],
+  remoteOperation: SyncEvent['operation'],
+  remotePayload: SyncEvent['payload'],
+): [SyncCommand, SyncEvent] {
+  const entity = { kind, syncId: asSyncIdentifier(`entity-${id}`)! };
+  return [{
+    commandId: asSyncIdentifier(`command-${id}`)!,
+    entity,
+    operation: localOperation,
+    expectedVersion: 1,
+    dependsOn: [],
+    payload: localPayload,
+  }, {
+    eventId: asSyncIdentifier(`event-${id}`)!,
+    cursor: { value: asSyncIdentifier(`cursor-${id}`)! },
+    entity,
+    operation: remoteOperation,
+    version: 2,
+    payload: remotePayload,
+  }];
 }

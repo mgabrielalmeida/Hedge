@@ -16,7 +16,7 @@ import {
   SelectableChip,
   useSuccessFeedback,
 } from '@/components';
-import { createAccount, updateAccountWithBalance } from '@/db/repositories';
+import { createAccount, StaleBalanceAdjustmentError, updateAccountWithBalance } from '@/db/repositories';
 import { useDatabase } from '@/db/DatabaseProvider';
 import { formatBrazilianMoneyInput, parseMoneyInput, validateRequiredText } from '@/domain';
 import type { Account, Cents, ThemeColorIndex } from '@/domain';
@@ -101,6 +101,7 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
             ...visualInput,
             currentBalanceCents: amount.value,
             adjustmentDate: getLocalCivilDate(),
+            expectedFinancialVersion: account.financialVersion,
           })
         : await createAccount(database, {
             ...visualInput,
@@ -110,8 +111,10 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
       if (!savedAccount) throw new Error('Account was not found.');
       showSuccess(account ? 'Conta atualizada.' : 'Conta criada.');
       onSaved(savedAccount);
-    } catch {
-      setFeedback(`Não foi possível ${account ? 'salvar' : 'criar'} a conta. Confira os dados e toque em salvar novamente.`);
+    } catch (error) {
+      setFeedback(error instanceof StaleBalanceAdjustmentError
+        ? 'O saldo mudou desde que esta tela foi aberta. Volte, abra a conta novamente e revise o valor antes de salvar.'
+        : `Não foi possível ${account ? 'salvar' : 'criar'} a conta. Confira os dados e toque em salvar novamente.`);
     } finally {
       setIsSubmitting(false);
     }

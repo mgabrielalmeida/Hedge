@@ -24,6 +24,7 @@ export type AccountRow = {
   theme_color_index: number | null;
   is_archived: number;
   archived_at: string | null;
+  financial_version: number;
   created_at: string;
   updated_at: string;
 };
@@ -90,6 +91,7 @@ export function mapAccount(row: AccountRow): Account {
     themeColorIndex: row.theme_color_index as ThemeColorIndex | null,
     isArchived: row.is_archived === 1,
     archivedAt: row.archived_at,
+    financialVersion: row.financial_version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

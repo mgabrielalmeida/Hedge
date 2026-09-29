@@ -4,6 +4,7 @@ export type MigrationDatabase = Pick<SQLiteDatabase, 'execAsync'>;
 
 export type MigrationExecutorDatabase = MigrationDatabase & {
   getFirstAsync: <T>(source: string) => Promise<T | null>;
+  runAsync: (source: string, ...parameters: (string | number | null)[]) => Promise<unknown>;
   withExclusiveTransactionAsync: (
     task: (transaction: MigrationDatabase) => Promise<void>,
   ) => Promise<void>;

@@ -14,6 +14,7 @@ export interface Account {
   readonly themeColorIndex: ThemeColorIndex | null;
   readonly isArchived: boolean;
   readonly archivedAt: UtcTimestamp | null;
+  readonly financialVersion: number;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
 }

@@ -71,6 +71,8 @@ export function validateAccount(account: Account): ValidationResult<Account, Dom
     !isThemeColorIndex(account.themeColorIndex) ||
     (account.isArchived && !isUtcTimestamp(account.archivedAt ?? '')) ||
     (!account.isArchived && account.archivedAt !== null) ||
+    !Number.isSafeInteger(account.financialVersion) ||
+    account.financialVersion < 0 ||
     !isUtcTimestamp(account.createdAt) ||
     !isUtcTimestamp(account.updatedAt)
   ) {
