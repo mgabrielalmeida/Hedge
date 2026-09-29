@@ -285,6 +285,26 @@ describe('SQLite repositories', () => {
     await expect(getConsolidatedBalance(database)).resolves.toBe(155);
   });
 
+  it('filters paged transaction history by category and literal text in name or description', async () => {
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-01' }, () => createdAt);
+    const food = await createCategory(database, { name: 'Food', monthlyBudgetCents: 0 }, () => createdAt);
+    const transport = await createCategory(database, { name: 'Transport', monthlyBudgetCents: 0 }, () => createdAt);
+    await createTransaction(database, { kind: 'expense', accountId: account.id, categoryId: food.id, name: 'Mercado Central', description: 'Compra semanal', amountCents: -100, transactionDate: '2026-09-02' }, () => createdAt);
+    await createTransaction(database, { kind: 'expense', accountId: account.id, categoryId: food.id, name: 'Desconto 50%', amountCents: -50, transactionDate: '2026-09-01' }, () => createdAt);
+    await createTransaction(database, { kind: 'expense', accountId: account.id, categoryId: transport.id, name: 'Mercado do posto', description: 'Compra semanal', amountCents: -20, transactionDate: '2026-09-01' }, () => createdAt);
+
+    await expect(listTransactionPage(database, {
+      accountId: account.id, categoryId: food.id, historyKind: 'transactions', month: '2026-09', searchQuery: 'SEMANAL',
+    })).resolves.toEqual(expect.objectContaining({
+      items: [expect.objectContaining({ name: 'Mercado Central' })],
+    }));
+    await expect(listTransactionPage(database, {
+      accountId: account.id, historyKind: 'transactions', month: '2026-09', searchQuery: '50%',
+    })).resolves.toEqual(expect.objectContaining({
+      items: [expect.objectContaining({ name: 'Desconto 50%' })],
+    }));
+  });
+
   it('processes overdue occurrences in recoverable batches', async () => {
     const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
     await createRecurringRule(database, { kind: 'income', accountId: account.id, name: 'Weekly income', amountCents: 1, frequency: 'weekly', chargeDay: 1, startDate: '2025-01-06' }, () => createdAt);

@@ -51,9 +51,11 @@ export async function listTransactionPage(
   db: RepositoryDatabase,
   options: {
     readonly accountId: EntityId | null;
+    readonly categoryId?: EntityId | null;
     readonly cursor?: TransactionPageCursor | null;
     readonly historyKind: TransactionHistoryKind;
     readonly month: string;
+    readonly searchQuery?: string;
   },
 ): Promise<TransactionPage> {
   const monthStart = `${options.month}-01`;
@@ -68,11 +70,28 @@ export async function listTransactionPage(
   const accountClause = options.accountId === null
     ? ''
     : 'AND (t.account_id = ? OR t.destination_account_id = ?)';
+  const categoryId = options.categoryId ?? null;
+  if (categoryId !== null && (!Number.isSafeInteger(categoryId) || categoryId <= 0)) {
+    throw new Error('Invalid transaction history category.');
+  }
+  if (categoryId !== null && options.historyKind !== 'transactions') {
+    throw new Error('Transaction history category requires transaction history.');
+  }
+  const categoryClause = categoryId === null ? '' : 'AND t.category_id = ?';
+  const searchQuery = options.searchQuery?.trim() ?? '';
+  const searchClause = searchQuery === ''
+    ? ''
+    : "AND (LOWER(t.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(t.description, '')) LIKE ? ESCAPE '\\')";
   const cursorClause = options.cursor === undefined || options.cursor === null
     ? ''
     : 'AND (t.transaction_date < ? OR (t.transaction_date = ? AND t.id < ?))';
   const parameters: (string | number)[] = [monthStart, nextMonth];
   if (options.accountId !== null) parameters.push(options.accountId, options.accountId);
+  if (categoryId !== null) parameters.push(categoryId);
+  if (searchQuery !== '') {
+    const pattern = `%${escapeLikePattern(searchQuery.toLowerCase())}%`;
+    parameters.push(pattern, pattern);
+  }
   if (options.cursor !== undefined && options.cursor !== null) {
     parameters.push(options.cursor.transactionDate, options.cursor.transactionDate, options.cursor.id);
   }
@@ -87,6 +106,8 @@ export async function listTransactionPage(
        AND t.transaction_date >= ? AND t.transaction_date < ?
        AND ${kindClause}
        ${accountClause}
+       ${categoryClause}
+       ${searchClause}
        ${cursorClause}
      ORDER BY t.transaction_date DESC, t.id DESC
      LIMIT ?;`,
@@ -99,6 +120,10 @@ export async function listTransactionPage(
     items,
     nextCursor: hasMore && last ? { id: last.id, transactionDate: last.transactionDate } : null,
   };
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
 }
 
 export async function findTransactionById(db: RepositoryDatabase, id: number): Promise<Transaction | null> {

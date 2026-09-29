@@ -11,6 +11,7 @@ import {
   ChipGroup,
   EmptyStateCard,
   FadeSelection,
+  Field,
   FormFeedback,
   MonthNavigator,
   PressableCard,
@@ -74,6 +75,9 @@ export function TransactionsHomeScreen({
   const [recurringRules, setRecurringRules] = useState<readonly RecurringRule[]>([]);
   const [historyType, setHistoryType] = useState<HistoryType>('transactions');
   const [selectedMonth, setSelectedMonth] = useState<YearMonth>(() => getLocalCivilDate().slice(0, 7));
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -92,8 +96,10 @@ export function TransactionsHomeScreen({
           ? Promise.resolve({ items: [], nextCursor: null })
           : listTransactionPage(db, {
             accountId: selectedAccountId,
+            categoryId: historyType === 'transactions' ? selectedCategoryId : null,
             historyKind: historyType,
             month: selectedMonth,
+            searchQuery: appliedSearchQuery,
           }),
         selectedAccountId === null
           ? getConsolidatedBalance(db)
@@ -116,7 +122,7 @@ export function TransactionsHomeScreen({
     } finally {
       setIsLoading(false);
     }
-  }, [db, historyType, onNoAccounts, selectedAccountId, selectedMonth]);
+  }, [appliedSearchQuery, db, historyType, onNoAccounts, selectedAccountId, selectedCategoryId, selectedMonth]);
 
   useFocusEffect(useCallback(() => {
     setBalanceReplayKey((key) => key + 1);
@@ -132,7 +138,8 @@ export function TransactionsHomeScreen({
     .map((rule) => ({ rule, nextChargeDate: getNextRecurringChargeDate(rule, getLocalCivilDate()) }))
     .sort((left, right) => (left.nextChargeDate ?? '9999-12-31').localeCompare(right.nextChargeDate ?? '9999-12-31'));
   const transactionGroups = groupByDate(transactions.map((item) => ({ date: item.transactionDate, item })));
-  const historySelectionKey = `${historyType}:${selectedAccountId ?? 'all'}:${selectedMonth}`;
+  const historySelectionKey = `${historyType}:${selectedAccountId ?? 'all'}:${selectedMonth}:${selectedCategoryId ?? 'all'}:${appliedSearchQuery}`;
+  const hasTransactionFilters = appliedSearchQuery !== '' || (historyType === 'transactions' && selectedCategoryId !== null);
 
   if (isLoading) return <ScreenState message="Buscando lançamentos e recorrências…" status="loading" title="Carregando histórico" />;
   if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
@@ -187,9 +194,11 @@ export function TransactionsHomeScreen({
     try {
       const page = await listTransactionPage(db, {
         accountId: selectedAccountId,
+        categoryId: historyType === 'transactions' ? selectedCategoryId : null,
         cursor: nextTransactionCursor,
         historyKind: historyType,
         month: selectedMonth,
+        searchQuery: appliedSearchQuery,
       });
       setTransactions((current) => [...current, ...page.items]);
       setNextTransactionCursor(page.nextCursor);
@@ -234,6 +243,47 @@ export function TransactionsHomeScreen({
           value={historyType}
         />
         {historyType !== 'recurring' ? <MonthFilter month={selectedMonth} onChange={setSelectedMonth} /> : null}
+        {historyType !== 'recurring' ? (
+          <Card>
+            <View style={styles.filterSection}>
+              <Field
+                autoCapitalize="none"
+                label="Buscar"
+                onChangeText={setSearchText}
+                onSubmitEditing={() => setAppliedSearchQuery(searchText.trim())}
+                placeholder="Nome ou descrição"
+                returnKeyType="search"
+                value={searchText}
+              />
+              <View style={styles.filterActions}>
+                <Button label="Buscar" onPress={() => setAppliedSearchQuery(searchText.trim())} style={styles.filterAction} />
+                {hasTransactionFilters ? (
+                  <Button
+                    label="Limpar filtros"
+                    onPress={() => {
+                      setSearchText('');
+                      setAppliedSearchQuery('');
+                      setSelectedCategoryId(null);
+                    }}
+                    style={styles.filterAction}
+                    variant="secondary"
+                  />
+                ) : null}
+              </View>
+              {historyType === 'transactions' ? (
+                <View style={styles.categoryFilter}>
+                  <Text tone="muted" variant="caption">Categoria</Text>
+                  <ChipGroup accessibilityLabel="Categoria do histórico">
+                    <SelectableChip animateSelection label="Todas" onPress={() => setSelectedCategoryId(null)} selected={selectedCategoryId === null} />
+                    {categories.map((category) => (
+                      <SelectableChip animateSelection key={category.id} label={category.name} onPress={() => setSelectedCategoryId(category.id)} selected={category.id === selectedCategoryId} />
+                    ))}
+                  </ChipGroup>
+                </View>
+              ) : null}
+            </View>
+          </Card>
+        ) : null}
         <FadeSelection selectionKey={historySelectionKey}>
           <View style={styles.list}>
           {historyType === 'recurring' ? visibleRecurringRules.length === 0 ? (
@@ -254,7 +304,7 @@ export function TransactionsHomeScreen({
               ))}
             </>
           ) : transactions.length === 0 ? (
-            <EmptyStateCard message={historyType === 'transfers' ? 'Nenhuma transferência registrada neste mês.' : 'Nenhum lançamento registrado neste mês.'} />
+            <EmptyStateCard message={hasTransactionFilters ? 'Nenhum lançamento encontrado com os filtros selecionados.' : historyType === 'transfers' ? 'Nenhuma transferência registrada neste mês.' : 'Nenhum lançamento registrado neste mês.'} />
           ) : transactionGroups.map((group) => (
             <HistoryDateGroup date={group.date} key={group.date}>
               {group.items.map((transaction) => (
@@ -415,10 +465,14 @@ function formatRecurringSchedule(rule: RecurringRule): string {
 
 const styles = StyleSheet.create({
   balanceHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  categoryFilter: { gap: 8 },
   dateGroup: { gap: 8 },
   dateGroupItems: { gap: 10 },
   dateHeading: { fontWeight: '600', paddingHorizontal: 4 },
   list: { gap: 10 },
+  filterAction: { flex: 1 },
+  filterActions: { flexDirection: 'row', gap: 8 },
+  filterSection: { gap: 12 },
   recurringAction: { alignItems: 'center', borderWidth: 1, justifyContent: 'center', minHeight: 40, minWidth: 64, paddingHorizontal: 10 },
   recurringDetails: { flex: 1, minWidth: 0 },
   recurringHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 10 },

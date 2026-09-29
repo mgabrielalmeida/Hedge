@@ -156,7 +156,10 @@ e atualizarão o resultado após uma escrita relevante. O histórico busca
 lançamentos por mês, tipo e conta em páginas de até 50 itens, usando o cursor
 composto por data e identificador; as telas mantêm somente as páginas que o
 usuário pediu. Saldos consolidados e por conta são calculados por agregações
-SQL, sem carregar o histórico inteiro na memória. Uma solução de cache ou
+SQL, sem carregar o histórico inteiro na memória. A mesma consulta pode filtrar
+lançamentos por categoria e por texto no nome ou na descrição, com parâmetros
+vinculados e correspondência literal sem distinção entre maiúsculas e minúsculas.
+Uma solução de cache ou
 reatividade só será adicionada se esse modelo demonstrar uma limitação real.
 
 As seguintes regras foram decididas:
