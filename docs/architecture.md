@@ -168,6 +168,11 @@ vinculados e correspondência literal sem distinção entre maiúsculas e minús
 Uma solução de cache ou
 reatividade só será adicionada se esse modelo demonstrar uma limitação real.
 
+Contas e categorias persistem separadamente a cor do traço do ícone SVG e a
+cor de fundo de seu indicador. Cada cor pode acompanhar dinamicamente o tema
+ativo ou ser uma escolha manual; o banco preserva ambas para que a aparência
+não dependa de estado global da interface.
+
 As seguintes regras foram decididas:
 
 - valores monetários serão armazenados como `INTEGER` em centavos;

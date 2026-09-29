@@ -17,13 +17,17 @@ import {
 } from './visualOptions';
 
 type VisualPickerProps = {
+  backgroundColorValue: string;
+  backgroundThemeColorIndex: number | null;
   colorValue: string;
   iconOptions: readonly IconOption[];
   iconValue: string;
   label?: string;
   onCustomColorChange: (value: string) => void;
+  onCustomBackgroundColorChange: (value: string) => void;
   onIconChange: (value: string) => void;
   onThemeColorChange: (index: ThemeColorIndex, value: string) => void;
+  onBackgroundThemeColorChange: (index: ThemeColorIndex, value: string) => void;
   themeColorIndex: number | null;
 };
 
@@ -54,13 +58,23 @@ const LIGHTNESS_OPTIONS = [
   { label: 'Profunda', value: 34 },
 ] as const;
 
+const NEUTRAL_COLOR_OPTIONS = [
+  { label: 'Preto', value: '#1C1B1F' },
+  { label: 'Cinza', value: '#757575' },
+  { label: 'Branco', value: '#FFFFFF' },
+] as const;
+
 export function VisualPicker({
+  backgroundColorValue,
+  backgroundThemeColorIndex,
   colorValue,
   iconOptions,
   iconValue,
   onCustomColorChange,
+  onCustomBackgroundColorChange,
   onIconChange,
   onThemeColorChange,
+  onBackgroundThemeColorChange,
   themeColorIndex,
 }: VisualPickerProps) {
   const { tokens } = useTheme();
@@ -68,8 +82,11 @@ export function VisualPicker({
   const [activeIconKind, setActiveIconKind] = useState<'emoji' | 'minimalist'>(
     selectedIconKind ?? 'minimalist',
   );
+  const [activeMixer, setActiveMixer] = useState<'background' | 'icon' | null>(null);
   const themeColorOptions = getThemeColorOptions(tokens.primary);
   const resolvedColorValue = resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary);
+  const backgroundThemeColorOptions = getThemeColorOptions(tokens.primaryContainer);
+  const resolvedBackgroundColorValue = resolveThemeColorValue(backgroundColorValue, backgroundThemeColorIndex, tokens.primaryContainer);
 
   const visibleIconOptions = iconOptions.filter((option) => option.kind === activeIconKind);
 
@@ -103,7 +120,7 @@ export function VisualPicker({
               style={({ pressed }) => [
                 styles.option,
                 {
-                  backgroundColor: resolvedColorValue,
+                  backgroundColor: resolvedBackgroundColorValue,
                   borderColor: selected ? tokens.focusRing : tokens.border,
                   borderRadius: tokens.radius.md,
                   borderWidth: selected ? 3 : 1,
@@ -111,44 +128,78 @@ export function VisualPicker({
                 },
               ]}
             >
-              <IconGlyph size={22} value={option.value} />
+              <IconGlyph color={resolvedColorValue} size={22} value={option.value} />
               {selected ? <SelectionBadge /> : null}
             </Pressable>
           );
         })}
       </View>
 
-      <Text variant="caption" style={{ color: tokens.textMuted }}>Cor</Text>
-      <View accessibilityLabel="Cor do indicador visual" accessibilityRole="radiogroup" style={styles.grid}>
-        {themeColorOptions.map((option, index) => {
-          const selected = themeColorIndex === index;
-          return (
-            <Pressable
-              accessibilityLabel={option.label}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              key={option.value}
-              onPress={() => onThemeColorChange(index as ThemeColorIndex, option.value)}
-              style={({ pressed }) => [
-                styles.option,
-                {
-                  backgroundColor: option.value,
-                  borderColor: selected ? tokens.focusRing : tokens.border,
-                  borderRadius: tokens.radius.md,
-                  borderWidth: selected ? 3 : 1,
-                  opacity: pressed ? 0.74 : 1,
-                },
-              ]}
-            >
-              {selected ? <SelectionBadge /> : null}
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <ColorMixer onChange={onCustomColorChange} value={resolvedColorValue} />
+      <ColorSelection
+        colorOptions={themeColorOptions}
+        customSelected={themeColorIndex === null}
+        label="Cor do ícone"
+        onCustomColorChange={onCustomColorChange}
+        onCustomPress={() => setActiveMixer('icon')}
+        onThemeColorChange={onThemeColorChange}
+        selectedIndex={themeColorIndex}
+        selectedCustomColor={resolvedColorValue}
+      />
+      <ColorSelection
+        colorOptions={backgroundThemeColorOptions}
+        customSelected={backgroundThemeColorIndex === null}
+        label="Cor de fundo"
+        onCustomColorChange={onCustomBackgroundColorChange}
+        onCustomPress={() => setActiveMixer('background')}
+        onThemeColorChange={onBackgroundThemeColorChange}
+        selectedIndex={backgroundThemeColorIndex}
+        selectedCustomColor={resolvedBackgroundColorValue}
+      />
+      {activeMixer === 'icon' ? <ColorMixer onChange={onCustomColorChange} value={resolvedColorValue} /> : null}
+      {activeMixer === 'background' ? <ColorMixer onChange={onCustomBackgroundColorChange} value={resolvedBackgroundColorValue} /> : null}
     </View>
   );
+}
+
+function ColorSelection({
+  colorOptions,
+  customSelected,
+  label,
+  onCustomColorChange,
+  onCustomPress,
+  onThemeColorChange,
+  selectedIndex,
+  selectedCustomColor,
+}: {
+  colorOptions: readonly { label: string; value: string }[];
+  customSelected: boolean;
+  label: string;
+  onCustomColorChange: (value: string) => void;
+  onCustomPress: () => void;
+  onThemeColorChange: (index: ThemeColorIndex, value: string) => void;
+  selectedIndex: number | null;
+  selectedCustomColor: string;
+}) {
+  const { tokens } = useTheme();
+  const hasNeutralSelected = customSelected && NEUTRAL_COLOR_OPTIONS.some((option) => option.value === selectedCustomColor);
+  return (
+    <View style={styles.colorSelection}>
+      <Text variant="caption" style={{ color: tokens.textMuted }}>{label}</Text>
+      <View accessibilityLabel={label} accessibilityRole="radiogroup" style={styles.grid}>
+        {colorOptions.map((option, index) => <ColorOption key={`theme-${option.value}`} color={option.value} label={option.label} onPress={() => onThemeColorChange(index as ThemeColorIndex, option.value)} selected={selectedIndex === index} />)}
+        {NEUTRAL_COLOR_OPTIONS.map((option) => <ColorOption key={`neutral-${option.value}`} color={option.value} label={option.label} onPress={() => onCustomColorChange(option.value)} selected={customSelected && selectedCustomColor === option.value} />)}
+        <Pressable accessibilityLabel="Misture sua cor" accessibilityRole="radio" accessibilityState={{ selected: customSelected && !hasNeutralSelected }} onPress={onCustomPress} style={({ pressed }) => [styles.option, { backgroundColor: tokens.surface, borderColor: customSelected && !hasNeutralSelected ? tokens.focusRing : tokens.border, borderRadius: tokens.radius.md, borderWidth: customSelected && !hasNeutralSelected ? 3 : 1, opacity: pressed ? 0.74 : 1 }]}>
+          <IconGlyph color={tokens.primary} size={22} value="lucide:sliders-horizontal" />
+          {customSelected && !hasNeutralSelected ? <SelectionBadge /> : null}
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function ColorOption({ color, label, onPress, selected }: { color: string; label: string; onPress: () => void; selected: boolean }) {
+  const { tokens } = useTheme();
+  return <Pressable accessibilityLabel={label} accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.option, { backgroundColor: color, borderColor: selected ? tokens.focusRing : tokens.border, borderRadius: tokens.radius.md, borderWidth: selected ? 3 : 1, opacity: pressed ? 0.74 : 1 }]}>{selected ? <SelectionBadge /> : null}</Pressable>;
 }
 
 function ColorMixer({ onChange, value }: { onChange: (value: string) => void; value: string }) {
@@ -350,6 +401,7 @@ const styles = StyleSheet.create({
     width: 20,
   },
   check: { fontSize: 12, fontWeight: '800', lineHeight: 16 },
+  colorSelection: { gap: 8 },
   container: { gap: 12 },
   control: { gap: 8 },
   controlOption: { alignItems: 'center', borderWidth: 1, flex: 1, gap: 5, minHeight: 58, padding: 7 },

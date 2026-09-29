@@ -16,6 +16,7 @@ import {
   ScreenHeader,
   ScreenState,
   ScrollableScreen,
+  resolveThemeColorValue,
   SelectableChip,
   Text,
   useReducedMotion,
@@ -47,6 +48,7 @@ import {
   validateRequiredText,
 } from '@/domain';
 import type { Account, Category, RecurringFrequency, RecurringRule, Transaction } from '@/domain';
+import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 type ExpenseScreenProps = {
@@ -76,6 +78,7 @@ export function ExpenseScreen({
 }: ExpenseScreenProps) {
   const db = useSQLiteContext();
   const reduceMotion = useReducedMotion();
+  const { tokens } = useTheme();
   const { showSuccess } = useSuccessFeedback();
   const initialDate = getLocalCivilDate();
   const initialDateParts = getCivilDateParts(initialDate);
@@ -302,7 +305,7 @@ export function ExpenseScreen({
             <Text tone={showRequiredErrors && accountIsMissing ? 'negative' : 'muted'} variant="caption">Conta</Text>
             <ChipGroup accessibilityLabel="Conta" error={showRequiredErrors && accountIsMissing}>{accounts.map((account) => <SelectableChip animateSelection key={account.id} label={account.name} onPress={() => { setAccountId(account.id); setShowRequiredErrors(false); }} selected={accountId === account.id} />)}</ChipGroup>
             {showRequiredErrors && accountIsMissing ? <Text tone="negative" variant="caption">Selecione uma conta.</Text> : null}
-            {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><ChipGroup accessibilityLabel="Categoria" error={showRequiredErrors && categoryIsMissing}>{categories.map((category) => <SelectableChip icon={<IconGlyph size={16} value={getIconDisplayValue(category.iconValue)} />} key={category.id} label={category.name} onPress={() => { setCategoryId(category.id); setShowRequiredErrors(false); }} selected={categoryId === category.id} />)}</ChipGroup>{showRequiredErrors && categoryIsMissing ? <Text tone="negative" variant="caption">Selecione uma categoria.</Text> : null}</> : null}
+            {kind === 'expense' ? <><Text tone={showRequiredErrors && categoryIsMissing ? 'negative' : 'muted'} variant="caption">Categoria</Text><ChipGroup accessibilityLabel="Categoria" error={showRequiredErrors && categoryIsMissing}>{categories.map((category) => <SelectableChip icon={<IconGlyph color={resolveThemeColorValue(category.colorValue, category.themeColorIndex, tokens.primary)} size={16} value={getIconDisplayValue(category.iconValue)} />} key={category.id} label={category.name} onPress={() => { setCategoryId(category.id); setShowRequiredErrors(false); }} selected={categoryId === category.id} />)}</ChipGroup>{showRequiredErrors && categoryIsMissing ? <Text tone="negative" variant="caption">Selecione uma categoria.</Text> : null}</> : null}
             <Field label="Descrição (opcional)" onChangeText={setDescription} value={description} placeholder="Adicionar observação" multiline />
             {transactionId === undefined && recurringRuleId === undefined ? <><Text tone="muted" variant="caption">Regra recorrente (opcional)</Text><ChipGroup accessibilityLabel="Regra recorrente"><SelectableChip label="Não se repete" onPress={() => setRecurrenceEnabled(false)} selected={!recurrenceEnabled} /><SelectableChip label="Configurar recorrência" onPress={() => setRecurrenceEnabled(true)} selected={recurrenceEnabled} /></ChipGroup></> : null}
             {recurrenceEnabled ? <RecurrenceFields chargeDay={chargeDay} chargeMonth={chargeMonth} endDate={endDate} frequency={frequency} onChargeDayChange={setChargeDay} onChargeMonthChange={setChargeMonth} onEndDateChange={setEndDate} onFrequencyChange={(nextFrequency) => {

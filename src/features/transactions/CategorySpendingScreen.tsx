@@ -96,6 +96,9 @@ export function CategorySpendingScreen({
   const categoryColor = data
     ? resolveThemeColorValue(data.category.colorValue, data.category.themeColorIndex, tokens.primary)
     : tokens.primary;
+  const categoryBackgroundColor = data
+    ? resolveThemeColorValue(data.category.backgroundColorValue, data.category.backgroundThemeColorIndex, tokens.primaryContainer)
+    : tokens.primaryContainer;
   const expenses = data && selectedMonth
     ? data.transactions.filter((transaction): transaction is ExpenseTransaction => (
       transaction.kind === 'expense' &&
@@ -128,7 +131,7 @@ export function CategorySpendingScreen({
         description={formatYearMonth(selectedMonth)}
         onBack={onBack}
         title={data.category.name}
-        trailing={<EntityVisual color={categoryColor} iconValue={getIconDisplayValue(data.category.iconValue)} size="large" />}
+        trailing={<EntityVisual backgroundColor={categoryBackgroundColor} iconColor={categoryColor} iconValue={getIconDisplayValue(data.category.iconValue)} size="large" />}
       />
       <Card elevated>
         <Text tone="muted" variant="caption">Total no mês</Text>
@@ -211,6 +214,11 @@ function CategorySpendingChart({
         account.colorValue,
         account.themeColorIndex,
         tokens.primary,
+      ),
+      accountBackgroundColor: resolveThemeColorValue(
+        account.backgroundColorValue,
+        account.backgroundThemeColorIndex,
+        tokens.primaryContainer,
       ),
       spendingByMonth: item.spendingByMonth,
     }];
@@ -389,7 +397,7 @@ function CategorySpendingChart({
           <View key={item.account.id} style={styles.legendItem}>
             <Svg height={14} width={14}><Rect fill={item.accountColor} height={14} width={14} /></Svg>
             <View style={styles.legendAccount}>
-              <EntityVisual color={item.accountColor} iconValue={getIconDisplayValue(item.account.iconValue)} size="small" />
+              <EntityVisual backgroundColor={item.accountBackgroundColor} iconColor={item.accountColor} iconValue={getIconDisplayValue(item.account.iconValue)} size="small" />
               <Text variant="caption">{item.account.name}</Text>
             </View>
           </View>

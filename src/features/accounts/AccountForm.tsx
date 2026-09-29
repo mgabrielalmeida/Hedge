@@ -60,6 +60,10 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
   const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(
     account ? account.themeColorIndex : 2,
   );
+  const [backgroundColorValue, setBackgroundColorValue] = useState(account?.backgroundColorValue ?? tokens.primaryContainer);
+  const [backgroundThemeColorIndex, setBackgroundThemeColorIndex] = useState<ThemeColorIndex | null>(
+    account ? account.backgroundThemeColorIndex : 2,
+  );
   const [feedback, setFeedback] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ balance?: string; institution?: string; name?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,6 +99,8 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
         iconValue,
         colorValue: resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary),
         themeColorIndex,
+        backgroundColorValue: resolveThemeColorValue(backgroundColorValue, backgroundThemeColorIndex, tokens.primaryContainer),
+        backgroundThemeColorIndex,
       };
       const savedAccount = account
         ? await updateAccountWithBalance(database, account.id, {
@@ -178,10 +184,14 @@ export function AccountForm({ account, currentBalanceCents, onSaved, submitLabel
         key={iconValue}
         iconOptions={ACCOUNT_ICON_OPTIONS}
         iconValue={iconValue}
+        backgroundColorValue={backgroundColorValue}
+        backgroundThemeColorIndex={backgroundThemeColorIndex}
         colorValue={colorValue}
         onIconChange={setIconValue}
         onThemeColorChange={(index, value) => { setThemeColorIndex(index); setColorValue(value); }}
         onCustomColorChange={(value) => { setThemeColorIndex(null); setColorValue(value); }}
+        onCustomBackgroundColorChange={(value) => { setBackgroundThemeColorIndex(null); setBackgroundColorValue(value); }}
+        onBackgroundThemeColorChange={(index, value) => { setBackgroundThemeColorIndex(index); setBackgroundColorValue(value); }}
         themeColorIndex={themeColorIndex}
       />
 

@@ -142,7 +142,7 @@ function AccountCard({ account }: { account: Account }) {
   return (
     <View>
       <View style={styles.accountRow}>
-        <EntityVisual color={resolveThemeColorValue(account.colorValue, account.themeColorIndex, tokens.primary)} iconValue={getIconDisplayValue(account.iconValue)} />
+        <EntityVisual backgroundColor={resolveThemeColorValue(account.backgroundColorValue, account.backgroundThemeColorIndex, tokens.primaryContainer)} iconColor={resolveThemeColorValue(account.colorValue, account.themeColorIndex, tokens.primary)} iconValue={getIconDisplayValue(account.iconValue)} />
         <View style={styles.accountText}>
           <Text variant="title">{account.name}</Text>
           <Text tone="muted" variant="caption">{account.institutionName}</Text>

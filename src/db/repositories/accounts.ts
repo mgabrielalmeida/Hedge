@@ -4,7 +4,7 @@ import type { Account, Cents, CivilDate, ThemeColorIndex } from '@/domain';
 import { type Clock, type RepositoryDatabase, type RepositorySession, systemClock } from './database';
 import { mapAccount, type AccountRow } from './rows';
 
-const accountColumns = 'id, name, institution_name, icon_value, color_value, theme_color_index, is_archived, archived_at, created_at, updated_at';
+const accountColumns = 'id, name, institution_name, icon_value, color_value, theme_color_index, background_color_value, background_theme_color_index, is_archived, archived_at, created_at, updated_at';
 
 export type CreateAccountInput = {
   readonly name: string;
@@ -12,6 +12,8 @@ export type CreateAccountInput = {
   readonly iconValue: string;
   readonly colorValue: string;
   readonly themeColorIndex?: ThemeColorIndex | null;
+  readonly backgroundColorValue?: string;
+  readonly backgroundThemeColorIndex?: ThemeColorIndex | null;
   readonly initialBalanceCents: Cents;
   readonly openingBalanceDate: CivilDate;
   readonly openingBalanceDescription?: string | null;
@@ -32,7 +34,10 @@ export async function createAccount(db: RepositoryDatabase, input: CreateAccount
   const iconValue = required(input.iconValue, 'account icon value');
   const colorValue = required(input.colorValue, 'account color value');
   const themeColorIndex = input.themeColorIndex ?? null;
+  const backgroundColorValue = required(input.backgroundColorValue ?? '#D4EFDD', 'account background color value');
+  const backgroundThemeColorIndex = input.backgroundThemeColorIndex ?? 2;
   validateThemeColorIndex(themeColorIndex);
+  validateThemeColorIndex(backgroundThemeColorIndex);
   if (!Number.isSafeInteger(input.initialBalanceCents)) throw new Error('Invalid opening balance.');
   if (!parseCivilDate(input.openingBalanceDate).ok) throw new Error('Invalid opening balance date.');
   const description = normalizeOptionalText(input.openingBalanceDescription);
@@ -40,8 +45,8 @@ export async function createAccount(db: RepositoryDatabase, input: CreateAccount
   let account: Account | null = null;
   await db.withExclusiveTransactionAsync(async (transaction) => {
     await transaction.runAsync(
-      'INSERT INTO accounts (name, institution_name, visual_type, visual_value, icon_value, color_value, theme_color_index, created_at, updated_at) VALUES (?, ?, \'icon\', ?, ?, ?, ?, ?, ?);',
-      name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, timestamp, timestamp,
+      'INSERT INTO accounts (name, institution_name, visual_type, visual_value, icon_value, color_value, theme_color_index, background_color_value, background_theme_color_index, created_at, updated_at) VALUES (?, ?, \'icon\', ?, ?, ?, ?, ?, ?, ?, ?);',
+      name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, backgroundColorValue, backgroundThemeColorIndex, timestamp, timestamp,
     );
     const row = await transaction.getFirstAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE id = last_insert_rowid();`);
     if (!row) throw new Error('Created account was not found.');
@@ -95,8 +100,11 @@ export async function updateAccount(db: RepositoryDatabase, id: number, input: U
   const iconValue = required(input.iconValue, 'account icon value');
   const colorValue = required(input.colorValue, 'account color value');
   const themeColorIndex = input.themeColorIndex ?? null;
+  const backgroundColorValue = required(input.backgroundColorValue ?? '#D4EFDD', 'account background color value');
+  const backgroundThemeColorIndex = input.backgroundThemeColorIndex ?? 2;
   validateThemeColorIndex(themeColorIndex);
-  await db.runAsync('UPDATE accounts SET name = ?, institution_name = ?, visual_type = \'icon\', visual_value = ?, icon_value = ?, color_value = ?, theme_color_index = ?, updated_at = ? WHERE id = ? AND is_archived = 0;', name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, clock(), id);
+  validateThemeColorIndex(backgroundThemeColorIndex);
+  await db.runAsync('UPDATE accounts SET name = ?, institution_name = ?, visual_type = \'icon\', visual_value = ?, icon_value = ?, color_value = ?, theme_color_index = ?, background_color_value = ?, background_theme_color_index = ?, updated_at = ? WHERE id = ? AND is_archived = 0;', name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, backgroundColorValue, backgroundThemeColorIndex, clock(), id);
   return findAccountById(db, id);
 }
 
@@ -111,7 +119,10 @@ export async function updateAccountWithBalance(
   const iconValue = required(input.iconValue, 'account icon value');
   const colorValue = required(input.colorValue, 'account color value');
   const themeColorIndex = input.themeColorIndex ?? null;
+  const backgroundColorValue = required(input.backgroundColorValue ?? '#D4EFDD', 'account background color value');
+  const backgroundThemeColorIndex = input.backgroundThemeColorIndex ?? 2;
   validateThemeColorIndex(themeColorIndex);
+  validateThemeColorIndex(backgroundThemeColorIndex);
   assertSafeCents(input.currentBalanceCents);
   if (!parseCivilDate(input.adjustmentDate).ok) throw new Error('Invalid balance adjustment date.');
 
@@ -130,9 +141,9 @@ export async function updateAccountWithBalance(
     await transaction.runAsync(
       `UPDATE accounts
        SET name = ?, institution_name = ?, visual_type = 'icon', visual_value = ?, icon_value = ?,
-           color_value = ?, theme_color_index = ?, updated_at = ?
+           color_value = ?, theme_color_index = ?, background_color_value = ?, background_theme_color_index = ?, updated_at = ?
        WHERE id = ? AND is_archived = 0;`,
-      name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, timestamp, id,
+      name, institutionName, iconValue, iconValue, colorValue, themeColorIndex, backgroundColorValue, backgroundThemeColorIndex, timestamp, id,
     );
 
     if (differenceCents !== 0) {

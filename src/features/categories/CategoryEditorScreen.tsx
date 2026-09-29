@@ -40,6 +40,8 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
   const [iconValue, setIconValue] = useState<string>('emoji:🏷️');
   const [colorValue, setColorValue] = useState(tokens.primary);
   const [themeColorIndex, setThemeColorIndex] = useState<ThemeColorIndex | null>(2);
+  const [backgroundColorValue, setBackgroundColorValue] = useState(tokens.primaryContainer);
+  const [backgroundThemeColorIndex, setBackgroundThemeColorIndex] = useState<ThemeColorIndex | null>(2);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ budget?: string; name?: string }>({});
@@ -64,6 +66,8 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
           setIconValue(getIconDisplayValue(found.iconValue));
           setColorValue(found.colorValue);
           setThemeColorIndex(found.themeColorIndex);
+          setBackgroundColorValue(found.backgroundColorValue);
+          setBackgroundThemeColorIndex(found.backgroundThemeColorIndex);
       }
     } catch {
       setLoadError('Não foi possível carregar a categoria.');
@@ -100,6 +104,8 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
         iconValue,
         colorValue: resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary),
         themeColorIndex,
+        backgroundColorValue: resolveThemeColorValue(backgroundColorValue, backgroundThemeColorIndex, tokens.primaryContainer),
+        backgroundThemeColorIndex,
       };
       if (category) await updateCategory(database, category.id, input);
       else await createCategory(database, input);
@@ -145,10 +151,14 @@ export function CategoryEditorScreen({ categoryId, onDone }: CategoryEditorScree
               key={iconValue}
               iconOptions={CATEGORY_ICON_OPTIONS}
               iconValue={iconValue}
+              backgroundColorValue={backgroundColorValue}
+              backgroundThemeColorIndex={backgroundThemeColorIndex}
               colorValue={colorValue}
               onIconChange={setIconValue}
               onThemeColorChange={(index, value) => { setThemeColorIndex(index); setColorValue(value); }}
               onCustomColorChange={(value) => { setThemeColorIndex(null); setColorValue(value); }}
+              onCustomBackgroundColorChange={(value) => { setBackgroundThemeColorIndex(null); setBackgroundColorValue(value); }}
+              onBackgroundThemeColorChange={(index, value) => { setBackgroundThemeColorIndex(index); setBackgroundColorValue(value); }}
               themeColorIndex={themeColorIndex}
             />
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar categoria'} onPress={() => void save()} />

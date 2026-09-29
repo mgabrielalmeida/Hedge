@@ -12,6 +12,8 @@ export interface Account {
   readonly iconValue: string;
   readonly colorValue: string;
   readonly themeColorIndex: ThemeColorIndex | null;
+  readonly backgroundColorValue: string;
+  readonly backgroundThemeColorIndex: ThemeColorIndex | null;
   readonly isArchived: boolean;
   readonly archivedAt: UtcTimestamp | null;
   readonly createdAt: UtcTimestamp;
@@ -25,6 +27,8 @@ export interface Category {
   readonly iconValue: string;
   readonly colorValue: string;
   readonly themeColorIndex: ThemeColorIndex | null;
+  readonly backgroundColorValue: string;
+  readonly backgroundThemeColorIndex: ThemeColorIndex | null;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
 }

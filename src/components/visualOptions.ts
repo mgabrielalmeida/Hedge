@@ -165,7 +165,7 @@ export function getThemeColorOptions(themeColor: string): readonly ColorOption[]
   return [
     { label: 'Profunda', value: hslToHex(base.hue, saturation, 32) },
     { label: 'Intensa', value: hslToHex(base.hue, saturation, 43) },
-    { label: 'Do tema', value: normalizeHexColor(themeColor) ?? hslToHex(base.hue, saturation, 54) },
+    { label: 'Cor padrão', value: normalizeHexColor(themeColor) ?? hslToHex(base.hue, saturation, 54) },
     { label: 'Suave', value: hslToHex(base.hue, saturation, 65) },
     { label: 'Clara', value: hslToHex(base.hue, saturation, 76) },
   ];

@@ -31,6 +31,6 @@ describe('unarchive accounts migration', () => {
       { name: 'Paused with account', deleted_at: null },
       { name: 'Deleted separately', deleted_at: '2026-09-11T10:00:00.000Z' },
     ]);
-    await expect(database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;')).resolves.toEqual({ user_version: 9 });
+    await expect(database.getFirstAsync<{ user_version: number }>('PRAGMA user_version;')).resolves.toEqual({ user_version: 10 });
   });
 });

@@ -54,7 +54,7 @@ describe('shared visual options', () => {
     const options = getThemeColorOptions('#176B9C');
 
     expect(options).toHaveLength(5);
-    expect(options.map((option) => option.label)).toEqual(['Profunda', 'Intensa', 'Do tema', 'Suave', 'Clara']);
+    expect(options.map((option) => option.label)).toEqual(['Profunda', 'Intensa', 'Cor padrão', 'Suave', 'Clara']);
     expect(options[2].value).toBe('#176B9C');
     expect(new Set(options.map((option) => option.value)).size).toBe(5);
   });

@@ -68,7 +68,7 @@ export function CategoriesScreen({
 
 function CategoryCard({ category, onEdit }: { category: Category; onEdit: () => void }) {
   const { tokens } = useTheme();
-  return <PressableCard accessibilityLabel={`Editar categoria ${category.name}`} onPress={onEdit}><View style={styles.row}><EntityVisual color={resolveThemeColorValue(category.colorValue, category.themeColorIndex, tokens.primary)} iconValue={getIconDisplayValue(category.iconValue)} /><View style={styles.details}><Text variant="title">{category.name}</Text><Text tone="muted" variant="caption">Orçamento: {formatBrazilianCurrency(category.monthlyBudgetCents)}</Text></View></View></PressableCard>;
+  return <PressableCard accessibilityLabel={`Editar categoria ${category.name}`} onPress={onEdit}><View style={styles.row}><EntityVisual backgroundColor={resolveThemeColorValue(category.backgroundColorValue, category.backgroundThemeColorIndex, tokens.primaryContainer)} iconColor={resolveThemeColorValue(category.colorValue, category.themeColorIndex, tokens.primary)} iconValue={getIconDisplayValue(category.iconValue)} /><View style={styles.details}><Text variant="title">{category.name}</Text><Text tone="muted" variant="caption">Orçamento: {formatBrazilianCurrency(category.monthlyBudgetCents)}</Text></View></View></PressableCard>;
 }
 
 const styles = StyleSheet.create({ details: { flex: 1 }, list: { gap: 12 }, row: { alignItems: 'center', flexDirection: 'row', gap: 12 } });

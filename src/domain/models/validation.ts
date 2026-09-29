@@ -69,6 +69,8 @@ export function validateAccount(account: Account): ValidationResult<Account, Dom
     !isNormalizedRequiredText(account.iconValue) ||
     !isNormalizedRequiredText(account.colorValue) ||
     !isThemeColorIndex(account.themeColorIndex) ||
+    !isNormalizedRequiredText(account.backgroundColorValue) ||
+    !isThemeColorIndex(account.backgroundThemeColorIndex) ||
     (account.isArchived && !isUtcTimestamp(account.archivedAt ?? '')) ||
     (!account.isArchived && account.archivedAt !== null) ||
     !isUtcTimestamp(account.createdAt) ||
@@ -88,6 +90,8 @@ export function validateCategory(category: Category): ValidationResult<Category,
     !isNormalizedRequiredText(category.iconValue) ||
     !isNormalizedRequiredText(category.colorValue) ||
     !isThemeColorIndex(category.themeColorIndex) ||
+    !isNormalizedRequiredText(category.backgroundColorValue) ||
+    !isThemeColorIndex(category.backgroundThemeColorIndex) ||
     !isUtcTimestamp(category.createdAt) ||
     !isUtcTimestamp(category.updatedAt)
   ) {
