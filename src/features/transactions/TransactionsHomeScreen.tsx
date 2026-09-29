@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -80,13 +80,18 @@ export function TransactionsHomeScreen({
   const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasInitialData, setHasInitialData] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [displayedBalance, setDisplayedBalance] = useState(0);
   const [recurringActionError, setRecurringActionError] = useState<string | null>(null);
   const [balanceReplayKey, setBalanceReplayKey] = useState(0);
+  const hasLoadedInitialData = useRef(false);
+  const balanceRequestId = useRef(0);
+  const historyRequestId = useRef(0);
+  const previousBalanceAccountId = useRef<number | null>(selectedAccountId);
 
   const load = useCallback(async () => {
-    setIsLoading(true);
+    if (!hasLoadedInitialData.current) setIsLoading(true);
     try {
       const [loadedAccounts, loadedCategories, loadedRecurringRules, page, balance] = await Promise.all([
         listAccounts(db),
@@ -117,6 +122,8 @@ export function TransactionsHomeScreen({
       setCategories(loadedCategories);
       setRecurringRules(loadedRecurringRules);
       setError(null);
+      hasLoadedInitialData.current = true;
+      setHasInitialData(true);
     } catch {
       setError('Não foi possível carregar o histórico.');
     } finally {
@@ -124,11 +131,60 @@ export function TransactionsHomeScreen({
     }
   }, [appliedSearchQuery, db, historyType, onNoAccounts, selectedAccountId, selectedCategoryId, selectedMonth]);
 
+  const loadReference = useRef(load);
+  useEffect(() => {
+    loadReference.current = load;
+  }, [load]);
+
   useFocusEffect(useCallback(() => {
     setBalanceReplayKey((key) => key + 1);
-    return scheduleAfterSecondaryTransition(() => void load(), screenReduceMotion === false);
-  }, [load, screenReduceMotion]));
-  useEffect(() => subscribeToRecurringProcessing(() => void load()), [load]);
+    return scheduleAfterSecondaryTransition(() => void loadReference.current(), screenReduceMotion === false);
+  }, [screenReduceMotion]));
+  useEffect(() => subscribeToRecurringProcessing(() => void loadReference.current()), []);
+
+  useEffect(() => {
+    if (!hasLoadedInitialData.current || previousBalanceAccountId.current === selectedAccountId) return;
+
+    previousBalanceAccountId.current = selectedAccountId;
+    const requestId = balanceRequestId.current + 1;
+    balanceRequestId.current = requestId;
+
+    const balance = selectedAccountId === null
+      ? getConsolidatedBalance(db)
+      : getAccountBalance(db, selectedAccountId);
+
+    void balance.then((nextBalance) => {
+      if (balanceRequestId.current !== requestId) return;
+      setDisplayedBalance(nextBalance ?? 0);
+      setBalanceReplayKey((key) => key + 1);
+    }).catch(() => {
+      if (balanceRequestId.current !== requestId) return;
+      setError('Não foi possível atualizar o saldo da conta selecionada.');
+    });
+  }, [db, selectedAccountId]);
+
+  useEffect(() => {
+    if (!hasLoadedInitialData.current || historyType === 'recurring') return;
+
+    const requestId = historyRequestId.current + 1;
+    historyRequestId.current = requestId;
+
+    void listTransactionPage(db, {
+      accountId: selectedAccountId,
+      categoryId: historyType === 'transactions' ? selectedCategoryId : null,
+      historyKind: historyType,
+      month: selectedMonth,
+      searchQuery: appliedSearchQuery,
+    }).then((page) => {
+      if (historyRequestId.current !== requestId) return;
+      setTransactions(page.items);
+      setNextTransactionCursor(page.nextCursor);
+      setError(null);
+    }).catch(() => {
+      if (historyRequestId.current !== requestId) return;
+      setError('Não foi possível atualizar os lançamentos filtrados.');
+    });
+  }, [appliedSearchQuery, db, historyType, selectedAccountId, selectedCategoryId, selectedMonth]);
 
   const selectedAccount = selectedAccountId === null
     ? null
@@ -142,7 +198,7 @@ export function TransactionsHomeScreen({
   const hasTransactionFilters = appliedSearchQuery !== '' || (historyType === 'transactions' && selectedCategoryId !== null);
 
   if (isLoading) return <ScreenState message="Buscando lançamentos e recorrências…" status="loading" title="Carregando histórico" />;
-  if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
+  if (error && !hasInitialData) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
 
   async function toggleRecurringRule(rule: RecurringRule) {
     if (!rule.isActive) {
@@ -224,6 +280,7 @@ export function TransactionsHomeScreen({
             <Text variant="title">{selectedAccount?.name ?? 'Todas as contas'}</Text>
           </FadeSelection>
           <AnimatedMoneyText
+            animateChanges={false}
             cents={displayedBalance}
             hidden={hideBalances}
             replayKey={balanceReplayKey}
@@ -286,6 +343,7 @@ export function TransactionsHomeScreen({
         ) : null}
         <FadeSelection selectionKey={historySelectionKey}>
           <View style={styles.list}>
+          {error ? <FormFeedback message={error} title="Não foi possível atualizar o histórico" /> : null}
           {historyType === 'recurring' ? visibleRecurringRules.length === 0 ? (
             <EmptyStateCard message="Nenhuma recorrência configurada para esta conta." />
           ) : (

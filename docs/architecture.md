@@ -207,6 +207,13 @@ permanece local com hooks do React. React Context será usado somente para dados
 pequenos e realmente transversais: tema, preferências e uma única confirmação
 temporária de operação concluída exibida acima da navegação.
 
+Na tela de histórico, o carregamento completo ocorre somente na primeira
+entrada sem dados. Mudar mês, tipo, categoria ou texto preserva a tela já
+montada e consulta apenas a página de lançamentos correspondente. A animação
+numérica do saldo é acionada ao entrar na tela ou trocar a conta selecionada;
+atualizações ordinárias do histórico substituem o valor exibido sem reiniciar a
+animação.
+
 Redux, Zustand, React Query e bibliotecas equivalentes não fazem parte da
 arquitetura inicial.
 

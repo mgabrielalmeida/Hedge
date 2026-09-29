@@ -10,13 +10,14 @@ import { useReducedMotion } from './useReducedMotion';
 const BALANCE_TRANSITION_DURATION = 240;
 
 type AnimatedMoneyTextProps = Omit<ComponentProps<typeof Text>, 'children' | 'tone'> & {
+  animateChanges?: boolean;
   cents: number;
   hidden?: boolean;
   replayKey?: number;
   tone?: ComponentProps<typeof Text>['tone'];
 };
 
-export function AnimatedMoneyText({ cents, hidden = false, replayKey, tone, ...props }: AnimatedMoneyTextProps) {
+export function AnimatedMoneyText({ animateChanges = true, cents, hidden = false, replayKey, tone, ...props }: AnimatedMoneyTextProps) {
   const reduceMotion = useReducedMotion();
   const [value] = useState(() => new Animated.Value(cents));
   const previousCents = useRef(cents);
@@ -38,9 +39,9 @@ export function AnimatedMoneyText({ cents, hidden = false, replayKey, tone, ...p
 
     let animation: Animated.CompositeAnimation | null = null;
     value.stopAnimation((currentValue) => {
-      if (hidden || reduceMotion !== false) {
+      if (hidden || reduceMotion !== false || (!shouldReplay && !animateChanges)) {
         value.setValue(cents);
-        if (reduceMotion !== null) previousReplayKey.current = replayKey;
+        previousReplayKey.current = replayKey;
         return;
       }
 
@@ -56,7 +57,7 @@ export function AnimatedMoneyText({ cents, hidden = false, replayKey, tone, ...p
     });
 
     return () => animation?.stop();
-  }, [cents, hidden, reduceMotion, replayKey, value]);
+  }, [animateChanges, cents, hidden, reduceMotion, replayKey, value]);
 
   return (
     <Text
