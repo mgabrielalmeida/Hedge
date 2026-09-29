@@ -36,6 +36,7 @@ function activeExpenseRule(overrides: Partial<RecurringRule> = {}): RecurringRul
     description: null,
     amountCents: -150000,
     startDate: '2026-01-01',
+    processingStartDate: '2026-01-01',
     endDate: null,
     isActive: true,
     deletedAt: null,
@@ -88,6 +89,10 @@ describe('financial model validation', () => {
         activeExpenseRule({ schedule: { frequency: 'weekly', chargeDay: 1.5, chargeMonth: null } }),
       ),
     ).toEqual({ ok: false, error: 'invalid_recurring_rule' });
+    expect(validateRecurringRule(activeExpenseRule({ processingStartDate: '2025-12-31' }))).toEqual({
+      ok: false,
+      error: 'invalid_recurring_rule',
+    });
   });
 
   it('validates recurring occurrence references and civil dates', () => {

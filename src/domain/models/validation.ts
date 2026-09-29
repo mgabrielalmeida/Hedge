@@ -177,12 +177,19 @@ export function validateRecurringRule(
   }
 
   const startDate = parseCivilDate(rule.startDate);
+  const processingStartDate = parseCivilDate(rule.processingStartDate);
   const endDate = rule.endDate === null ? valid(null) : parseCivilDate(rule.endDate);
   if (!startDate.ok) {
     return startDate;
   }
   if (!endDate.ok) {
     return endDate;
+  }
+  if (!processingStartDate.ok) {
+    return processingStartDate;
+  }
+  if (processingStartDate.value < startDate.value) {
+    return invalid('invalid_recurring_rule');
   }
 
   const dateRange = validateDateRange(startDate.value, endDate.value);

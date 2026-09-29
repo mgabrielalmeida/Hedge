@@ -152,7 +152,11 @@ ou no domínio.
 
 O SQLite é a fonte de verdade. Não haverá uma cópia de todas as contas e
 transações em um estado global. As telas consultarão o banco ao entrar em foco
-e atualizarão o resultado após uma escrita relevante. Uma solução de cache ou
+e atualizarão o resultado após uma escrita relevante. O histórico busca
+lançamentos por mês, tipo e conta em páginas de até 50 itens, usando o cursor
+composto por data e identificador; as telas mantêm somente as páginas que o
+usuário pediu. Saldos consolidados e por conta são calculados por agregações
+SQL, sem carregar o histórico inteiro na memória. Uma solução de cache ou
 reatividade só será adicionada se esse modelo demonstrar uma limitação real.
 
 As seguintes regras foram decididas:
@@ -180,9 +184,17 @@ telas e não podem receber novas escritas. Arquivar uma conta desativa suas
 regras recorrentes ativas na mesma transação. Regras recorrentes usam exclusão lógica para preservar procedência e podem ser pausadas sem exclusão; regras pausadas não geram novas ocorrências até serem retomadas. Uma tabela
 de ocorrências registra cada data processada mesmo depois da exclusão do
 lançamento gerado, evitando geração duplicada. Ao inicializar ou retornar ao
-primeiro plano, o repositório gera em uma transação todas as datas vencidas e
-ainda não registradas de regras ativas; a interface bloqueia a abertura até
-essa etapa concluir ou exibe uma recuperação explícita em caso de falha. A migração 1 não deve ser
+primeiro plano, o repositório gera as datas vencidas ainda não registradas em
+lotes transacionais de até 50 ocorrências. Cada lote confirmado pode ser
+retomado com segurança após interrupção, pois as ocorrências já registradas não
+são duplicadas. A interface bloqueia a abertura até concluir ou exibe uma
+recuperação explícita em caso de falha.
+
+Ao retomar uma recorrência pausada, a interface exige uma decisão: lançar os
+vencimentos do período pausado ou ignorá-los e voltar a gerar a partir do dia
+atual. A segunda escolha persiste uma data de processamento separada do início
+histórico da regra; assim, o cadastro continua descrevendo quando a recorrência
+foi criada, sem recriar cobranças que o usuário decidiu ignorar. A migração 1 não deve ser
 alterada depois de aplicada; mudanças futuras exigem novas migrações.
 
 ## Estado da interface

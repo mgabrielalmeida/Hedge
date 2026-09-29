@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { processDueRecurringRules } from '@/db/repositories';
+import type { RepositoryDatabase } from '@/db/repositories/database';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 const completionListeners = new Set<() => void>();
@@ -18,6 +19,21 @@ export type RecurringProcessingState = {
   readonly hasFailed: boolean;
 };
 
+export async function processAllDueRecurringRules(
+  db: RepositoryDatabase,
+  scheduledDate = getLocalCivilDate(),
+): Promise<boolean> {
+  let hasMore = true;
+  let generatedAny = false;
+  while (hasMore) {
+    const result = await processDueRecurringRules(db, scheduledDate);
+    generatedAny ||= result.generated.length > 0;
+    hasMore = result.hasMore;
+    if (hasMore) await yieldToEventLoop();
+  }
+  return generatedAny;
+}
+
 export function useRecurringProcessing(): RecurringProcessingState {
   const db = useSQLiteContext();
   const isProcessing = useRef(false);
@@ -28,8 +44,8 @@ export function useRecurringProcessing(): RecurringProcessingState {
     if (isProcessing.current) return;
     isProcessing.current = true;
     try {
-      const result = await processDueRecurringRules(db, getLocalCivilDate());
-      if (result.generated.length > 0) completionListeners.forEach((listener) => listener());
+      const generatedAny = await processAllDueRecurringRules(db);
+      if (generatedAny) completionListeners.forEach((listener) => listener());
       setHasFailed(false);
     } catch {
       setHasFailed(true);
@@ -56,4 +72,8 @@ export function useRecurringProcessing(): RecurringProcessingState {
   }, [processToday]);
 
   return { hasFailed, isInitialProcessingComplete, retry: () => void processToday() };
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }

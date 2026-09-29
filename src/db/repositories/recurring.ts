@@ -17,8 +17,9 @@ import {
 } from './database';
 import { mapRecurringOccurrence, mapRecurringRule, mapTransaction, type RecurringOccurrenceRow, type RecurringRuleRow, type TransactionRow } from './rows';
 
-const ruleColumns = 'id, kind, account_id, category_id, name, description, amount_cents, frequency, charge_day, charge_month, start_date, end_date, is_active, deleted_at, created_at, updated_at';
+const ruleColumns = 'id, kind, account_id, category_id, name, description, amount_cents, frequency, charge_day, charge_month, start_date, processing_start_date, end_date, is_active, deleted_at, created_at, updated_at';
 const transactionColumns = 'id, kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at';
+const RECURRING_BATCH_SIZE = 50;
 
 export type RecurringRuleInput = {
   readonly kind: 'expense' | 'income'; readonly accountId: EntityId; readonly categoryId?: EntityId | null;
@@ -34,7 +35,10 @@ export type DueOccurrence = {
 
 export type RecurringProcessingResult = {
   readonly generated: readonly DueOccurrence[];
+  readonly hasMore: boolean;
 };
+
+export type ResumeRecurringRuleMode = 'process-paused' | 'skip-paused';
 
 export async function listRecurringRules(db: RepositoryDatabase, activeOnly = false): Promise<readonly RecurringRule[]> {
   const rows = await db.getAllAsync<RecurringRuleRow>(`SELECT r.${ruleColumns.replaceAll(', ', ', r.')} FROM recurring_rules r JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0 WHERE ${activeOnly ? 'r.is_active = 1' : '1 = 1'} ORDER BY r.id DESC;`);
@@ -58,7 +62,7 @@ export async function findRecurringRuleById(db: RepositoryDatabase, id: number):
 export async function createRecurringRule(db: RepositoryDatabase, input: RecurringRuleInput, clock: Clock = systemClock): Promise<RecurringRule> {
   const rule = normalized(input); const timestamp = clock();
   await assertActiveAccount(db, rule.accountId);
-  await db.runAsync(`INSERT INTO recurring_rules (kind, account_id, category_id, name, description, amount_cents, frequency, charge_day, charge_month, start_date, end_date, is_active, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?);`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, rule.frequency, rule.chargeDay, rule.chargeMonth, rule.startDate, rule.endDate, timestamp, timestamp);
+  await db.runAsync(`INSERT INTO recurring_rules (kind, account_id, category_id, name, description, amount_cents, frequency, charge_day, charge_month, start_date, processing_start_date, end_date, is_active, deleted_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?);`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, rule.frequency, rule.chargeDay, rule.chargeMonth, rule.startDate, rule.startDate, rule.endDate, timestamp, timestamp);
   const row = await db.getFirstAsync<RecurringRuleRow>(`SELECT ${ruleColumns} FROM recurring_rules WHERE id = last_insert_rowid();`);
   if (!row) throw new Error('Created recurring rule was not found.'); return mapRecurringRule(row);
 }
@@ -67,7 +71,8 @@ export async function updateRecurringRule(db: RepositoryDatabase, id: number, in
   if (!existing?.isActive) return null;
   const rule = normalized(input);
   await assertActiveAccount(db, rule.accountId);
-  await db.runAsync(`UPDATE recurring_rules SET kind = ?, account_id = ?, category_id = ?, name = ?, description = ?, amount_cents = ?, frequency = ?, charge_day = ?, charge_month = ?, start_date = ?, end_date = ?, updated_at = ? WHERE id = ? AND is_active = 1;`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, rule.frequency, rule.chargeDay, rule.chargeMonth, rule.startDate, rule.endDate, clock(), id);
+  const processingStartDate = rule.startDate > existing.processingStartDate ? rule.startDate : existing.processingStartDate;
+  await db.runAsync(`UPDATE recurring_rules SET kind = ?, account_id = ?, category_id = ?, name = ?, description = ?, amount_cents = ?, frequency = ?, charge_day = ?, charge_month = ?, start_date = ?, processing_start_date = ?, end_date = ?, updated_at = ? WHERE id = ? AND is_active = 1;`, rule.kind, rule.accountId, rule.categoryId, rule.name, rule.description, rule.amountCents, rule.frequency, rule.chargeDay, rule.chargeMonth, rule.startDate, processingStartDate, rule.endDate, clock(), id);
   return findRecurringRuleById(db, id);
 }
 export async function deleteRecurringRule(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
@@ -81,10 +86,20 @@ export async function pauseRecurringRule(db: RepositoryDatabase, id: number, clo
   await db.runAsync('UPDATE recurring_rules SET is_active = 0, deleted_at = NULL, updated_at = ? WHERE id = ? AND is_active = 1;', clock(), id);
   return true;
 }
-export async function resumeRecurringRule(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
+export async function resumeRecurringRule(
+  db: RepositoryDatabase,
+  id: number,
+  mode: ResumeRecurringRuleMode,
+  resumeDate: CivilDate,
+  clock: Clock = systemClock,
+): Promise<boolean> {
   const existing = await findRecurringRuleById(db, id);
   if (!existing || existing.isActive || existing.deletedAt !== null) return false;
-  await db.runAsync('UPDATE recurring_rules SET is_active = 1, updated_at = ? WHERE id = ? AND is_active = 0 AND deleted_at IS NULL;', clock(), id);
+  if (!parseCivilDate(resumeDate).ok) throw new Error('Invalid recurring rule resume date.');
+  const processingStartDate = mode === 'skip-paused' && resumeDate > existing.processingStartDate
+    ? resumeDate
+    : existing.processingStartDate;
+  await db.runAsync('UPDATE recurring_rules SET is_active = 1, processing_start_date = ?, updated_at = ? WHERE id = ? AND is_active = 0 AND deleted_at IS NULL;', processingStartDate, clock(), id);
   return true;
 }
 export async function createDueOccurrence(
@@ -116,6 +131,7 @@ export async function processDueRecurringRules(
   if (!parseCivilDate(scheduledDate).ok) throw new Error('Invalid recurring processing date.');
 
   const generated: DueOccurrence[] = [];
+  let hasMore = false;
   await db.withExclusiveTransactionAsync(async (session) => {
     const rows = await session.getAllAsync<RecurringRuleRow>(
       `SELECT r.${ruleColumns.replaceAll(', ', ', r.')}
@@ -132,11 +148,15 @@ export async function processDueRecurringRules(
       for (const occurrenceDate of listRecurringRuleDatesDueBy(rule, scheduledDate)) {
         if (await findOccurrence(session, rule.id, occurrenceDate)) continue;
         generated.push(await insertDueOccurrence(session, rule, occurrenceDate, clock()));
+        if (generated.length === RECURRING_BATCH_SIZE) {
+          hasMore = true;
+          return;
+        }
       }
     }
   });
 
-  return { generated };
+  return { generated, hasMore };
 }
 
 async function findOccurrence(

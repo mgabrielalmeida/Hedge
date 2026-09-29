@@ -71,6 +71,19 @@ export async function getAccountBalance(db: RepositoryDatabase, id: number): Pro
   return readAccountBalance(db, id);
 }
 
+export async function getConsolidatedBalance(db: RepositoryDatabase): Promise<Cents> {
+  const row = await db.getFirstAsync<BalanceRow>(
+    `SELECT COALESCE(SUM(CASE WHEN t.kind = 'transfer' THEN 0 ELSE t.amount_cents END), 0) AS balance_cents
+     FROM transactions t
+     JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0
+     LEFT JOIN accounts d ON d.id = t.destination_account_id
+     WHERE t.destination_account_id IS NULL OR d.is_archived = 0;`,
+  );
+  const balance = row?.balance_cents ?? 0;
+  assertSafeCents(balance);
+  return balance;
+}
+
 export async function updateAccount(db: RepositoryDatabase, id: number, input: UpdateAccountInput, clock: Clock = systemClock): Promise<Account | null> {
   const name = required(input.name, 'account name');
   const institutionName = required(input.institutionName, 'institution name');
@@ -167,13 +180,17 @@ async function readAccountBalance(db: RepositorySession, id: number): Promise<Ce
   const row = await db.getFirstAsync<BalanceRow>(
     `SELECT COALESCE(SUM(
        CASE
-         WHEN account_id = ? THEN amount_cents
-         WHEN kind = 'transfer' AND destination_account_id = ? THEN -amount_cents
+         WHEN t.account_id = ? THEN t.amount_cents
+         WHEN t.kind = 'transfer' AND t.destination_account_id = ? THEN -t.amount_cents
          ELSE 0
        END
      ), 0) AS balance_cents
-     FROM transactions
-     WHERE account_id = ? OR destination_account_id = ?;`,
+     FROM transactions t
+     JOIN accounts a ON a.id = t.account_id
+     LEFT JOIN accounts d ON d.id = t.destination_account_id
+     WHERE (t.account_id = ? OR t.destination_account_id = ?)
+       AND a.is_archived = 0
+       AND (t.destination_account_id IS NULL OR d.is_archived = 0);`,
     id, id, id, id,
   );
   const balance = row?.balance_cents ?? 0;

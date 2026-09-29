@@ -19,6 +19,7 @@ function rule(schedule: RecurringRule['schedule']): RecurringRule {
     name: 'Rule',
     schedule,
     startDate: '2026-01-01',
+    processingStartDate: '2026-01-01',
     updatedAt: timestamp,
   };
 }

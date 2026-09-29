@@ -209,13 +209,19 @@ uma cobrança de 29 de fevereiro durante um ano não bissexto. Na frequência
 semanal, os dias são numerados de 1 a 7, de segunda-feira a domingo.
 
 Ao abrir ou retornar ao primeiro plano, o aplicativo processa todas as
-ocorrências com vencimento entre o início da regra e o dia civil local, limitado
-pela data final quando existir. Assim, uma cobrança não é perdida se o
-aplicativo não for aberto em seu dia exato. O processamento é idempotente: a
-tabela de ocorrências impede lançamentos duplicados, inclusive quando uma
-ocorrência anterior tiver seu lançamento apagado. Se o processamento falhar, o
-aplicativo informa a falha e oferece uma opção para tentar novamente; nenhuma
-geração parcial é confirmada, porque cada execução usa uma transação SQLite.
+ocorrências com vencimento entre a data de processamento da regra e o dia civil
+local, limitado pela data final quando existir. Assim, uma cobrança não é
+perdida se o aplicativo não for aberto em seu dia exato. O processamento é
+idempotente: a tabela de ocorrências impede lançamentos duplicados, inclusive
+quando uma ocorrência anterior tiver seu lançamento apagado. Para limitar o
+tempo de bloqueio em períodos longos, cada transação confirma no máximo 50
+ocorrências; os lotes seguintes continuam em seguida e uma interrupção deixa os
+lotes já confirmados seguros para a próxima tentativa.
+
+Ao retomar uma recorrência pausada, o usuário escolhe entre lançar os
+vencimentos do período pausado ou ignorá-los e continuar a partir do dia atual.
+Ignorar o período não altera a data de início exibida da regra; apenas atualiza
+a data a partir da qual novos vencimentos podem ser gerados.
 
 O usuário pode visualizar, editar e excluir suas regras de despesas e rendas
 recorrentes. Editar ou excluir uma regra não altera lançamentos pontuais já

@@ -73,6 +73,7 @@ const monthlyRule: RecurringRule = {
   description: null,
   amountCents: -1000,
   startDate: '2026-01-01',
+  processingStartDate: '2026-01-01',
   endDate: null,
   isActive: true,
   deletedAt: null,
@@ -102,14 +103,14 @@ describe('financial calculations', () => {
   it('matches weekly and adjusted yearly schedules inside their inclusive date range', () => {
     expect(isRecurringRuleDueOn({ ...monthlyRule, schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(true);
     expect(isRecurringRuleDueOn({ ...monthlyRule, schedule: { frequency: 'weekly', chargeDay: 4, chargeMonth: null } }, '2026-09-02')).toBe(false);
-    expect(isRecurringRuleDueOn({ ...monthlyRule, startDate: '2026-09-03', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(false);
+    expect(isRecurringRuleDueOn({ ...monthlyRule, startDate: '2026-09-03', processingStartDate: '2026-09-03', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(false);
     expect(isRecurringRuleDueOn({ ...monthlyRule, endDate: '2026-09-01', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-09-02')).toBe(false);
     expect(isRecurringRuleDueOn({ ...monthlyRule, schedule: { frequency: 'yearly', chargeDay: 29, chargeMonth: 2 } }, '2027-02-28')).toBe(true);
   });
 
   it('lists every overdue occurrence through the processing date', () => {
-    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2026-01-30' }, '2026-03-31')).toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
-    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2026-01-28', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-02-11')).toEqual(['2026-01-28', '2026-02-04', '2026-02-11']);
-    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2024-02-29', schedule: { frequency: 'yearly', chargeDay: 29, chargeMonth: 2 } }, '2026-03-01')).toEqual(['2024-02-29', '2025-02-28', '2026-02-28']);
+    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2026-01-30', processingStartDate: '2026-01-30' }, '2026-03-31')).toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
+    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2026-01-28', processingStartDate: '2026-01-28', schedule: { frequency: 'weekly', chargeDay: 3, chargeMonth: null } }, '2026-02-11')).toEqual(['2026-01-28', '2026-02-04', '2026-02-11']);
+    expect(listRecurringRuleDatesDueBy({ ...monthlyRule, startDate: '2024-02-29', processingStartDate: '2024-02-29', schedule: { frequency: 'yearly', chargeDay: 29, chargeMonth: 2 } }, '2026-03-01')).toEqual(['2024-02-29', '2025-02-28', '2026-02-28']);
   });
 });

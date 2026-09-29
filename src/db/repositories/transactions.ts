@@ -5,6 +5,19 @@ import { type Clock, type RepositoryDatabase, systemClock } from './database';
 import { mapTransaction, type TransactionRow } from './rows';
 
 const transactionColumns = 'id, kind, account_id, destination_account_id, category_id, name, description, amount_cents, transaction_date, created_at, updated_at';
+const HISTORY_PAGE_SIZE = 50;
+
+export type TransactionHistoryKind = 'transactions' | 'transfers';
+
+export type TransactionPageCursor = {
+  readonly id: EntityId;
+  readonly transactionDate: CivilDate;
+};
+
+export type TransactionPage = {
+  readonly items: readonly Transaction[];
+  readonly nextCursor: TransactionPageCursor | null;
+};
 
 export type TransactionInput = {
   readonly kind: Transaction['kind'];
@@ -32,6 +45,60 @@ export async function createTransaction(db: RepositoryDatabase, input: Transacti
 export async function listTransactions(db: RepositoryDatabase): Promise<readonly Transaction[]> {
   const rows = await db.getAllAsync<TransactionRow>(`SELECT t.${transactionColumns.replaceAll(', ', ', t.')} FROM transactions t JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0 LEFT JOIN accounts d ON d.id = t.destination_account_id WHERE t.destination_account_id IS NULL OR d.is_archived = 0 ORDER BY t.transaction_date DESC, t.id DESC;`);
   return rows.map(mapTransaction);
+}
+
+export async function listTransactionPage(
+  db: RepositoryDatabase,
+  options: {
+    readonly accountId: EntityId | null;
+    readonly cursor?: TransactionPageCursor | null;
+    readonly historyKind: TransactionHistoryKind;
+    readonly month: string;
+  },
+): Promise<TransactionPage> {
+  const monthStart = `${options.month}-01`;
+  if (!parseCivilDate(monthStart).ok) throw new Error('Invalid transaction history month.');
+  const [year, month] = options.month.split('-').map(Number);
+  const nextMonth = month === 12
+    ? `${String(year + 1).padStart(4, '0')}-01-01`
+    : `${String(year).padStart(4, '0')}-${String(month + 1).padStart(2, '0')}-01`;
+  const kindClause = options.historyKind === 'transfers'
+    ? "t.kind = 'transfer'"
+    : "t.kind IN ('expense', 'income')";
+  const accountClause = options.accountId === null
+    ? ''
+    : 'AND (t.account_id = ? OR t.destination_account_id = ?)';
+  const cursorClause = options.cursor === undefined || options.cursor === null
+    ? ''
+    : 'AND (t.transaction_date < ? OR (t.transaction_date = ? AND t.id < ?))';
+  const parameters: (string | number)[] = [monthStart, nextMonth];
+  if (options.accountId !== null) parameters.push(options.accountId, options.accountId);
+  if (options.cursor !== undefined && options.cursor !== null) {
+    parameters.push(options.cursor.transactionDate, options.cursor.transactionDate, options.cursor.id);
+  }
+  parameters.push(HISTORY_PAGE_SIZE + 1);
+
+  const rows = await db.getAllAsync<TransactionRow>(
+    `SELECT t.${transactionColumns.replaceAll(', ', ', t.')}
+     FROM transactions t
+     JOIN accounts a ON a.id = t.account_id AND a.is_archived = 0
+     LEFT JOIN accounts d ON d.id = t.destination_account_id
+     WHERE (t.destination_account_id IS NULL OR d.is_archived = 0)
+       AND t.transaction_date >= ? AND t.transaction_date < ?
+       AND ${kindClause}
+       ${accountClause}
+       ${cursorClause}
+     ORDER BY t.transaction_date DESC, t.id DESC
+     LIMIT ?;`,
+    ...parameters,
+  );
+  const hasMore = rows.length > HISTORY_PAGE_SIZE;
+  const items = rows.slice(0, HISTORY_PAGE_SIZE).map(mapTransaction);
+  const last = items.at(-1);
+  return {
+    items,
+    nextCursor: hasMore && last ? { id: last.id, transactionDate: last.transactionDate } : null,
+  };
 }
 
 export async function findTransactionById(db: RepositoryDatabase, id: number): Promise<Transaction | null> {

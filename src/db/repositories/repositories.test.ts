@@ -13,12 +13,16 @@ import {
   findAccountById,
   findTransactionById,
   getAccountBalance,
+  getConsolidatedBalance,
   listAccounts,
   listCategories,
   listRecurringOccurrencesForMonth,
   listRecurringRules,
   listTransactions,
+  listTransactionPage,
+  pauseRecurringRule,
   processDueRecurringRules,
+  resumeRecurringRule,
   updateAccount,
   updateAccountWithBalance,
   updateCategory,
@@ -171,6 +175,7 @@ describe('SQLite repositories', () => {
     await expect(listAccounts(database)).resolves.toEqual([expect.objectContaining({ id: active.id, isArchived: false })]);
     await expect(findAccountById(database, archived.id)).resolves.toBeNull();
     await expect(listTransactions(database)).resolves.toEqual(expect.not.arrayContaining([expect.objectContaining({ id: transfer.id })]));
+    await expect(getAccountBalance(database, active.id)).resolves.toBe(0);
     await expect(listRecurringRules(database)).resolves.toEqual([]);
     await expect(createTransaction(database, { kind: 'income', accountId: archived.id, name: 'Blocked', amountCents: 1, transactionDate: '2026-09-02' })).rejects.toThrow('Archived');
     await expect(createRecurringRule(database, { kind: 'expense', accountId: archived.id, categoryId: category.id, name: 'Blocked', amountCents: -1, frequency: 'monthly', chargeDay: 2, startDate: '2026-09-01' })).rejects.toThrow('Archived');
@@ -236,10 +241,10 @@ describe('SQLite repositories', () => {
       'Not today:2026-07-03',
       'Not today:2026-08-03',
     ]);
-    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [] });
+    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [], hasMore: false });
 
     await deleteTransaction(database, firstProcessing.generated[0].transaction.id);
-    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [] });
+    await expect(processDueRecurringRules(database, '2026-09-02', () => updatedAt)).resolves.toEqual({ generated: [], hasMore: false });
     await expect(listRecurringOccurrencesForMonth(database, '2026-09')).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({ scheduledDate: '2026-09-02' }),
     ]));
@@ -258,5 +263,53 @@ describe('SQLite repositories', () => {
 
     expect(result.generated.map((item) => item.transaction.transactionDate)).toEqual(['2026-01-15', '2026-02-15']);
     expect(result.generated.every((item) => item.transaction.name === 'Limited subscription')).toBe(true);
+  });
+
+  it('loads the history in stable cursor pages and calculates balances in SQLite', async () => {
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 100, openingBalanceDate: '2026-09-01' }, () => createdAt);
+    for (let index = 0; index < 55; index += 1) {
+      await createTransaction(database, {
+        kind: 'income', accountId: account.id, name: `Income ${index}`, amountCents: 1,
+        transactionDate: index % 2 === 0 ? '2026-09-02' : '2026-09-01',
+      }, () => createdAt);
+    }
+
+    const firstPage = await listTransactionPage(database, { accountId: account.id, historyKind: 'transactions', month: '2026-09' });
+    expect(firstPage.items).toHaveLength(50);
+    expect(firstPage.nextCursor).not.toBeNull();
+    const secondPage = await listTransactionPage(database, { accountId: account.id, cursor: firstPage.nextCursor, historyKind: 'transactions', month: '2026-09' });
+    expect(secondPage.items).toHaveLength(5);
+    expect(secondPage.nextCursor).toBeNull();
+    expect(new Set([...firstPage.items, ...secondPage.items].map((item) => item.id)).size).toBe(55);
+    await expect(getAccountBalance(database, account.id)).resolves.toBe(155);
+    await expect(getConsolidatedBalance(database)).resolves.toBe(155);
+  });
+
+  it('processes overdue occurrences in recoverable batches', async () => {
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    await createRecurringRule(database, { kind: 'income', accountId: account.id, name: 'Weekly income', amountCents: 1, frequency: 'weekly', chargeDay: 1, startDate: '2025-01-06' }, () => createdAt);
+
+    const firstBatch = await processDueRecurringRules(database, '2026-09-02', () => updatedAt);
+    expect(firstBatch.generated).toHaveLength(50);
+    expect(firstBatch.hasMore).toBe(true);
+    const secondBatch = await processDueRecurringRules(database, '2026-09-02', () => updatedAt);
+    expect(secondBatch.generated.length).toBeGreaterThan(0);
+    expect(secondBatch.hasMore).toBe(false);
+  });
+
+  it('resumes a paused rule either from its historical processing date or from today', async () => {
+    const account = await createAccount(database, { name: 'Main', institutionName: 'Bank', iconValue: 'bank', colorValue: '#276749', initialBalanceCents: 0, openingBalanceDate: '2026-09-02' }, () => createdAt);
+    const category = await createCategory(database, { name: 'Bills', monthlyBudgetCents: 0 }, () => createdAt);
+    const skipped = await createRecurringRule(database, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Skipped', amountCents: -1, frequency: 'monthly', chargeDay: 15, startDate: '2026-01-01' }, () => createdAt);
+    await pauseRecurringRule(database, skipped.id, () => updatedAt);
+    await resumeRecurringRule(database, skipped.id, 'skip-paused', '2026-03-01', () => updatedAt);
+    const skipResult = await processDueRecurringRules(database, '2026-03-31', () => updatedAt);
+    expect(skipResult.generated.filter((item) => item.transaction.name === 'Skipped').map((item) => item.transaction.transactionDate)).toEqual(['2026-03-15']);
+
+    const recovered = await createRecurringRule(database, { kind: 'expense', accountId: account.id, categoryId: category.id, name: 'Recovered', amountCents: -1, frequency: 'monthly', chargeDay: 15, startDate: '2026-01-01' }, () => createdAt);
+    await pauseRecurringRule(database, recovered.id, () => updatedAt);
+    await resumeRecurringRule(database, recovered.id, 'process-paused', '2026-03-01', () => updatedAt);
+    const recoveredResult = await processDueRecurringRules(database, '2026-03-31', () => updatedAt);
+    expect(recoveredResult.generated.filter((item) => item.transaction.name === 'Recovered').map((item) => item.transaction.transactionDate)).toEqual(['2026-01-15', '2026-02-15', '2026-03-15']);
   });
 });

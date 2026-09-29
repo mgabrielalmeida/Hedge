@@ -99,6 +99,7 @@ interface RecurringRuleBase {
   readonly description: string | null;
   readonly amountCents: Cents;
   readonly startDate: CivilDate;
+  readonly processingStartDate: CivilDate;
   readonly endDate: CivilDate | null;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;

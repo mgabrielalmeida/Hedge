@@ -7,7 +7,7 @@ import {
 import type { CivilDate, RecurringRule } from '../models/financial';
 
 export function isRecurringRuleDueOn(rule: RecurringRule, date: CivilDate): boolean {
-  if (!rule.isActive || compareCivilDates(date, rule.startDate) < 0) {
+  if (!rule.isActive || compareCivilDates(date, rule.processingStartDate) < 0) {
     return false;
   }
 
@@ -29,7 +29,7 @@ export function isRecurringRuleDueOn(rule: RecurringRule, date: CivilDate): bool
 }
 
 export function listRecurringRuleDatesDueBy(rule: RecurringRule, processingDate: CivilDate): readonly CivilDate[] {
-  if (!rule.isActive || compareCivilDates(processingDate, rule.startDate) < 0) return [];
+  if (!rule.isActive || compareCivilDates(processingDate, rule.processingStartDate) < 0) return [];
   const endDate = rule.endDate !== null && compareCivilDates(rule.endDate, processingDate) < 0
     ? rule.endDate
     : processingDate;
@@ -43,7 +43,7 @@ export function listRecurringRuleDatesDueBy(rule: RecurringRule, processingDate:
 
 export function getNextRecurringChargeDate(rule: RecurringRule, fromDate: CivilDate): CivilDate | null {
   if (!rule.isActive) return null;
-  const start = compareCivilDates(fromDate, rule.startDate) < 0 ? rule.startDate : fromDate;
+  const start = compareCivilDates(fromDate, rule.processingStartDate) < 0 ? rule.processingStartDate : fromDate;
   const { year, month } = getCivilDateParts(start);
   let next: CivilDate;
   if (rule.schedule.frequency === 'weekly') {
@@ -63,17 +63,17 @@ export function getNextRecurringChargeDate(rule: RecurringRule, fromDate: CivilD
 }
 
 function weeklyDates(rule: RecurringRule, endDate: CivilDate): readonly CivilDate[] {
-  const offset = (rule.schedule.chargeDay - getMondayBasedWeekday(rule.startDate) + 7) % 7;
+  const offset = (rule.schedule.chargeDay - getMondayBasedWeekday(rule.processingStartDate) + 7) % 7;
   const dates: CivilDate[] = [];
-  for (let date = addDays(rule.startDate, offset); compareCivilDates(date, endDate) <= 0; date = addDays(date, 7)) dates.push(date);
+  for (let date = addDays(rule.processingStartDate, offset); compareCivilDates(date, endDate) <= 0; date = addDays(date, 7)) dates.push(date);
   return dates;
 }
 
 function monthlyDates(rule: RecurringRule, endDate: CivilDate): readonly CivilDate[] {
-  const start = getCivilDateParts(rule.startDate); const end = getCivilDateParts(endDate); const dates: CivilDate[] = [];
+  const start = getCivilDateParts(rule.processingStartDate); const end = getCivilDateParts(endDate); const dates: CivilDate[] = [];
   for (let year = start.year, month = start.month; year < end.year || (year === end.year && month <= end.month); ({ year, month } = nextMonth(year, month))) {
     const date = civilDate(year, month, Math.min(rule.schedule.chargeDay, daysInMonth(year, month)));
-    if (compareCivilDates(date, rule.startDate) >= 0 && compareCivilDates(date, endDate) <= 0) dates.push(date);
+    if (compareCivilDates(date, rule.processingStartDate) >= 0 && compareCivilDates(date, endDate) <= 0) dates.push(date);
   }
   return dates;
 }
@@ -81,11 +81,11 @@ function monthlyDates(rule: RecurringRule, endDate: CivilDate): readonly CivilDa
 function yearlyDates(rule: RecurringRule, endDate: CivilDate): readonly CivilDate[] {
   const schedule = rule.schedule;
   if (schedule.frequency !== 'yearly') return [];
-  const start = getCivilDateParts(rule.startDate); const end = getCivilDateParts(endDate); const dates: CivilDate[] = [];
+  const start = getCivilDateParts(rule.processingStartDate); const end = getCivilDateParts(endDate); const dates: CivilDate[] = [];
   for (let year = start.year; year <= end.year; year += 1) {
     const month = schedule.chargeMonth;
     const date = civilDate(year, month, Math.min(schedule.chargeDay, daysInMonth(year, month)));
-    if (compareCivilDates(date, rule.startDate) >= 0 && compareCivilDates(date, endDate) <= 0) dates.push(date);
+    if (compareCivilDates(date, rule.processingStartDate) >= 0 && compareCivilDates(date, endDate) <= 0) dates.push(date);
   }
   return dates;
 }

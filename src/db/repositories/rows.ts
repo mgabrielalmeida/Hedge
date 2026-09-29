@@ -65,6 +65,7 @@ export type RecurringRuleRow = {
   charge_day: number;
   charge_month: number | null;
   start_date: string;
+  processing_start_date: string | null;
   end_date: string | null;
   is_active: number;
   deleted_at: string | null;
@@ -148,14 +149,14 @@ export function mapRecurringRule(row: RecurringRuleRow): RecurringRule {
     rule = {
       id: row.id, kind: 'income', accountId: row.account_id, categoryId: null,
       name: row.name, description: row.description, amountCents: row.amount_cents,
-      startDate: row.start_date, endDate: row.end_date, isActive: row.is_active === 1,
+      startDate: row.start_date, processingStartDate: row.processing_start_date ?? row.start_date, endDate: row.end_date, isActive: row.is_active === 1,
       deletedAt: row.deleted_at, schedule, createdAt: row.created_at, updatedAt: row.updated_at,
     };
   } else if (row.kind === 'expense') {
     rule = {
       id: row.id, kind: 'expense', accountId: row.account_id, categoryId: row.category_id,
       name: row.name, description: row.description, amountCents: row.amount_cents,
-      startDate: row.start_date, endDate: row.end_date, isActive: row.is_active === 1,
+      startDate: row.start_date, processingStartDate: row.processing_start_date ?? row.start_date, endDate: row.end_date, isActive: row.is_active === 1,
       deletedAt: row.deleted_at, schedule, createdAt: row.created_at, updatedAt: row.updated_at,
     } as RecurringRule;
   } else {

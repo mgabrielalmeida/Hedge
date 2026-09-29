@@ -35,6 +35,7 @@ function rule(id: number, amountCents: number, chargeDay: number): RecurringRule
     name: amountCents < 0 ? 'Internet' : 'Salary',
     schedule: { chargeDay, chargeMonth: null, frequency: 'monthly' },
     startDate: '2026-01-01',
+    processingStartDate: '2026-01-01',
     updatedAt: timestamp,
   } as RecurringRule;
 }

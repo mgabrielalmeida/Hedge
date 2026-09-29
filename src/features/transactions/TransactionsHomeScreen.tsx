@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -7,6 +7,7 @@ import {
   Card,
   AnimatedMoneyText,
   BalanceVisibilityButton,
+  Button,
   ChipGroup,
   EmptyStateCard,
   FadeSelection,
@@ -23,14 +24,14 @@ import {
   useReducedMotion,
   useSuccessFeedback,
 } from '@/components';
-import { listAccounts, listCategories, listRecurringRules, listTransactions, pauseRecurringRule, resumeRecurringRule } from '@/db/repositories';
-import { calculateAccountBalance, calculateConsolidatedBalance, formatBrazilianCurrency, formatCivilDate, getNextRecurringChargeDate } from '@/domain';
+import { getAccountBalance, getConsolidatedBalance, listAccounts, listCategories, listRecurringRules, listTransactionPage, pauseRecurringRule, resumeRecurringRule } from '@/db/repositories';
+import { formatBrazilianCurrency, formatCivilDate, getNextRecurringChargeDate } from '@/domain';
 import type { Account, Category, RecurringRule, Transaction, TransferTransaction, YearMonth } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 import { getLocalCivilDate } from '@/utils/localCivilDate';
 
 import { formatYearMonth, shiftYearMonth } from './monthNavigation';
-import { subscribeToRecurringProcessing } from './useRecurringProcessing';
+import { processAllDueRecurringRules, subscribeToRecurringProcessing } from './useRecurringProcessing';
 
 type HistoryType = 'transactions' | 'transfers' | 'recurring';
 
@@ -68,22 +69,35 @@ export function TransactionsHomeScreen({
   const [accounts, setAccounts] = useState<readonly Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<readonly Transaction[]>([]);
+  const [nextTransactionCursor, setNextTransactionCursor] = useState<{ id: number; transactionDate: string } | null>(null);
   const [categories, setCategories] = useState<readonly Category[]>([]);
   const [recurringRules, setRecurringRules] = useState<readonly RecurringRule[]>([]);
   const [historyType, setHistoryType] = useState<HistoryType>('transactions');
   const [selectedMonth, setSelectedMonth] = useState<YearMonth>(() => getLocalCivilDate().slice(0, 7));
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [displayedBalance, setDisplayedBalance] = useState(0);
   const [recurringActionError, setRecurringActionError] = useState<string | null>(null);
   const [balanceReplayKey, setBalanceReplayKey] = useState(0);
 
   const load = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const [loadedAccounts, loadedTransactions, loadedCategories, loadedRecurringRules] = await Promise.all([
+      const [loadedAccounts, loadedCategories, loadedRecurringRules, page, balance] = await Promise.all([
         listAccounts(db),
-        listTransactions(db),
         listCategories(db),
         listRecurringRules(db),
+        historyType === 'recurring'
+          ? Promise.resolve({ items: [], nextCursor: null })
+          : listTransactionPage(db, {
+            accountId: selectedAccountId,
+            historyKind: historyType,
+            month: selectedMonth,
+          }),
+        selectedAccountId === null
+          ? getConsolidatedBalance(db)
+          : getAccountBalance(db, selectedAccountId),
       ]);
       if (loadedAccounts.length === 0) {
         onNoAccounts();
@@ -91,7 +105,9 @@ export function TransactionsHomeScreen({
       }
       setAccounts(loadedAccounts);
       setSelectedAccountId((id) => id !== null && loadedAccounts.some((account) => account.id === id) ? id : null);
-      setTransactions(loadedTransactions);
+      setTransactions(page.items);
+      setNextTransactionCursor(page.nextCursor);
+      setDisplayedBalance(balance ?? 0);
       setCategories(loadedCategories);
       setRecurringRules(loadedRecurringRules);
       setError(null);
@@ -100,7 +116,7 @@ export function TransactionsHomeScreen({
     } finally {
       setIsLoading(false);
     }
-  }, [db, onNoAccounts]);
+  }, [db, historyType, onNoAccounts, selectedAccountId, selectedMonth]);
 
   useFocusEffect(useCallback(() => {
     setBalanceReplayKey((key) => key + 1);
@@ -111,38 +127,76 @@ export function TransactionsHomeScreen({
   const selectedAccount = selectedAccountId === null
     ? null
     : accounts.find((item) => item.id === selectedAccountId) ?? null;
-  const visibleTransactions = transactions.filter((item) => {
-    const hasSelectedAccount = selectedAccountId === null || item.accountId === selectedAccountId ||
-      (item.kind === 'transfer' && item.destinationAccountId === selectedAccountId);
-    if (!hasSelectedAccount || item.transactionDate.slice(0, 7) !== selectedMonth) return false;
-    return historyType === 'transfers'
-      ? item.kind === 'transfer'
-      : item.kind === 'expense' || item.kind === 'income';
-  });
   const visibleRecurringRules = recurringRules
     .filter((rule) => rule.deletedAt === null && (selectedAccountId === null || rule.accountId === selectedAccountId))
     .map((rule) => ({ rule, nextChargeDate: getNextRecurringChargeDate(rule, getLocalCivilDate()) }))
     .sort((left, right) => (left.nextChargeDate ?? '9999-12-31').localeCompare(right.nextChargeDate ?? '9999-12-31'));
-  const transactionGroups = groupByDate(visibleTransactions.map((item) => ({ date: item.transactionDate, item })));
+  const transactionGroups = groupByDate(transactions.map((item) => ({ date: item.transactionDate, item })));
   const historySelectionKey = `${historyType}:${selectedAccountId ?? 'all'}:${selectedMonth}`;
-  const displayedBalance = selectedAccount
-    ? calculateAccountBalance(transactions, selectedAccount.id)
-    : calculateConsolidatedBalance(transactions);
 
   if (isLoading) return <ScreenState message="Buscando lançamentos e recorrências…" status="loading" title="Carregando histórico" />;
   if (error) return <ScreenState actionLabel="Tentar novamente" message={error} onAction={() => void load()} status="error" />;
 
   async function toggleRecurringRule(rule: RecurringRule) {
+    if (!rule.isActive) {
+      Alert.alert(
+        'Retomar recorrência',
+        'Escolha como tratar os vencimentos desde a pausa.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Ignorar período pausado',
+            onPress: () => void resumeRule(rule, 'skip-paused'),
+          },
+          {
+            text: 'Lançar vencimentos',
+            onPress: () => void resumeRule(rule, 'process-paused'),
+          },
+        ],
+      );
+      return;
+    }
+
     try {
-      const changed = rule.isActive
-        ? await pauseRecurringRule(db, rule.id)
-        : await resumeRecurringRule(db, rule.id);
+      const changed = await pauseRecurringRule(db, rule.id);
       if (!changed) throw new Error('Recurring rule state did not change.');
       setRecurringActionError(null);
-      showSuccess(rule.isActive ? 'Recorrência pausada.' : 'Recorrência retomada.');
+      showSuccess('Recorrência pausada.');
       await load();
     } catch {
-      setRecurringActionError(`Não foi possível ${rule.isActive ? 'pausar' : 'retomar'} a recorrência. Tente novamente.`);
+      setRecurringActionError('Não foi possível pausar a recorrência. Tente novamente.');
+    }
+  }
+
+  async function resumeRule(rule: RecurringRule, mode: 'process-paused' | 'skip-paused') {
+    try {
+      const changed = await resumeRecurringRule(db, rule.id, mode, getLocalCivilDate());
+      if (!changed) throw new Error('Recurring rule state did not change.');
+      if (mode === 'process-paused') await processAllDueRecurringRules(db);
+      setRecurringActionError(null);
+      showSuccess(mode === 'process-paused' ? 'Recorrência retomada e vencimentos pendentes lançados.' : 'Recorrência retomada a partir de hoje.');
+      await load();
+    } catch {
+      setRecurringActionError('Não foi possível retomar a recorrência. Tente novamente.');
+    }
+  }
+
+  async function loadMoreTransactions() {
+    if (nextTransactionCursor === null || historyType === 'recurring') return;
+    setIsLoadingMore(true);
+    try {
+      const page = await listTransactionPage(db, {
+        accountId: selectedAccountId,
+        cursor: nextTransactionCursor,
+        historyKind: historyType,
+        month: selectedMonth,
+      });
+      setTransactions((current) => [...current, ...page.items]);
+      setNextTransactionCursor(page.nextCursor);
+    } catch {
+      setError('Não foi possível carregar mais lançamentos.');
+    } finally {
+      setIsLoadingMore(false);
     }
   }
 
@@ -199,7 +253,7 @@ export function TransactionsHomeScreen({
                 />
               ))}
             </>
-          ) : visibleTransactions.length === 0 ? (
+          ) : transactions.length === 0 ? (
             <EmptyStateCard message={historyType === 'transfers' ? 'Nenhuma transferência registrada neste mês.' : 'Nenhum lançamento registrado neste mês.'} />
           ) : transactionGroups.map((group) => (
             <HistoryDateGroup date={group.date} key={group.date}>
@@ -217,6 +271,14 @@ export function TransactionsHomeScreen({
               ))}
             </HistoryDateGroup>
           ))}
+          {nextTransactionCursor !== null && historyType !== 'recurring' ? (
+            <Button
+              disabled={isLoadingMore}
+              label={isLoadingMore ? 'Carregando…' : 'Carregar mais'}
+              onPress={() => void loadMoreTransactions()}
+              variant="secondary"
+            />
+          ) : null}
           </View>
         </FadeSelection>
     </ScrollableScreen>
