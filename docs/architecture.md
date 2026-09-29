@@ -73,6 +73,12 @@ Hedge/
     └── utils/                 # Funções pequenas, genéricas e sem estado
 ```
 
+Os dados fictícios usados durante o desenvolvimento ficam em
+`src/db/developmentSeed.ts` e são documentados em
+[`development-seed.md`](development-seed.md). Eles não são uma migração e só
+são aplicados em `__DEV__` a um banco sem contas; builds de produção não devem
+executá-los.
+
 Arquivos `.gitkeep` existem somente para tornar as pastas vazias versionáveis.
 Eles devem ser removidos quando a pasta receber seu primeiro arquivo real.
 
