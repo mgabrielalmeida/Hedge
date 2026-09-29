@@ -55,6 +55,18 @@ export async function listRecurringOccurrencesForMonth(
   );
   return rows.map(mapRecurringOccurrence);
 }
+
+export async function findRecurringOccurrenceByTransactionId(
+  db: RepositoryDatabase,
+  transactionId: EntityId,
+): Promise<RecurringOccurrence | null> {
+  if (!validId(transactionId)) throw new Error('Invalid recurring occurrence transaction.');
+  const row = await db.getFirstAsync<RecurringOccurrenceRow>(
+    'SELECT id, recurring_rule_id, scheduled_date, transaction_id, created_at FROM recurring_occurrences WHERE transaction_id = ?;',
+    transactionId,
+  );
+  return row ? mapRecurringOccurrence(row) : null;
+}
 export async function findRecurringRuleById(db: RepositoryDatabase, id: number): Promise<RecurringRule | null> {
   const row = await db.getFirstAsync<RecurringRuleRow>(`SELECT r.${ruleColumns.replaceAll(', ', ', r.')} FROM recurring_rules r JOIN accounts a ON a.id = r.account_id AND a.is_archived = 0 WHERE r.id = ?;`, id);
   return row ? mapRecurringRule(row) : null;

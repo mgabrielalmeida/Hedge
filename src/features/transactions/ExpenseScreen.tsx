@@ -26,6 +26,7 @@ import {
   createTransaction,
   deleteRecurringRule,
   deleteTransaction,
+  findRecurringOccurrenceByTransactionId,
   findRecurringRuleById,
   findTransactionById,
   listAccounts,
@@ -34,7 +35,9 @@ import {
   updateTransaction,
 } from '@/db/repositories';
 import {
+  formatBrazilianCurrency,
   formatBrazilianMoneyInput,
+  formatCivilDate,
   getCivilDateParts,
   getMondayBasedWeekday,
   parseCivilDate,
@@ -91,12 +94,14 @@ export function ExpenseScreen({
   const [showRequiredErrors, setShowRequiredErrors] = useState(false);
   const [saving, setSaving] = useState(false);
   const [existingTransaction, setExistingTransaction] = useState<Transaction | null>(null);
+  const [isRecurringOccurrence, setIsRecurringOccurrence] = useState(false);
   const [existingRule, setExistingRule] = useState<RecurringRule | null>(null);
   const [recurrenceEnabled, setRecurrenceEnabled] = useState(recurringRuleId !== undefined);
   const [frequency, setFrequency] = useState<RecurringFrequency>('monthly');
   const [chargeDay, setChargeDay] = useState(String(initialDateParts.day));
   const [chargeMonth, setChargeMonth] = useState(String(initialDateParts.month));
   const [endDate, setEndDate] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -105,14 +110,16 @@ export function ExpenseScreen({
         listAccounts(db),
         listCategories(db),
         transactionId ? findTransactionById(db, transactionId) : Promise.resolve(null),
+        transactionId ? findRecurringOccurrenceByTransactionId(db, transactionId) : Promise.resolve(null),
         recurringRuleId ? findRecurringRuleById(db, recurringRuleId) : Promise.resolve(null),
-      ]).then(([loadedAccounts, loadedCategories, transaction, rule]) => {
+      ]).then(([loadedAccounts, loadedCategories, transaction, occurrence, rule]) => {
         if (!active) return;
         setAccounts(loadedAccounts);
         setCategories(loadedCategories);
 
         if (transaction && (transaction.kind === 'expense' || transaction.kind === 'income')) {
           setExistingTransaction(transaction);
+          setIsRecurringOccurrence(occurrence !== null);
           setAccountId(transaction.accountId);
           setCategoryId(transaction.categoryId);
           setName(transaction.name);
@@ -238,6 +245,33 @@ export function ExpenseScreen({
     }
   }
 
+  function confirmTransactionDeletion() {
+    if (!existingTransaction) return;
+    Alert.alert(
+      'Excluir lançamento permanentemente?',
+      transactionDeletionMessage(existingTransaction, isRecurringOccurrence),
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir permanentemente', style: 'destructive', onPress: () => void removeTransaction() },
+      ],
+    );
+  }
+
+  async function removeTransaction() {
+    if (!existingTransaction) return;
+    setDeleting(true);
+    try {
+      const deleted = await deleteTransaction(db, existingTransaction.id);
+      if (!deleted) throw new Error('Transaction was not deleted.');
+      showSuccess('Lançamento excluído permanentemente.');
+      onDone();
+    } catch {
+      setError('O lançamento não foi excluído. Tente novamente ou volte sem fazer alterações.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (isLoading) {
     return <ScreenState message="Preparando o formulário do lançamento…" status="loading" title="Carregando formulário" />;
   }
@@ -281,13 +315,22 @@ export function ExpenseScreen({
               }
             }} /> : null}
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} onPress={() => void save()} />
-            {existingTransaction ? <Button label="Excluir lançamento" onPress={() => Alert.alert('Excluir lançamento?', 'Esta ação remove o lançamento e atualiza o saldo da conta.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteTransaction(db, existingTransaction.id).then(() => { showSuccess('Lançamento excluído.'); onDone(); }).catch(() => setError('O lançamento não foi excluído. Tente novamente ou volte sem fazer alterações.')) }])} variant="destructive" /> : null}
+            {existingTransaction ? <Button disabled={deleting || saving} label={deleting ? 'Excluindo…' : 'Excluir lançamento'} onPress={confirmTransactionDeletion} variant="destructive" /> : null}
             {existingRule ? <Button label="Excluir regra recorrente" onPress={() => Alert.alert('Excluir regra recorrente?', 'Os lançamentos já gerados serão mantidos no histórico.', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void deleteRecurringRule(db, existingRule.id).then(() => { showSuccess('Regra recorrente excluída.'); onDone(); }).catch(() => setError('A regra recorrente não foi excluída. Tente novamente ou volte sem fazer alterações.')) }])} variant="destructive" /> : null}
             <Button label="Cancelar" onPress={onDone} variant="ghost" />
           </View>
         </Card>
     </ScrollableScreen>
   );
+}
+
+function transactionDeletionMessage(transaction: Transaction, isRecurringOccurrence: boolean): string {
+  const noun = transaction.kind === 'expense' ? 'A despesa' : 'A renda';
+  const details = `${noun} “${transaction.name}” de ${formatBrazilianCurrency(Math.abs(transaction.amountCents))} em ${formatCivilDate(transaction.transactionDate)}`;
+  if (isRecurringOccurrence) {
+    return `${details} foi gerada por uma recorrência. Ela será removida permanentemente e o saldo será recalculado. A regra recorrente não será alterada; se continuar ativa, os próximos vencimentos serão gerados. Este vencimento não será recriado.`;
+  }
+  return `${details} será removida permanentemente e o saldo será recalculado. Esta ação não pode ser desfeita.`;
 }
 
 function RecurrenceFields({ chargeDay, chargeMonth, endDate, frequency, onChargeDayChange, onChargeMonthChange, onEndDateChange, onFrequencyChange }: {

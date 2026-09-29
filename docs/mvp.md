@@ -155,7 +155,10 @@ e trata caracteres como `%` e `_` literalmente. Mês, tipo, conta, categoria e
 texto são combinados antes da paginação do histórico. O usuário pode editar ou excluir seus lançamentos. O lançamento de saldo inicial também segue
 essas regras, embora não seja apresentado como um atributo da conta. A
 exclusão é permanente: o lançamento deixa de integrar o histórico e os
-cálculos de saldo e gastos.
+cálculos de saldo e gastos. Antes de confirmar a exclusão, a interface mostra
+o lançamento e seu efeito no saldo. Se ele tiver sido gerado por recorrência,
+informa que somente aquela ocorrência será removida, a regra não será alterada
+e o vencimento excluído não será recriado.
 
 ## Transferências
 

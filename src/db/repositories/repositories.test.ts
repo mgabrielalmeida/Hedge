@@ -11,6 +11,7 @@ import {
   deleteRecurringRule,
   deleteTransaction,
   findAccountById,
+  findRecurringOccurrenceByTransactionId,
   findTransactionById,
   getAccountBalance,
   getConsolidatedBalance,
@@ -212,9 +213,16 @@ describe('SQLite repositories', () => {
     await expect(createDueOccurrence(database, activeRule.id, '2028-02-28', () => updatedAt)).rejects.toThrow('not due');
     const generated = await createDueOccurrence(database, activeRule.id, '2028-02-29', () => updatedAt);
     expect(generated).toEqual({ occurrence: expect.objectContaining({ recurringRuleId: rule.id, scheduledDate: '2028-02-29' }), transaction: expect.objectContaining({ kind: 'expense', name: 'Internet plus', amountCents: -200 }) });
+    await expect(findRecurringOccurrenceByTransactionId(database, generated.transaction.id)).resolves.toEqual(expect.objectContaining({
+      id: generated.occurrence.id,
+      transactionId: generated.transaction.id,
+    }));
     const countBeforeDuplicate = (await listTransactions(database)).length;
     await expect(createDueOccurrence(database, activeRule.id, '2028-02-29', () => updatedAt)).rejects.toThrow();
     expect((await listTransactions(database)).length).toBe(countBeforeDuplicate);
+    await deleteTransaction(database, generated.transaction.id);
+    await expect(findRecurringOccurrenceByTransactionId(database, generated.transaction.id)).resolves.toBeNull();
+    await expect(database.getFirstAsync<{ transaction_id: number | null }>('SELECT transaction_id FROM recurring_occurrences WHERE id = ?;', generated.occurrence.id)).resolves.toEqual({ transaction_id: null });
     await expect(deleteRecurringRule(database, rule.id, () => updatedAt)).resolves.toBe(true);
     await expect(listRecurringRules(database, true)).resolves.toEqual([]);
     await expect(createDueOccurrence(database, activeRule.id, '2029-02-28', () => updatedAt)).rejects.toThrow('not due');

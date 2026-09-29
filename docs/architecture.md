@@ -214,6 +214,11 @@ numérica do saldo é acionada ao entrar na tela ou trocar a conta selecionada;
 atualizações ordinárias do histórico substituem o valor exibido sem reiniciar a
 animação.
 
+Antes de excluir um lançamento permanentemente, a interface identifica o
+registro afetado, informa o efeito sobre o saldo e exige confirmação. Quando o
+lançamento veio de uma recorrência, a confirmação esclarece que a regra não é
+alterada e que a ocorrência permanece registrada para evitar nova geração.
+
 Redux, Zustand, React Query e bibliotecas equivalentes não fazem parte da
 arquitetura inicial.
 

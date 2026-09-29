@@ -26,7 +26,9 @@ import {
   updateTransaction,
 } from '@/db/repositories';
 import {
+  formatBrazilianCurrency,
   formatBrazilianMoneyInput,
+  formatCivilDate,
   parseCivilDate,
   parseMoneyInput,
   validateNotFuture,
@@ -56,6 +58,7 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
 
   useEffect(() => {
@@ -148,12 +151,16 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
 
   async function remove() {
     if (!existing) return;
+    setDeleting(true);
     try {
-      await deleteTransaction(db, existing.id);
-      showSuccess('Transferência excluída.');
+      const deleted = await deleteTransaction(db, existing.id);
+      if (!deleted) throw new Error('Transfer was not deleted.');
+      showSuccess('Transferência excluída permanentemente.');
       onDone();
     } catch {
       setError('Não foi possível excluir a transferência.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -220,13 +227,14 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
             <Button disabled={saving} label={saving ? 'Salvando…' : 'Salvar'} onPress={() => void save()} />
             {existing ? (
               <Button
-                label="Excluir transferência"
+                disabled={deleting || saving}
+                label={deleting ? 'Excluindo…' : 'Excluir transferência'}
                 onPress={() => Alert.alert(
-                  'Excluir transferência?',
-                  'Esta ação remove a transferência e atualiza o saldo das duas contas.',
+                  'Excluir transferência permanentemente?',
+                  transferDeletionMessage(existing, accounts),
                   [
                     { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Excluir', style: 'destructive', onPress: () => void remove() },
+                    { text: 'Excluir permanentemente', style: 'destructive', onPress: () => void remove() },
                   ],
                 )}
                 variant="destructive"
@@ -237,6 +245,12 @@ export function TransferScreen({ deferInitialLoad = true, onDone, transactionId 
         </Card>
     </ScrollableScreen>
   );
+}
+
+function transferDeletionMessage(transfer: TransferTransaction, accounts: readonly Account[]): string {
+  const source = accounts.find((account) => account.id === transfer.accountId)?.name ?? 'conta de origem';
+  const destination = accounts.find((account) => account.id === transfer.destinationAccountId)?.name ?? 'conta de destino';
+  return `A transferência de ${formatBrazilianCurrency(Math.abs(transfer.amountCents))} em ${formatCivilDate(transfer.transactionDate)} de “${source}” para “${destination}” será removida permanentemente. Os saldos das duas contas serão recalculados. Esta ação não pode ser desfeita.`;
 }
 
 function AccountChoices({
