@@ -1,182 +1,90 @@
-import {
-  backupDatabaseAsync,
-  deserializeDatabaseAsync,
-  openDatabaseAsync,
-} from 'expo-sqlite';
+import { backupDatabaseAsync, deserializeDatabaseAsync, openDatabaseAsync } from 'expo-sqlite';
 
+import {
+  BackupError,
+  copyPreparedBackupToDatabase,
+  createBackupBytes,
+  prepareBackupRestore,
+} from './backup';
 import { initializeDatabase } from './database';
-import { BackupError, createBackupBytes, restoreBackupBytes } from './backup';
 import { runMigrations } from './migrate';
-import {
-  loadThemePreferences,
-  saveThemePreferences,
-  type ThemePreferences,
-} from './preferences';
+import { loadThemePreferences, type ThemePreferences } from './preferences';
 
-jest.mock('expo-sqlite', () => ({
-  backupDatabaseAsync: jest.fn(),
-  deserializeDatabaseAsync: jest.fn(),
-  openDatabaseAsync: jest.fn(),
-}));
+jest.mock('expo-sqlite', () => ({ backupDatabaseAsync: jest.fn(), deserializeDatabaseAsync: jest.fn(), openDatabaseAsync: jest.fn() }));
 jest.mock('./database', () => ({ initializeDatabase: jest.fn() }));
 jest.mock('./migrate', () => ({ runMigrations: jest.fn() }));
-jest.mock('./migrations', () => ({ migrations: Array.from({ length: 10 }) }));
-jest.mock('./preferences', () => {
-  const actual = jest.requireActual('./preferences');
-  return {
-    ...actual,
-    loadThemePreferences: jest.fn(),
-    saveThemePreferences: jest.fn(),
-  };
-});
+jest.mock('./migrations', () => ({ migrations: Array.from({ length: 12 }) }));
+jest.mock('./preferences', () => ({ ...jest.requireActual('./preferences'), loadThemePreferences: jest.fn() }));
 
 const preferences: ThemePreferences = {
-  appearance: 'dark',
-  customTheme: { primary: '#A23E2D', secondary: '#70458A' },
-  hideBalances: true,
-  themeName: 'custom',
+  appearance: 'dark', customTheme: { primary: '#A23E2D', secondary: '#70458A' }, hideBalances: true, themeName: 'custom',
 };
+const mockBackup = jest.mocked(backupDatabaseAsync);
+const mockDeserialize = jest.mocked(deserializeDatabaseAsync);
+const mockOpen = jest.mocked(openDatabaseAsync);
+const mockInitialize = jest.mocked(initializeDatabase);
+const mockMigrations = jest.mocked(runMigrations);
+const mockPreferences = jest.mocked(loadThemePreferences);
 
-const mockedDeserialize = jest.mocked(deserializeDatabaseAsync);
-const mockedOpenDatabase = jest.mocked(openDatabaseAsync);
-const mockedBackup = jest.mocked(backupDatabaseAsync);
-const mockedInitialize = jest.mocked(initializeDatabase);
-const mockedRunMigrations = jest.mocked(runMigrations);
-const mockedLoadPreferences = jest.mocked(loadThemePreferences);
-const mockedSavePreferences = jest.mocked(saveThemePreferences);
-
-describe('backup database orchestration', () => {
+describe('backup isolation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedLoadPreferences.mockResolvedValue(preferences);
-    mockedSavePreferences.mockResolvedValue();
-    mockedInitialize.mockResolvedValue();
-    mockedRunMigrations.mockResolvedValue();
-    mockedBackup.mockResolvedValue();
+    mockBackup.mockResolvedValue(); mockInitialize.mockResolvedValue(); mockMigrations.mockResolvedValue(); mockPreferences.mockResolvedValue(preferences);
   });
 
-  it('exports a serialized database with versioned metadata and preferences', async () => {
-    const outputBytes = new Uint8Array([3, 4]);
-    const database = {};
-    const backupDatabase = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      execAsync: jest.fn().mockResolvedValue(undefined),
-      getFirstAsync: jest.fn().mockResolvedValue({ user_version: 10 }),
-      runAsync: jest.fn().mockResolvedValue(undefined),
-      serializeAsync: jest.fn().mockResolvedValue(outputBytes),
-    };
-    mockedOpenDatabase.mockResolvedValue(backupDatabase as never);
-    const createdAt = new Date('2026-09-11T12:00:00.000Z');
+  it('exports financial data without queue, cursor, receipts, conflicts, or session data', async () => {
+    const backup = fakeDatabase([{ user_version: 12 }, profile('profile-a', 'ledger-a', 2)]);
+    backup.serializeAsync = jest.fn().mockResolvedValue(new Uint8Array([1]));
+    mockOpen.mockResolvedValue(backup as never);
 
-    await expect(createBackupBytes(database as never, createdAt)).resolves.toBe(outputBytes);
+    await createBackupBytes({} as never, new Date('2026-09-29T12:00:00.000Z'));
 
-    expect(mockedOpenDatabase).toHaveBeenCalledWith(
-      ':memory:',
-      { useNewConnection: true },
-    );
-    expect(mockedBackup).toHaveBeenCalledWith({
-      destDatabase: backupDatabase,
-      sourceDatabase: database,
-    });
-    expect(backupDatabase.execAsync).toHaveBeenNthCalledWith(
-      1,
-      'PRAGMA journal_mode = MEMORY;',
-    );
-    expect(backupDatabase.runAsync).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO __hedge_backup_metadata_v1'),
-      'com.hedge.backup',
-      1,
-      createdAt.toISOString(),
-      10,
-      JSON.stringify(preferences),
-    );
-    expect(backupDatabase.closeAsync).toHaveBeenCalled();
+    expect(backup.execAsync).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM sync_outbox'));
+    expect(backup.execAsync).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM sync_conflicts'));
+    expect(backup.execAsync).toHaveBeenCalledWith(expect.stringContaining('UPDATE sync_state SET cursor_value = NULL'));
+    expect(backup.runAsync).toHaveBeenCalledWith(expect.stringContaining('profile_id, ledger_id, generation'),
+      'com.hedge.backup', 2, '2026-09-29T12:00:00.000Z', 12, JSON.stringify(preferences), 'profile-a', 'ledger-a', 2);
   });
 
-  it('validates, migrates and restores both database and preferences', async () => {
-    const incoming = createIncomingBackup();
-    const rollback = { closeAsync: jest.fn().mockResolvedValue(undefined) };
-    const database = {};
-    mockedDeserialize.mockResolvedValue(incoming as never);
-    mockedOpenDatabase.mockResolvedValue(rollback as never);
+  it('rejects a newer or malformed backup before any destination is copied', async () => {
+    const incoming = fakeIncoming({ format_version: 3 });
+    mockDeserialize.mockResolvedValue(incoming as never);
 
-    await expect(restoreBackupBytes(database as never, new Uint8Array([1]))).resolves.toEqual(preferences);
-
-    expect(incoming.execAsync).toHaveBeenNthCalledWith(
-      1,
-      'PRAGMA journal_mode = MEMORY;',
-    );
-    expect(incoming.execAsync).toHaveBeenNthCalledWith(
-      2,
-      'DROP TABLE __hedge_backup_metadata_v1;',
-    );
-    expect(mockedRunMigrations).toHaveBeenCalledWith(incoming);
-    expect(mockedBackup).toHaveBeenNthCalledWith(1, {
-      destDatabase: rollback,
-      sourceDatabase: database,
-    });
-    expect(mockedBackup).toHaveBeenNthCalledWith(2, {
-      destDatabase: database,
-      sourceDatabase: incoming,
-    });
-    expect(mockedInitialize).toHaveBeenCalledWith(database);
-    expect(mockedSavePreferences).toHaveBeenCalledWith(preferences);
+    await expect(prepareBackupRestore(new Uint8Array([1]))).rejects.toEqual(expect.objectContaining<Partial<BackupError>>({ code: 'newer-backup' }));
+    expect(mockBackup).not.toHaveBeenCalled();
     expect(incoming.closeAsync).toHaveBeenCalled();
-    expect(rollback.closeAsync).toHaveBeenCalled();
   });
 
-  it('restores the previous state when applying preferences fails', async () => {
-    const incoming = createIncomingBackup();
-    const rollback = { closeAsync: jest.fn().mockResolvedValue(undefined) };
-    const database = {};
-    mockedDeserialize.mockResolvedValue(incoming as never);
-    mockedOpenDatabase.mockResolvedValue(rollback as never);
-    mockedSavePreferences
-      .mockRejectedValueOnce(new Error('storage unavailable'))
-      .mockResolvedValueOnce();
+  it('copies only a prepared, verified backup to an isolated destination generation', async () => {
+    const incoming = fakeIncoming();
+    mockDeserialize.mockResolvedValue(incoming as never);
+    const prepared = await prepareBackupRestore(new Uint8Array([1]), { profileId: 'profile-a', ledgerId: 'ledger-a', generation: 1 });
+    const destination = fakeDatabase([{ quick_check: 'ok' }, profile('profile-a', 'ledger-a', 2)]);
 
-    await expect(
-      restoreBackupBytes(database as never, new Uint8Array([1])),
-    ).rejects.toEqual(expect.objectContaining({ code: 'restore-failed' }));
+    await expect(copyPreparedBackupToDatabase(prepared, destination as never, 'hedge-profile-00000000-0000-4000-8000-000000000001.db', 2))
+      .resolves.toEqual({ profileId: 'profile-a', ledgerId: 'ledger-a', generation: 2 });
 
-    expect(mockedBackup).toHaveBeenNthCalledWith(3, {
-      destDatabase: database,
-      sourceDatabase: rollback,
-    });
-    expect(mockedSavePreferences).toHaveBeenLastCalledWith(preferences);
-    expect(rollback.closeAsync).toHaveBeenCalled();
-  });
-
-  it('rejects backups created by a newer format before changing data', async () => {
-    const incoming = createIncomingBackup({ format_version: 2 });
-    mockedDeserialize.mockResolvedValue(incoming as never);
-
-    await expect(
-      restoreBackupBytes({} as never, new Uint8Array([1])),
-    ).rejects.toEqual(expect.objectContaining<Partial<BackupError>>({ code: 'newer-backup' }));
-
-    expect(mockedBackup).not.toHaveBeenCalled();
-    expect(incoming.closeAsync).toHaveBeenCalled();
+    expect(mockBackup).toHaveBeenCalledWith({ destDatabase: destination, sourceDatabase: incoming });
+    expect(mockInitialize).toHaveBeenCalledWith(destination, expect.objectContaining({ createRecoveryCopy: true }));
+    expect(destination.runAsync).toHaveBeenCalledWith(expect.stringContaining('generation = ?'), 2);
+    await prepared.database.closeAsync();
   });
 });
 
-function createIncomingBackup(overrides: Partial<Record<string, unknown>> = {}) {
-  const metadata = {
-    created_at: '2026-09-11T12:00:00.000Z',
-    format: 'com.hedge.backup',
-    format_version: 1,
-    preferences_json: JSON.stringify(preferences),
-    schema_version: 8,
-    ...overrides,
-  };
+function profile(profileId: string, ledgerId: string, generation: number) {
+  return { profile_id: profileId, ledger_id: ledgerId, generation };
+}
 
+function fakeIncoming(overrides: Partial<Record<string, unknown>> = {}) {
+  const metadata = { created_at: '2026-09-29T12:00:00.000Z', format: 'com.hedge.backup', format_version: 2, preferences_json: JSON.stringify(preferences), schema_version: 12, ...overrides };
+  return fakeDatabase([{ quick_check: 'ok' }, metadata, profile('profile-a', 'ledger-a', 1), { user_version: 12 }, metadata, profile('profile-a', 'ledger-a', 1), { quick_check: 'ok' }, profile('profile-a', 'ledger-a', 1)]);
+}
+
+function fakeDatabase(responses: unknown[]) {
   return {
     closeAsync: jest.fn().mockResolvedValue(undefined),
     execAsync: jest.fn().mockResolvedValue(undefined),
-    getFirstAsync: jest.fn(async (source: string) => {
-      if (source.includes('quick_check')) return { quick_check: 'ok' };
-      if (source.includes('user_version')) return { user_version: 8 };
-      return metadata;
-    }),
-  };
+    getFirstAsync: jest.fn(async () => responses.shift() ?? null),
+    runAsync: jest.fn().mockResolvedValue(undefined),
+  } as { closeAsync: jest.Mock; execAsync: jest.Mock; getFirstAsync: jest.Mock; runAsync: jest.Mock; serializeAsync?: jest.Mock };
 }

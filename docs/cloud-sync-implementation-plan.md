@@ -211,6 +211,35 @@ separado. Testar logout, troca de perfil, chave ausente e sessão expirada.
 **Aceite:** backup corrompido/futuro/malicioso não altera o banco; restauração
 interrompida recupera a versão anterior; sessão perdida não apaga dados ou fila.
 
+**Evidência de conclusão — 29 de setembro de 2026:** o formato de backup passou
+para a versão 2 e registra a identidade vinculada de perfil e ledger, além das
+preferências visuais permitidas. A exportação remove da cópia todas as estruturas
+técnicas de sincronização — outbox, base confirmada, recibos, cursor, eventos,
+conflitos e checkpoints — e não inclui sessão ou token. A importação valida
+integridade, metadados, versão de formato e schema antes de migrar o artefato em
+memória. Formatos futuros, arquivos inválidos e backups vinculados a outro perfil
+são rejeitados antes de qualquer cópia para um banco local; backups v1 continuam
+importáveis e recebem as migrações necessárias.
+
+Uma restauração válida é copiada para um arquivo SQLite isolado, verificada e só
+então registrada como nova geração do perfil ativo. A seleção anterior não é
+alterada quando a cópia é interrompida; o `DatabaseProvider` remonta a conexão
+somente depois desse commit do registro. A sessão local está em `src/auth` e usa
+AES-GCM com chave por perfil no SecureStore e ciphertext separado no kv-store.
+Logout, troca de perfil, chave ausente e expiração removem apenas a sessão, sem
+tocar em dados financeiros ou na fila.
+
+Os testes cobrem exportação sem estado técnico de sync, rejeição de formato
+futuro antes de escrita, cópia apenas após preparação verificada, recuperação
+interrompida com registro anterior preservado, troca para nova geração, logout,
+isolamento entre perfis, chave ausente e expiração. `npm run typecheck`,
+`npm run lint`, `npm test -- --runInBand` e `git diff --check` foram executados
+na Etapa 6. `npm run check:expo` também foi executado e apontou sete atualizações
+patch já pendentes de módulos Expo; nenhuma dependência foi alterada fora do
+escopo. A validação do Marco A, incluindo suas evidências externas, fica
+expressamente para a próxima tarefa; nenhum PostgreSQL, cliente remoto ou envio
+de rede foi ativado.
+
 ## Marco A — bloqueio antes do PostgreSQL
 
 Só iniciar o schema remoto quando as etapas 1–6 tiverem evidência de aceite,

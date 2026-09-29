@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { Button, Card, FormFeedback, Text, useSuccessFeedback } from '@/components';
-import { BackupError, createBackupBytes, restoreBackupBytes } from '@/db/backup';
-import { useDatabase } from '@/db/DatabaseProvider';
+import { BackupError, createBackupBytes } from '@/db/backup';
+import { useDatabase, useLocalProfile } from '@/db/DatabaseProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 
 import { pickBackupFile, shareBackupFile } from './backupFiles';
 
 export function BackupSection() {
   const database = useDatabase();
+  const { restoreBackup } = useLocalProfile();
   const { showSuccess } = useSuccessFeedback();
   const { reloadPreferences, tokens } = useTheme();
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function BackupSection() {
 
       Alert.alert(
         'Restaurar este backup?',
-        `O arquivo “${selected.name}” substituirá todas as contas, categorias, lançamentos, recorrências, tema e preferências atuais.`,
+        `O arquivo “${selected.name}” criará uma nova geração para suas contas, categorias, lançamentos, recorrências, tema e preferências. A versão atual será preservada até a conclusão.`,
         [
           { text: 'Cancelar', style: 'cancel' },
           {
@@ -63,7 +64,7 @@ export function BackupSection() {
     setError(null);
 
     try {
-      await restoreBackupBytes(database, contents);
+      await restoreBackup(contents);
       await reloadPreferences();
       showSuccess('Backup restaurado.');
     } catch (caught) {
@@ -104,7 +105,7 @@ export function BackupSection() {
       <Card>
         <Text variant="title">Restaurar backup</Text>
         <Text tone="muted" style={{ marginTop: tokens.spacing.xs }}>
-          A restauração substitui integralmente os dados e preferências atuais.
+          A restauração cria uma nova geração depois de validar o arquivo. Seus dados atuais permanecem intactos se ela for interrompida.
         </Text>
         <Button
           disabled={isBusy}

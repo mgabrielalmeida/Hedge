@@ -2,7 +2,12 @@ import { randomUUID } from 'expo-crypto';
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import AsyncStorage from 'expo-sqlite/kv-store';
 
+import {
+  copyPreparedBackupToDatabase,
+  prepareBackupRestore,
+} from './backup';
 import { DATABASE_NAME, initializeDatabase } from './database';
+import { loadThemePreferences, saveThemePreferences, type ThemePreferences } from './preferences';
 
 const LOCAL_PROFILES_KEY = 'database.localProfiles.v1';
 const DEFAULT_PROFILE_NAME = 'Perfil local';
@@ -36,6 +41,11 @@ export type ProfileDependencies = {
   readonly storage: ProfileStorage;
 };
 
+export type LocalRecoveryDependencies = ProfileDependencies & {
+  readonly loadPreferences: () => Promise<ThemePreferences>;
+  readonly savePreferences: (preferences: ThemePreferences) => Promise<void>;
+};
+
 const defaultDependencies: ProfileDependencies = {
   initialize: async (database, databaseName) => initializeDatabase(database, {
     createRecoveryCopy: true,
@@ -43,6 +53,12 @@ const defaultDependencies: ProfileDependencies = {
   }),
   open: async (databaseName) => openDatabaseAsync(databaseName, { useNewConnection: true }),
   storage: AsyncStorage,
+};
+
+const defaultRecoveryDependencies: LocalRecoveryDependencies = {
+  ...defaultDependencies,
+  loadPreferences: loadThemePreferences,
+  savePreferences: saveThemePreferences,
 };
 
 export async function loadActiveDatabaseName(
@@ -100,6 +116,57 @@ export async function createLocalProfile(
   } finally {
     await database.closeAsync();
   }
+}
+
+/**
+ * Restores into an unregistered database file and changes the registry only
+ * after that file has been migrated and verified. The previous generation is
+ * deliberately kept untouched for interrupted-recovery safety.
+ */
+export async function restoreLocalProfileBackup(
+  activeProfile: LocalProfile,
+  backupBytes: Uint8Array,
+  dependencies: LocalRecoveryDependencies = defaultRecoveryDependencies,
+): Promise<LocalProfile> {
+  const prepared = await prepareBackupRestore(backupBytes, activeProfile);
+  const databaseName = `hedge-profile-${randomUUID()}.db`;
+  let database: ProfileDatabase | null = null;
+  let restored: LocalProfile | null = null;
+  let currentPreferences: ThemePreferences;
+  try {
+    currentPreferences = await dependencies.loadPreferences();
+    database = await dependencies.open(databaseName);
+    const nextGeneration = prepared.isLinkedToProfile ? activeProfile.generation + 1 : 1;
+    const identity = await copyPreparedBackupToDatabase(
+      prepared,
+      database,
+      databaseName,
+      nextGeneration,
+    );
+    if (prepared.isLinkedToProfile && (
+      identity.profileId !== activeProfile.profileId || identity.ledgerId !== activeProfile.ledgerId
+    )) {
+      throw new Error('Restored profile identity does not match the active profile.');
+    }
+    restored = { ...identity, databaseName, displayName: activeProfile.displayName };
+    await dependencies.savePreferences(prepared.preferences);
+  } finally {
+    await database?.closeAsync();
+    await prepared.database.closeAsync();
+  }
+  if (!restored) throw new Error('The restored local profile could not be prepared.');
+
+  const registry = await loadRegistry(dependencies.storage);
+  try {
+    const profiles = prepared.isLinkedToProfile
+      ? registry.profiles.map((profile) => profile.profileId === activeProfile.profileId ? restored! : profile)
+      : [...registry.profiles, restored];
+    await saveRegistry({ activeDatabaseName: databaseName, profiles }, dependencies.storage);
+  } catch (error) {
+    await dependencies.savePreferences(currentPreferences);
+    throw error;
+  }
+  return restored;
 }
 
 export async function prepareLocalProfileSwitch(

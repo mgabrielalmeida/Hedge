@@ -320,22 +320,26 @@ em qualquer aplicativo ou provedor de arquivos disponibilizado pelo sistema. A
 restauração usa o seletor nativo de documentos e aceita um arquivo por vez.
 
 O arquivo é um snapshot SQLite consistente, criado pelas APIs nativas de backup
-e serialização do `expo-sqlite`, e contém todas as tabelas financeiras. Uma
-tabela reservada,
-presente somente no artefato, registra a versão do formato, a versão do schema,
-o instante UTC da exportação e todas as preferências mantidas no
-`expo-sqlite/kv-store`, incluindo tema, aparência, tema Custom e ocultação de
-saldos. Essa tabela é validada e removida antes da restauração; não integra o
-schema normal do aplicativo.
+e serialização do `expo-sqlite`, e contém as tabelas financeiras e as
+preferências permitidas: tema, aparência, tema Custom e ocultação de saldos. Uma
+tabela reservada, presente somente no artefato, registra a versão do formato, a
+versão do schema, o instante UTC da exportação e a identidade do perfil e ledger.
+Antes da serialização, a cópia remove outbox, base confirmada, recibos, cursor,
+eventos aplicados, conflitos e checkpoints técnicos. Tokens e sessões nunca
+integram o SQLite de backup. Essa tabela é validada e removida antes da
+restauração; não integra o schema normal do aplicativo.
 
-A restauração substitui integralmente os dados e preferências atuais após uma
-confirmação explícita. Antes da substituição, o aplicativo mantém snapshots do
-banco e das preferências em memória e os reaplica se qualquer etapa falhar.
-Backups com schema anterior são atualizados pelas migrações existentes antes de
-serem aplicados. Formatos ou schemas mais recentes que o aplicativo são
-rejeitados, assim como arquivos corrompidos, metadados inválidos e arquivos com
-mais de 100 MB. A extensão é verificada antes da leitura e a integridade SQLite
-é verificada antes de qualquer escrita.
+A restauração não sobrescreve o arquivo SQLite ativo. Após confirmação explícita,
+o arquivo é desserializado em memória, tem formato, schema, preferências,
+identidade vinculada e integridade validados, recebe migrações pendentes e é
+copiado para um arquivo SQLite novo. Só então o registro de perfis passa a
+apontar para essa nova geração; a geração anterior permanece preservada se a
+importação for interrompida. Backups vinculados só restauram no mesmo perfil e
+ledger; backups v1 continuam aceitos, são migrados e passam a ser um perfil local
+isolado. Formatos ou schemas mais recentes que o aplicativo são rejeitados,
+assim como arquivos corrompidos, metadados inválidos e arquivos com mais de 100
+MB. A extensão é verificada antes da leitura e a integridade SQLite é verificada
+antes de qualquer troca de seleção.
 
 O backup não é criptografado, seguindo a decisão atual de usar SQLite padrão.
 Como o arquivo sai do sandbox e contém dados financeiros, a interface informa
@@ -394,9 +398,13 @@ tratado como uma decisão de privacidade separada antes da distribuição.
 Na fase inicial será usado o SQLite padrão, protegido pelo sandbox e pelos
 mecanismos do dispositivo. Isso não representa criptografia própria do banco.
 
-Nesta fase não adotamos SQLCipher nem criptografia ponta a ponta. A sessão será
-cifrada com AES-GCM e a chave ficará no SecureStore; o SQLite continua protegido
-pelo sandbox do dispositivo. RLS, RPCs e isolamento por usuário são obrigatórios.
+Nesta fase não adotamos SQLCipher nem criptografia ponta a ponta. A sessão local
+é cifrada com AES-GCM, com uma chave por perfil no SecureStore e ciphertext
+separado no `expo-sqlite/kv-store`; o payload é associado ao perfil como dado
+autenticado. Logout, expiração, chave ausente ou ciphertext inválido removem
+somente esses artefatos de sessão, sem apagar banco financeiro, outbox ou cursor.
+O SQLite continua protegido pelo sandbox do dispositivo. RLS, RPCs e isolamento
+por usuário continuam requisitos para a fase remota.
 
 ## Testes
 

@@ -16,6 +16,7 @@ import {
   loadActiveDatabaseName,
   prepareLocalProfileSwitch,
   registerLocalProfile,
+  restoreLocalProfileBackup,
   type LocalProfile,
 } from './localProfiles';
 
@@ -23,6 +24,7 @@ type LocalProfileContextValue = {
   readonly activeProfile: LocalProfile | null;
   readonly createProfile: (displayName: string) => Promise<LocalProfile>;
   readonly profiles: readonly LocalProfile[];
+  readonly restoreBackup: (backupBytes: Uint8Array) => Promise<void>;
   readonly switchProfile: (profileId: string) => Promise<void>;
 };
 
@@ -71,12 +73,23 @@ export function DatabaseProvider({ children, onError }: {
     return profile;
   }, []);
 
+  const restoreBackup = useCallback(async (backupBytes: Uint8Array) => {
+    if (!activeProfile) throw new Error('No active local profile is available for restoration.');
+    const restored = await restoreLocalProfileBackup(activeProfile, backupBytes);
+    setProfiles((current) => current.map((profile) => (
+      profile.profileId === restored.profileId ? restored : profile
+    )));
+    setActiveProfile(null);
+    setDatabaseName(restored.databaseName);
+  }, [activeProfile]);
+
   const value = useMemo<LocalProfileContextValue>(() => ({
     activeProfile,
     createProfile,
     profiles,
+    restoreBackup,
     switchProfile,
-  }), [activeProfile, createProfile, profiles, switchProfile]);
+  }), [activeProfile, createProfile, profiles, restoreBackup, switchProfile]);
 
   if (!databaseName) return null;
   return (
