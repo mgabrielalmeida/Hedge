@@ -1,7 +1,7 @@
 # Referência de medição local para sincronização
 
 **Status:** pronta para coleta em aparelhos físicos
-**Data:** 27 de setembro de 2026
+**Data:** 29 de setembro de 2026
 
 Este protocolo cria uma linha de base antes de introduzir identidade global,
 outbox ou rede. Ele mede exclusivamente o caminho local do SQLite: não requer
@@ -62,6 +62,10 @@ que a fixture já estiver persistida.
 | Armazenamento indisponível | Erro explícito; formulário não confirma sucesso | gravação de tela e log sem dados financeiros |
 | Base de 50 mil itens | Navegação e salvamento continuam locais | tabela acima |
 | Sem rede / modo avião | Abertura, rolagem e commit permanecem disponíveis | gravação de tela |
+| Dois dispositivos geram a mesma recorrência | Uma identidade `regra + data`; um único efeito remoto simulado | teste automatizado do transporte |
+| Retificação após outra movimentação | Transação recusada; saldo e metadados permanecem atuais | versão financeira e teste automatizado |
+| Lote recorrente interrompido | Checkpoint confirmado; retomada do mesmo lote sem duplicação | tabelas de lote/checkpoint e teste automatizado |
+| Conflito financeiro | Proposta local preservada até decisão explícita | revisão classificada e resolução testada |
 
 ## Estados de sessão antes da implementação de autenticação
 
@@ -84,3 +88,9 @@ negativas e valores de payload finitos. Não escolhem formato de UUID, schema
 remoto, transporte, usuário ou geração: essas decisões pertencem às Etapas 3,
 7 e 8. O módulo é TypeScript puro e não importa interface, React, Expo ou
 SQLite.
+
+Na Etapa 5, o contrato de conflito ganhou tipos puros para a classe de revisão e
+a resolução. A persistência e a decisão continuam em `src/db/sync`; nenhuma UI,
+API remota ou regra de relógio entra no domínio. As classes locais são edição,
+exclusão, arquivamento e categoria concorrentes, e as resoluções aceitas são
+manter a proposta local ou aceitar o evento remoto.

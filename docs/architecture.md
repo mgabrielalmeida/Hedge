@@ -1,7 +1,7 @@
 # Arquitetura do Hedge
 
 **Status:** aceita; evolução para conta e nuvem em preparação
-**Atualização:** 28 de setembro de 2026
+**Atualização:** 29 de setembro de 2026
 
 Este documento registra as decisões iniciais de arquitetura do Hedge. Ele deve
 ser atualizado quando uma decisão estrutural for alterada. O objetivo não é
@@ -202,9 +202,11 @@ telas e não podem receber novas escritas. Arquivar uma conta desativa suas
 regras recorrentes ativas na mesma transação. Regras recorrentes usam exclusão lógica para preservar procedência e podem ser pausadas sem exclusão; regras pausadas não geram novas ocorrências até serem retomadas. Uma tabela
 de ocorrências registra cada data processada mesmo depois da exclusão do
 lançamento gerado, evitando geração duplicada. Ao inicializar ou retornar ao
-primeiro plano, o repositório gera as datas vencidas de regras ativas em lotes
-transacionais independentes e idempotentes. Uma interrupção preserva os lotes já
-confirmados, e a próxima execução continua pelas ocorrências ausentes. A
+primeiro plano, o repositório resolve a data civil pelo fuso financeiro imutável
+do conjunto e gera as datas vencidas de regras ativas em lotes transacionais
+independentes e idempotentes. Lotes e checkpoints ficam persistidos; uma
+interrupção preserva os lotes já confirmados, e a próxima execução retoma o mesmo
+lote pelas ocorrências ausentes. A
 interface só atualiza seus saldos depois que o processamento completo termina;
 ela bloqueia a abertura até essa etapa concluir ou exibe uma recuperação
 explícita em caso de falha. A migração 1 não deve ser
@@ -228,6 +230,21 @@ financeira e seu comando são confirmados na mesma transação do repositório; 
 falha na fila reverte a mutação. Exclusões de categorias e lançamentos passam a
 usar os tombstones introduzidos pela migração 9 e deixam de participar das
 consultas locais, preservando a proposta para publicação e revisão.
+
+A migração 12 conclui as garantias financeiras locais anteriores ao servidor.
+O fuso financeiro é preenchido na primeira inicialização e depois permanece
+imutável no perfil. A identidade da ocorrência e a do lançamento recorrente são
+derivadas da mesma combinação `regra + data`, com sufixo próprio para o
+lançamento; registros anteriores e suas referências na reconciliação são
+convertidos atomicamente. Lotes e checkpoints de recorrência passam a ter
+persistência explícita.
+
+Cada conta também recebe uma `financial_version`, preenchida a partir dos
+lançamentos existentes e incrementada por gatilhos para toda inclusão, edição ou
+exclusão lógica que afete seu saldo, incluindo os dois lados de uma transferência.
+Uma retificação informa a versão lida pela tela e falha dentro da transação se
+outra movimentação já a tornou obsoleta. A falha preserva tanto os metadados da
+conta quanto o saldo atual.
 
 ## Estado da interface
 
@@ -358,10 +375,14 @@ fluxos de identidade futuros, sem manter dados financeiros em Context.
 Comandos usam IDs idempotentes, versões esperadas e dependências; leases vencidos
 voltam à fila após reinício. Recibos aceitos atualizam a base confirmada e
 removem o comando, enquanto rejeições mantêm o payload original e geram um
-conflito revisável. Um evento baixado atualiza a projeção somente quando não há
-proposta local pendente para a mesma entidade; caso haja, a base confirmada
-avança e a pendência é rebaseada. Eventos repetidos são ignorados e o cursor do
-lote só é salvo depois da aplicação. O transporte atual existe apenas em memória
+conflito revisável. Propostas rejeitadas continuam protegendo a projeção até uma
+decisão explícita. A revisão classifica edição, exclusão, arquivamento e troca de
+categoria concorrentes; aceitar o remoto aplica a base confirmada, enquanto
+manter o local cria um novo comando contra a versão remota observada e reescreve
+as dependências. Um evento baixado atualiza a projeção somente quando não há
+proposta local pendente ou rejeitada para a mesma entidade; caso haja, a base
+confirmada avança e a pendência é rebaseada. Eventos repetidos são ignorados e o
+cursor do lote só é salvo depois da aplicação. O transporte atual existe apenas em memória
 para testar perda, duplicação, reordenação e interrupção; nenhum dado sai do
 dispositivo nesta etapa.
 
@@ -398,7 +419,7 @@ de 1 mil, 10 mil e 50 mil lançamentos sem serem importados pela interface de
 produção. O [protocolo de medição local](local-sync-benchmark.md) define a coleta
 em aparelhos físicos para abertura, commit, memória, rolagem e feedback. Os
 contratos executáveis de comando, recibo, evento, snapshot, conflito e cursor
-ficam em `src/domain/sync`; são puros. A Etapa 4 usa esses contratos apenas no
+ficam em `src/domain/sync`; são puros. As Etapas 4 e 5 usam esses contratos apenas no
 SQLite e em um transporte simulado, sem ativar sincronização remota.
 
 ## Dependências deliberadamente excluídas

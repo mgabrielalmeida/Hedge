@@ -172,6 +172,35 @@ e categoria concorrentes.
 fim de mês e ano bissexto permanecem corretos; retificação desatualizada nunca
 altera o saldo silenciosamente.
 
+**Evidência de conclusão — 29 de setembro de 2026:** a migração sequencial 12
+persiste o fuso financeiro imutável do ledger, lotes retomáveis e checkpoints
+por regra. Ocorrência e lançamento gerado usam identidades determinísticas
+derivadas de `regra + data`; a migração converte lançamentos recorrentes antigos
+e suas referências locais sem alterar as migrações publicadas. A restrição única
+e a transação de geração impedem duplicação no mesmo banco, enquanto o transporte
+simulado confirma apenas uma ocorrência quando dois bancos com a mesma regra a
+geram independentemente.
+
+Contas agora possuem uma versão financeira preenchida para dados existentes e
+incrementada pelo SQLite em toda criação, edição ou tombstone de movimentação,
+inclusive nas duas contas de uma transferência. A tela envia a versão que leu;
+uma retificação obsoleta aborta antes de modificar conta ou saldo e apresenta
+recuperação explícita. Propostas rejeitadas não são mais sobrescritas pelo pull.
+Conflitos são classificados para revisão de edição, exclusão, arquivamento e
+categoria, podendo aceitar o remoto ou reenfileirar a proposta local sobre a
+versão observada.
+
+Testes cobrem migração e backfill, identidades determinísticas, dois dispositivos
+simulados, interrupção e retomada do mesmo lote, checkpoints, pausa e retomada,
+fim de mês, ano bissexto, incrementos de versão, retificação concorrente e as
+quatro classes de revisão. `npm run typecheck`, `npm run lint`,
+`npm test -- --runInBand` (40 suítes e 171 testes) e `git diff --check` passaram.
+`npm run check:expo` executou, mas apontou atualizações patch já pendentes para
+Expo e seis módulos oficiais; nenhuma dependência foi alterada fora do escopo da
+etapa. Nenhum schema PostgreSQL, cliente remoto ou envio de rede foi ativado; o
+Marco A permanece bloqueado pela Etapa 6 e pelas evidências externas já
+registradas.
+
 ## Etapa 6 — Backup, sessão e recuperação local
 
 Restringir backup a dados financeiros e preferências permitidas; excluir tokens,
