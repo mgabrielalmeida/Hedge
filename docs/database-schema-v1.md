@@ -73,6 +73,8 @@ saldo inicial e as referências usam `ON DELETE RESTRICT`. A decisão posterior
 é arquivá-las, preservando histórico e referências. A migração 6 acrescenta
 `is_archived` e `archived_at`; repositórios filtram contas e registros a elas
 vinculados das consultas de interface e bloqueiam novas escritas nesses vínculos.
+Desarquivar restaura a conta sem reativar as regras recorrentes pausadas pelo
+arquivamento.
 
 ## `categories`
 

@@ -85,7 +85,7 @@ export function AccountEditorScreen({ accountId, onDone }: AccountEditorScreenPr
               label="Arquivar conta"
               onPress={() => Alert.alert(
                 'Arquivar esta conta?',
-                'O histórico e as transferências serão preservados, mas a conta deixará de aparecer no aplicativo. Novos lançamentos serão bloqueados e recorrências associadas serão desativadas.',
+                'O histórico e as transferências serão preservados, mas a conta deixará de aparecer no aplicativo. Novos lançamentos serão bloqueados e recorrências associadas ficarão pausadas. Ao desarquivar, você poderá retomá-las no Histórico e escolher como tratar o período sem lançamentos.',
                 [
                   { text: 'Cancelar', style: 'cancel' },
                   { text: 'Arquivar', style: 'destructive', onPress: () => void archiveAccount(database, accountId).then(() => { showSuccess('Conta arquivada.'); onDone(); }).catch(() => setFeedback('A conta não foi arquivada. Tente novamente ou volte sem fazer alterações.')) },

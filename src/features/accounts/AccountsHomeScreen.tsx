@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import {
   Button,
+  Card,
   EntityVisual,
+  FormFeedback,
   getIconDisplayValue,
   PressableCard,
   resolveThemeColorValue,
@@ -15,8 +17,9 @@ import {
   ScrollableScreen,
   Text,
   useReducedMotion,
+  useSuccessFeedback,
 } from '@/components';
-import { listAccounts } from '@/db/repositories';
+import { listAccounts, listArchivedAccounts, unarchiveAccount } from '@/db/repositories';
 import type { Account } from '@/domain';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -29,15 +32,23 @@ type AccountsHomeScreenProps = {
 export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccounts }: AccountsHomeScreenProps) {
   const database = useSQLiteContext();
   const reduceMotion = useReducedMotion();
+  const { showSuccess } = useSuccessFeedback();
   const [accounts, setAccounts] = useState<readonly Account[] | null>(null);
+  const [archivedAccounts, setArchivedAccounts] = useState<readonly Account[] | null>(null);
   const [error, setError] = useState(false);
+  const [unarchiveError, setUnarchiveError] = useState<string | null>(null);
+  const [unarchivingAccountId, setUnarchivingAccountId] = useState<number | null>(null);
 
   const loadAccounts = useCallback(async () => {
     try {
-      const loadedAccounts = await listAccounts(database);
+      const [loadedAccounts, loadedArchivedAccounts] = await Promise.all([
+        listAccounts(database),
+        listArchivedAccounts(database),
+      ]);
       setAccounts(loadedAccounts);
+      setArchivedAccounts(loadedArchivedAccounts);
       setError(false);
-      if (loadedAccounts.length === 0) {
+      if (loadedAccounts.length === 0 && loadedArchivedAccounts.length === 0) {
         onNoAccounts();
       }
     } catch {
@@ -55,7 +66,33 @@ export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccount
     );
   }
 
-  if (accounts === null) return <ScreenState message="Buscando suas contas…" status="loading" title="Carregando contas" />;
+  if (accounts === null || archivedAccounts === null) return <ScreenState message="Buscando suas contas…" status="loading" title="Carregando contas" />;
+
+  function confirmUnarchive(account: Account) {
+    Alert.alert(
+      `Desarquivar “${account.name}”?`,
+      'A conta voltará a aparecer e aceitar lançamentos e transferências. As recorrências pausadas no arquivamento continuarão pausadas; retome cada uma no Histórico e escolha como tratar o período sem lançamentos.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Desarquivar', onPress: () => void unarchive(account) },
+      ],
+    );
+  }
+
+  async function unarchive(account: Account) {
+    setUnarchivingAccountId(account.id);
+    setUnarchiveError(null);
+    try {
+      const restored = await unarchiveAccount(database, account.id);
+      if (!restored) throw new Error('Account was not archived.');
+      await loadAccounts();
+      showSuccess('Conta desarquivada. As recorrências continuam pausadas.');
+    } catch {
+      setUnarchiveError('Não foi possível desarquivar a conta. Tente novamente.');
+    } finally {
+      setUnarchivingAccountId(null);
+    }
+  }
 
   return (
     <ScrollableScreen>
@@ -72,6 +109,28 @@ export function AccountsHomeScreen({ onCreateAccount, onEditAccount, onNoAccount
             </PressableCard>
           ))}
         </View>
+        {archivedAccounts.length > 0 ? (
+          <View style={styles.archivedSection}>
+            <Text variant="title">Contas arquivadas</Text>
+            <Text tone="muted">Desarquivar devolve a conta às telas do aplicativo. As recorrências pausadas permanecem assim até você retomá-las no Histórico.</Text>
+            {unarchiveError ? <FormFeedback message={unarchiveError} title="Não foi possível desarquivar" /> : null}
+            <View style={styles.list}>
+              {archivedAccounts.map((account) => (
+                <Card key={account.id}>
+                  <View style={styles.archivedAccount}>
+                    <AccountCard account={account} />
+                    <Button
+                      disabled={unarchivingAccountId !== null}
+                      label={unarchivingAccountId === account.id ? 'Desarquivando…' : 'Desarquivar'}
+                      onPress={() => confirmUnarchive(account)}
+                      variant="secondary"
+                    />
+                  </View>
+                </Card>
+              ))}
+            </View>
+          </View>
+        ) : null}
         <Button label="Adicionar conta" onPress={onCreateAccount} />
       </View>
     </ScrollableScreen>
@@ -96,6 +155,8 @@ function AccountCard({ account }: { account: Account }) {
 const styles = StyleSheet.create({
   accountRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   accountText: { flex: 1 },
+  archivedAccount: { gap: 12 },
+  archivedSection: { gap: 12 },
   content: { gap: 24 },
   list: { gap: 12 },
 });

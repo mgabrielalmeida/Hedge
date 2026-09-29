@@ -61,6 +61,11 @@ export async function listAccounts(db: RepositoryDatabase): Promise<readonly Acc
   return rows.map(mapAccount);
 }
 
+export async function listArchivedAccounts(db: RepositoryDatabase): Promise<readonly Account[]> {
+  const rows = await db.getAllAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE is_archived = 1 ORDER BY archived_at DESC, id DESC;`);
+  return rows.map(mapAccount);
+}
+
 export async function findAccountById(db: RepositoryDatabase, id: number): Promise<Account | null> {
   const row = await db.getFirstAsync<AccountRow>(`SELECT ${accountColumns} FROM accounts WHERE id = ? AND is_archived = 0;`, id);
   return row ? mapAccount(row) : null;
@@ -168,12 +173,22 @@ export async function archiveAccount(db: RepositoryDatabase, id: number, clock: 
       timestamp, timestamp, id,
     );
     await transaction.runAsync(
-      'UPDATE recurring_rules SET is_active = 0, deleted_at = ?, updated_at = ? WHERE account_id = ? AND is_active = 1;',
-      timestamp, timestamp, id,
+      'UPDATE recurring_rules SET is_active = 0, deleted_at = NULL, updated_at = ? WHERE account_id = ? AND is_active = 1;',
+      timestamp, id,
     );
     archived = true;
   });
   return archived;
+}
+
+export async function unarchiveAccount(db: RepositoryDatabase, id: number, clock: Clock = systemClock): Promise<boolean> {
+  const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM accounts WHERE id = ? AND is_archived = 1;', id);
+  if (!existing) return false;
+  await db.runAsync(
+    'UPDATE accounts SET is_archived = 0, archived_at = NULL, updated_at = ? WHERE id = ? AND is_archived = 1;',
+    clock(), id,
+  );
+  return true;
 }
 
 async function readAccountBalance(db: RepositorySession, id: number): Promise<Cents> {

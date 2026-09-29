@@ -6,6 +6,7 @@ import { themeColorIndicesMigration } from './005_theme_color_indices';
 import { accountArchivingMigration } from './006_account_archiving';
 import { defaultCategoryColorsMigration } from './007_default_category_colors';
 import { historyPagingAndRecurringResumeMigration } from './008_history_paging_and_recurring_resume';
+import { unarchiveAccountsMigration } from './009_unarchive_accounts';
 import type { Migration } from './migration';
 
-export const migrations: readonly Migration[] = [initialSchemaMigration, categoryVisualsMigration, defaultCategoryIconsMigration, composedVisualIndicatorsMigration, themeColorIndicesMigration, accountArchivingMigration, defaultCategoryColorsMigration, historyPagingAndRecurringResumeMigration];
+export const migrations: readonly Migration[] = [initialSchemaMigration, categoryVisualsMigration, defaultCategoryIconsMigration, composedVisualIndicatorsMigration, themeColorIndicesMigration, accountArchivingMigration, defaultCategoryColorsMigration, historyPagingAndRecurringResumeMigration, unarchiveAccountsMigration];

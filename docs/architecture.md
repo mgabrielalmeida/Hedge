@@ -183,8 +183,12 @@ linha com conta de origem e destino.
 
 Contas usam arquivamento lógico para preservar o histórico e as referências de
 transferências: registros arquivados são excluídos das consultas que alimentam
-telas e não podem receber novas escritas. Arquivar uma conta desativa suas
-regras recorrentes ativas na mesma transação. Regras recorrentes usam exclusão lógica para preservar procedência e podem ser pausadas sem exclusão; regras pausadas não geram novas ocorrências até serem retomadas. Uma tabela
+telas e não podem receber novas escritas. Arquivar uma conta pausa suas regras
+recorrentes ativas na mesma transação. Desarquivá-la volta a permitir operações
+na conta, mas mantém essas regras pausadas para que cada retomada escolha como
+tratar o período sem geração. Regras recorrentes usam exclusão lógica para
+preservar procedência e podem ser pausadas sem exclusão; regras pausadas não
+geram novas ocorrências até serem retomadas. Uma tabela
 de ocorrências registra cada data processada mesmo depois da exclusão do
 lançamento gerado, evitando geração duplicada. Ao inicializar ou retornar ao
 primeiro plano, o repositório gera as datas vencidas ainda não registradas em

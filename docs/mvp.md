@@ -112,14 +112,17 @@ exclusão dos demais lançamentos. Ele não é apresentado como um atributo ou
 saldo separado da conta: a interface apresenta o saldo atual, sempre derivado
 dos lançamentos. Contas podem ter saldo negativo.
 
-Quando não houver nenhuma conta ativa, o aplicativo abre o fluxo de onboarding
-para criação da primeira conta. Contas não são excluídas fisicamente: o usuário
-pode arquivá-las. O arquivamento preserva todos os lançamentos e transferências
+Quando não houver nenhuma conta ativa ou arquivada, o aplicativo abre o fluxo
+de onboarding para criação da primeira conta. Contas não são excluídas
+fisicamente: o usuário pode arquivá-las. O arquivamento preserva todos os lançamentos e transferências
 para fins de histórico e integridade referencial, mas oculta a conta e qualquer
 lançamento, transferência ou recorrência a ela vinculado em todas as telas.
 Uma conta arquivada não pode receber novos lançamentos nem participar de novas
-transferências; suas recorrências ativas são desativadas na mesma operação e
-não voltam a gerar lançamentos. A primeira versão não oferece desarquivamento.
+transferências; suas recorrências ativas ficam pausadas na mesma operação e
+não voltam a gerar lançamentos. A área de contas arquivadas permite
+desarquivar a conta; ela volta a aceitar operações, enquanto suas recorrências
+continuam pausadas até que o usuário decida retomá-las no Histórico e escolha
+como tratar os vencimentos do período.
 
 Despesas pontuais decrementam o saldo da conta selecionada e rendas pontuais o
 incrementam. A tela inicial mostra o saldo atual consolidado do usuário e, por
