@@ -76,8 +76,10 @@ que a fixture já estiver persistida.
 | `online_without_session` | disponível | disponível | preparação para solicitar autenticação futura |
 | `session_pending` | disponível | disponível ou indisponível | somente contrato; ainda não há token nem chamada remota |
 
-Os estados são uma matriz de produto e teste, não uma implementação de sessão.
-`src/auth` só será criado na Etapa 8.
+Os estados são uma matriz de produto e teste. A Etapa 6 introduziu somente o
+armazenamento local cifrado por perfil para sessão futura; não existe login,
+renovação, transporte ou chamada remota nesta fase. Esses fluxos continuam
+pertencendo à Etapa 8.
 
 ## Contratos locais de sincronização
 

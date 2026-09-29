@@ -1,7 +1,7 @@
 # Plano de implementação: conta, nuvem e sincronização offline
 
 **Data:** 27 de setembro de 2026  
-**Status:** Etapas 0, 2, 3 e 4 concluídas; Etapa 1 concluída provisoriamente sem evidências físicas; transporte remoto ainda não implementado
+**Status:** Etapas 0–6 concluídas localmente; Etapa 1 mantém a exceção autorizada sem evidências físicas; Marco A bloqueado por critérios externos; transporte remoto ainda não implementado
 
 Este plano mantém o SQLite como base usada pela interface. PostgreSQL será o
 estado compartilhado confirmado, e a rede jamais participará do caminho crítico
@@ -246,6 +246,52 @@ Só iniciar o schema remoto quando as etapas 1–6 tiverem evidência de aceite,
 outbox atômica, identidades globais, reconciliação, recorrências concorrentes,
 backup seguro, isolamento de perfis, Docker disponível, CLI Supabase executável
 e development builds Android/iOS disponíveis. Nenhum dado deve ser enviado antes.
+
+### Revisão de integridade e correções — 29 de setembro de 2026
+
+A revisão posterior às etapas 1–6 confirmou typecheck, lint, testes unitários,
+configuração Expo e histórico Git antes de qualquer avanço remoto. Foram
+corrigidos os seguintes pontos internos:
+
+- A coalescência de uma segunda edição local, enquanto o comando anterior da
+  mesma entidade está em lease, agora preserva a versão esperada já encadeada e
+  a dependência do lease. Isso impede que uma edição posterior volte para a
+  versão confirmada antiga e cause uma rejeição causal indevida.
+- Um payload de sessão ou chave AES ilegível remove ambos os artefatos de
+  sessão. Assim, um login posterior consegue gerar uma chave nova em vez de
+  permanecer bloqueado por uma chave corrompida no SecureStore.
+- A troca de perfil confere perfil, ledger e geração contra o registro local;
+  um arquivo substituído que reutilize somente o `profile_id` não passa a ser
+  selecionado.
+- A importação mede o arquivo pelo `File` nativo e o lê em stream limitado a
+  100 MB, evitando confiar apenas no tamanho informado pelo seletor e impedindo
+  que um fluxo sem tamanho aloque todo o arquivo antes da rejeição.
+- O acesso ao kv-store usado pela sessão passou por adaptador em `src/db`,
+  preservando o limite de persistência. O identificador iOS foi definido como
+  `com.gabrielmalmeida.hedge`, coerente com o Android já existente.
+
+Os critérios externos que continuam bloqueando o Marco A são objetivos e não
+foram substituídos por testes de desktop:
+
+1. Executar a coleta física da Etapa 1 em development build Android e iOS, com
+   `adb`/Xcode, preenchendo a tabela de 1 mil, 10 mil e 50 mil lançamentos,
+   inclusive p95 de commit e feedback, memória e jank de rolagem.
+2. Disponibilizar Docker e executar `supabase init` e `supabase start` de modo
+   reproduzível. A CLI Supabase está instalada, mas Docker não está disponível
+   neste ambiente; portanto não há stack PostgreSQL local validada.
+3. Gerar e instalar development builds Android e iOS reais. Não há dispositivo
+   Android conectado nem ambiente iOS disponível aqui; `expo config` e testes
+   JavaScript não verificam permissões, SecureStore, FileSystem, backup ou
+   tarefas em segundo plano nos sistemas operacionais.
+4. Antes de usar a Etapa 9, revisar a política iOS de transporte gerada pela
+   configuração nativa e validar em build que não há abertura indevida de HTTP;
+   nenhum cliente remoto foi criado nesta etapa.
+
+Além disso, `npm audit --omit=dev` ainda relata 16 vulnerabilidades moderadas
+transitivas do ecossistema Expo. Não há correção segura disponível: o comando
+automático propõe retroceder para Expo 46. Elas devem ser reavaliadas após cada
+atualização oficial do SDK; não justificam downgrades fora do contrato da
+plataforma.
 
 ## Etapa 7 — PostgreSQL local e autorização
 

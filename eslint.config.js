@@ -4,6 +4,13 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   ...expoConfig,
   {
-    ignores: ['.expo/**', 'coverage/**', 'node_modules/**'],
+    ignores: ['.expo/**', '**/.expo/**', 'coverage/**', 'node_modules/**'],
+  },
+  {
+    settings: {
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx', '.d.ts'] },
+      },
+    },
   },
 ]);

@@ -6,6 +6,9 @@
     "orientation": "portrait",
     "scheme": "hedge",
     "icon": "./assets/images/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.gabrielmalmeida.hedge"
+    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon-foreground.png",

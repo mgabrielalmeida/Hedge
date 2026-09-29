@@ -141,9 +141,11 @@ retornam modelos do domínio, e não detalhes internos do driver SQLite.
 Expo SQLite. Rotas e funcionalidades não importam o driver nem executam SQL.
 
 Também abriga adaptadores pequenos para armazenamento local auxiliar.
-`preferences.ts` encapsula preferências visuais e `localProfiles.ts` mantém o
-registro dos arquivos de perfil no `expo-sqlite/kv-store`; nenhum módulo fora de
-`src/db` acessa esse storage diretamente.
+`preferences.ts` encapsula preferências visuais, `localProfiles.ts` mantém o
+registro dos arquivos de perfil e `sessionStorage.ts` expõe o adaptador limitado
+usado pela sessão cifrada. Esses são os únicos pontos que acessam o
+`expo-sqlite/kv-store` diretamente; nenhum módulo fora de `src/db` acessa esse
+storage diretamente.
 
 ### `src/components`
 
@@ -279,8 +281,9 @@ estado informativo. Estados positivo, negativo e de atenção mantêm significad
 visual próprio, e cores de primeiro plano são escolhidas por contraste.
 
 A seleção de tema, aparência e a preferência de ocultar saldos é armazenada no `expo-sqlite/kv-store` pelo adaptador
-`src/db/preferences.ts`. Essa é a única área autorizada a acessar o storage
-diretamente: o `ThemeProvider` consome sua API tipada, aplica os padrões para
+`src/db/preferences.ts`. O `src/db/sessionStorage.ts` é o segundo adaptador
+autorizado, com escopo exclusivo para o ciphertext de sessão; o `ThemeProvider`
+consome a API tipada de preferências, aplica os padrões para
 nomes e definições Custom inválidos ou indisponíveis e expõe gravações que informam falha sem gerar
 rejeições não observadas. Inicialmente, temas podem alterar cores e propriedades
 visuais pequenas, mas não a estrutura ou o espaçamento fundamental das telas.
