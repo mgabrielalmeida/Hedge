@@ -1,6 +1,7 @@
 import { AESEncryptionKey, AESSealedData, aesDecryptAsync, aesEncryptAsync } from 'expo-crypto/build/aes';
 import * as SecureStore from 'expo-secure-store';
-import AsyncStorage from 'expo-sqlite/kv-store';
+
+import { sessionStorage, type SessionStorage } from '@/db/sessionStorage';
 
 const KEY_PREFIX = 'hedge.session.key.v1.';
 const PAYLOAD_PREFIX = 'auth.session.payload.v1.';
@@ -21,7 +22,7 @@ export type SessionDependencies = {
     readonly sealedFromCombined: (combined: string) => AESSealedData;
   };
   readonly secureStore: Pick<typeof SecureStore, 'deleteItemAsync' | 'getItemAsync' | 'setItemAsync'>;
-  readonly storage: Pick<typeof AsyncStorage, 'getItem' | 'removeItem' | 'setItem'>;
+  readonly storage: SessionStorage;
   readonly now: () => Date;
 };
 
@@ -34,7 +35,7 @@ const defaultDependencies: SessionDependencies = {
     sealedFromCombined: (combined) => AESSealedData.fromCombined(combined),
   },
   secureStore: SecureStore,
-  storage: AsyncStorage,
+  storage: sessionStorage,
   now: () => new Date(),
 };
 
@@ -80,7 +81,7 @@ export async function loadEncryptedSession(
     }
     return session;
   } catch {
-    await dependencies.storage.removeItem(payloadKey(profileId));
+    await clearEncryptedSession(profileId, dependencies);
     return null;
   }
 }

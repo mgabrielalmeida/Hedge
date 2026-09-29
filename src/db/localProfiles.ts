@@ -183,7 +183,9 @@ export async function prepareLocalProfileSwitch(
     await dependencies.initialize(database, stored.databaseName);
     await assertDatabaseIntegrity(database);
     const identity = await readLocalProfile(database);
-    if (identity.profileId !== profileId) {
+    if (identity.profileId !== stored.profileId
+      || identity.ledgerId !== stored.ledgerId
+      || identity.generation !== stored.generation) {
       throw new Error('Local profile identity does not match its registry entry.');
     }
     profile = { ...identity, databaseName: stored.databaseName, displayName: stored.displayName };

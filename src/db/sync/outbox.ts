@@ -48,31 +48,18 @@ export async function enqueueEntityMutation(
   if (!snapshot) throw new Error(`Cannot enqueue missing ${entityKind}.`);
 
   const dependencies = await resolveDependencies(db, snapshot.dependencySyncIds);
-  const pending = await db.getFirstAsync<{ command_id: string }>(
-    `SELECT command_id FROM sync_outbox
+  const pending = await db.getFirstAsync<{
+    command_id: string;
+    expected_version: number | null;
+    depends_on_json: string;
+  }>(
+    `SELECT command_id, expected_version, depends_on_json FROM sync_outbox
      WHERE entity_kind = ? AND entity_sync_id = ? AND state = 'pending'
      ORDER BY created_at DESC, command_id DESC LIMIT 1;`,
     entityKind,
     snapshot.syncId,
   );
   const payloadJson = JSON.stringify(snapshot.payload);
-  const dependenciesJson = JSON.stringify(dependencies);
-
-  if (pending) {
-    await db.runAsync(
-      `UPDATE sync_outbox
-       SET operation = ?, expected_version = ?, depends_on_json = ?, payload_json = ?, updated_at = ?
-       WHERE command_id = ?;`,
-      snapshot.operation,
-      snapshot.version,
-      dependenciesJson,
-      payloadJson,
-      timestamp,
-      pending.command_id,
-    );
-    return;
-  }
-
   const leased = await db.getFirstAsync<{ command_id: string; expected_version: number | null }>(
     `SELECT command_id, expected_version FROM sync_outbox
      WHERE entity_kind = ? AND entity_sync_id = ? AND state = 'leased'
@@ -80,6 +67,28 @@ export async function enqueueEntityMutation(
     entityKind,
     snapshot.syncId,
   );
+
+  if (pending) {
+    const retainedDependencies = parseOutboxDependencies(pending.depends_on_json);
+    const chainedDependencies = [...new Set([
+      ...retainedDependencies,
+      ...dependencies,
+      ...(leased ? [leased.command_id] : []),
+    ])].filter((dependency) => dependency !== pending.command_id);
+    await db.runAsync(
+      `UPDATE sync_outbox
+       SET operation = ?, expected_version = ?, depends_on_json = ?, payload_json = ?, updated_at = ?
+       WHERE command_id = ?;`,
+      snapshot.operation,
+      pending.expected_version,
+      JSON.stringify(chainedDependencies),
+      payloadJson,
+      timestamp,
+      pending.command_id,
+    );
+    return;
+  }
+
   const chainedDependencies = leased
     ? [...new Set([...dependencies, leased.command_id])]
     : dependencies;
@@ -101,6 +110,16 @@ export async function enqueueEntityMutation(
     timestamp,
     timestamp,
   );
+}
+
+function parseOutboxDependencies(value: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed) && parsed.every(isString)) return parsed;
+  } catch {
+    // The explicit error below prevents an invalid persisted command from losing ordering.
+  }
+  throw new Error('Invalid persisted outbox dependency.');
 }
 
 export async function acquireOutboxLease(

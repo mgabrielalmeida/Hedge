@@ -100,6 +100,25 @@ describe('local outbox and reconciliation', () => {
     }
   });
 
+  it('keeps the causal version and lease dependency when coalescing another local edit', async () => {
+    const category = await createCategory(database, { name: 'Ordered', monthlyBudgetCents: 100 }, () => first);
+    const lease = await acquireOutboxLease(database, second, third, 50);
+    const leased = lease.commands.find((command) => command.entity.kind === 'category' && command.entity.syncId);
+    expect(leased).toBeDefined();
+
+    await updateCategory(database, category.id, { name: 'Ordered once', monthlyBudgetCents: 200 }, () => third);
+    await updateCategory(database, category.id, { name: 'Ordered twice', monthlyBudgetCents: 300 }, () => '2026-09-28T10:03:00.000Z');
+
+    const pending = await database.getFirstAsync<{ expected_version: number; depends_on_json: string; payload_json: string }>(
+      `SELECT expected_version, depends_on_json, payload_json FROM sync_outbox
+       WHERE entity_kind = 'category' AND entity_sync_id = ? AND state = 'pending';`,
+      leased!.entity.syncId,
+    );
+    expect(pending?.expected_version).toBe((leased!.expectedVersion ?? 0) + 1);
+    expect(JSON.parse(pending!.depends_on_json)).toContain(leased!.commandId);
+    expect(JSON.parse(pending!.payload_json)).toEqual(expect.objectContaining({ name: 'Ordered twice' }));
+  });
+
   it('retries a lost response without duplicating server effects or local events', async () => {
     await createCategory(database, { name: 'Retry', monthlyBudgetCents: 100 }, () => first);
     const transport = new SimulatedSyncTransport({ dropPushResponse: true, duplicateEvents: true });

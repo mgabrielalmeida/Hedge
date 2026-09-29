@@ -106,6 +106,23 @@ describe('local profile registry', () => {
     expect(storage.contents()).toEqual(before);
   });
 
+  it('rejects a database with the same profile id but a different ledger or generation', async () => {
+    const storage = createStorage();
+    const targetName = 'hedge-profile-00000000-0000-4000-8000-000000000001.db';
+    await registerLocalProfile(profileDatabase('profile-a', 'ledger-a'), 'hedge.db', 'Principal', storage);
+    await registerLocalProfile(profileDatabase('profile-b', 'ledger-b'), targetName, 'Reserva', storage);
+    const before = storage.contents();
+    const replacement = profileDatabase('profile-b', 'another-ledger');
+    const dependencies: ProfileDependencies = {
+      initialize: jest.fn().mockResolvedValue(undefined),
+      open: jest.fn().mockResolvedValue(replacement),
+      storage,
+    };
+
+    await expect(prepareLocalProfileSwitch('profile-b', dependencies)).rejects.toThrow('does not match');
+    expect(storage.contents()).toEqual(before);
+  });
+
   it('rejects a corrupted registry instead of opening an ambiguous profile', async () => {
     const duplicated = {
       activeDatabaseName: 'hedge.db',

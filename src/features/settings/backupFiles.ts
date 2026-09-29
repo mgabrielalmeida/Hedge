@@ -51,10 +51,39 @@ export async function pickBackupFile(): Promise<{
   }
 
   const file = new File(asset.uri);
-  const bytes = await file.bytes();
-  if (bytes.byteLength > MAX_BACKUP_FILE_SIZE) {
+  if (file.size > MAX_BACKUP_FILE_SIZE) {
     throw new Error('O arquivo selecionado excede o limite de 100 MB.');
   }
 
+  const bytes = await readFileWithinLimit(file);
+
   return { bytes, name: asset.name };
+}
+
+async function readFileWithinLimit(file: File): Promise<Uint8Array> {
+  const reader = file.readableStream().getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      size += next.value.byteLength;
+      if (size > MAX_BACKUP_FILE_SIZE) {
+        await reader.cancel();
+        throw new Error('O arquivo selecionado excede o limite de 100 MB.');
+      }
+      chunks.push(next.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }

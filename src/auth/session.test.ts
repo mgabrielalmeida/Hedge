@@ -41,6 +41,19 @@ describe('encrypted local sessions', () => {
     expect(dependencies.storage.removeItem).toHaveBeenCalledWith('auth.session.payload.v1.profile-a');
     expect(dependencies.secureStore.deleteItemAsync).toHaveBeenCalledWith('hedge.session.key.v1.profile-a');
   });
+
+  it('clears a corrupted SecureStore key so a later login can create a replacement', async () => {
+    const dependencies = createDependencies();
+    await dependencies.storage.setItem('auth.session.payload.v1.profile-a', 'ciphertext');
+    await dependencies.secureStore.setItemAsync('hedge.session.key.v1.profile-a', 'corrupted-key');
+    (dependencies.crypto.importKey as jest.Mock).mockRejectedValueOnce(new Error('invalid key'));
+
+    await expect(loadEncryptedSession('profile-a', dependencies)).resolves.toBeNull();
+    await saveEncryptedSession('profile-a', payload, dependencies);
+
+    expect(dependencies.secureStore.deleteItemAsync).toHaveBeenCalledWith('hedge.session.key.v1.profile-a');
+    expect(dependencies.crypto.generateKey).toHaveBeenCalledTimes(1);
+  });
 });
 
 function createDependencies(now = new Date('2026-09-29T00:00:00.000Z')): SessionDependencies {
