@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeProvider';
 import type { ThemeColorIndex } from '@/domain';
 
 import { Text } from './Text';
+import { EntityVisual } from './EntityVisual';
 import { IconGlyph } from './IconGlyph';
 import { SegmentedControl } from './SegmentedControl';
 import {
@@ -155,9 +156,140 @@ export function VisualPicker({
         selectedIndex={backgroundThemeColorIndex}
         selectedCustomColor={resolvedBackgroundColorValue}
       />
-      {activeMixer === 'icon' ? <ColorMixer onChange={onCustomColorChange} value={resolvedColorValue} /> : null}
-      {activeMixer === 'background' ? <ColorMixer onChange={onCustomBackgroundColorChange} value={resolvedBackgroundColorValue} /> : null}
+      <ColorMixerMenu
+        activeMixer={activeMixer}
+        backgroundColor={resolvedBackgroundColorValue}
+        iconColor={resolvedColorValue}
+        iconValue={iconValue}
+        onChange={activeMixer === 'background' ? onCustomBackgroundColorChange : onCustomColorChange}
+        onClose={() => setActiveMixer(null)}
+        value={activeMixer === 'background' ? resolvedBackgroundColorValue : resolvedColorValue}
+      />
     </View>
+  );
+}
+
+function ColorMixerMenu({
+  activeMixer,
+  backgroundColor,
+  iconColor,
+  iconValue,
+  onChange,
+  onClose,
+  value,
+}: {
+  activeMixer: 'background' | 'icon' | null;
+  backgroundColor: string;
+  iconColor: string;
+  iconValue: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  value: string;
+}) {
+  const { tokens } = useTheme();
+  const title = activeMixer === 'background' ? 'Cor de fundo personalizada' : 'Cor do ícone personalizada';
+
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible={activeMixer !== null}
+    >
+      <View style={[styles.modalOverlay, { backgroundColor: tokens.overlay }]}>
+        <Pressable
+          accessibilityLabel="Fechar seleção de cor"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          accessibilityViewIsModal
+          style={[
+            styles.modalPanel,
+            {
+              backgroundColor: tokens.surface,
+              borderColor: tokens.border,
+              borderRadius: tokens.radius.xl,
+              shadowColor: tokens.text,
+            },
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHeading}>
+              <Text variant="title">{title}</Text>
+              <Text tone="muted" variant="caption">Ajuste a cor e confira a combinação antes de concluir.</Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Fechar seleção de cor"
+              accessibilityRole="button"
+              onPress={onClose}
+              style={({ pressed }) => [
+                styles.closeButton,
+                {
+                  backgroundColor: tokens.surfaceSubtle,
+                  borderColor: tokens.border,
+                  borderRadius: tokens.radius.pill,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.closeButtonLabel, { color: tokens.text }]}>×</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.modalContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={styles.modalScroll}
+          >
+            <View
+              accessible
+              accessibilityLabel="Prévia da combinação atual"
+              style={[
+                styles.entityPreview,
+                {
+                  backgroundColor: tokens.surfaceSubtle,
+                  borderColor: tokens.border,
+                  borderRadius: tokens.radius.lg,
+                },
+              ]}
+            >
+              <EntityVisual
+                backgroundColor={backgroundColor}
+                iconColor={iconColor}
+                iconValue={iconValue}
+                size="large"
+              />
+              <View style={styles.entityPreviewText}>
+                <Text variant="caption">Prévia da combinação</Text>
+                <Text tone="muted" variant="caption">
+                  Ícone e fundo são atualizados enquanto você escolhe.
+                </Text>
+              </View>
+            </View>
+
+            <ColorMixer onChange={onChange} value={value} />
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={onClose}
+              style={({ pressed }) => [
+                styles.doneButton,
+                {
+                  backgroundColor: tokens.primary,
+                  borderRadius: tokens.radius.md,
+                  opacity: pressed ? 0.78 : 1,
+                },
+              ]}
+            >
+              <Text style={{ color: tokens.onPrimary }}>Concluído</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -222,12 +354,7 @@ function ColorMixer({ onChange, value }: { onChange: (value: string) => void; va
         },
       ]}
     >
-      <View>
-        <Text variant="title">Misture sua cor</Text>
-        <Text tone="muted" variant="caption" style={{ marginTop: tokens.spacing.xs }}>
-          Escolha um tom na roda e ajuste sua aparência.
-        </Text>
-      </View>
+      <Text tone="muted" variant="caption">Escolha um tom na roda e ajuste sua aparência.</Text>
 
       <View
         accessibilityLabel="Roda de cores"
@@ -407,6 +534,11 @@ const styles = StyleSheet.create({
   controlOption: { alignItems: 'center', borderWidth: 1, flex: 1, gap: 5, minHeight: 58, padding: 7 },
   controlOptions: { flexDirection: 'row', gap: 8 },
   controlSwatch: { borderRadius: 9, height: 18, width: 18 },
+  closeButton: { alignItems: 'center', borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
+  closeButtonLabel: { fontSize: 28, lineHeight: 30 },
+  doneButton: { alignItems: 'center', justifyContent: 'center', minHeight: 48, paddingHorizontal: 18 },
+  entityPreview: { alignItems: 'center', borderWidth: 1, flexDirection: 'row', gap: 12, padding: 12 },
+  entityPreviewText: { flex: 1, gap: 3 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   hueButton: {
     alignItems: 'center',
@@ -427,6 +559,21 @@ const styles = StyleSheet.create({
     top: 74,
     width: 72,
   },
+  modalContent: { gap: 16, padding: 18 },
+  modalHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, paddingBottom: 0, paddingHorizontal: 18, paddingTop: 18 },
+  modalHeading: { flex: 1, gap: 4 },
+  modalOverlay: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 16 },
+  modalPanel: {
+    borderWidth: 1,
+    elevation: 12,
+    maxHeight: '90%',
+    maxWidth: 440,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    width: '100%',
+  },
+  modalScroll: { flexShrink: 1 },
   option: { alignItems: 'center', height: 48, justifyContent: 'center', width: 48 },
   selectedHueLabel: { textAlign: 'center' },
   wheel: { alignSelf: 'center', borderWidth: 1, height: 220, position: 'relative', width: 220 },
