@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useLayoutEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { Animated, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme/ThemeProvider';
 import type { ThemeColorIndex } from '@/domain';
@@ -8,6 +10,7 @@ import { Text } from './Text';
 import { EntityVisual } from './EntityVisual';
 import { IconGlyph } from './IconGlyph';
 import { SegmentedControl } from './SegmentedControl';
+import { useReducedMotion } from './useReducedMotion';
 import {
   hexToHsl,
   hslToHex,
@@ -65,6 +68,9 @@ const NEUTRAL_COLOR_OPTIONS = [
   { label: 'Branco', value: '#FFFFFF' },
 ] as const;
 
+const MINIMALIST_ICON_PAGE_SIZE = 24;
+const SELECTION_ANIMATION_DURATION = 130;
+
 export function VisualPicker({
   backgroundColorValue,
   backgroundThemeColorIndex,
@@ -83,20 +89,32 @@ export function VisualPicker({
   const [activeIconKind, setActiveIconKind] = useState<'emoji' | 'minimalist'>(
     selectedIconKind ?? 'minimalist',
   );
+  const [minimalistPage, setMinimalistPage] = useState(() => getMinimalistPage(iconOptions, iconValue));
   const [activeMixer, setActiveMixer] = useState<'background' | 'icon' | null>(null);
   const themeColorOptions = getThemeColorOptions(tokens.primary);
   const resolvedColorValue = resolveThemeColorValue(colorValue, themeColorIndex, tokens.primary);
   const backgroundThemeColorOptions = getThemeColorOptions(tokens.primaryContainer);
   const resolvedBackgroundColorValue = resolveThemeColorValue(backgroundColorValue, backgroundThemeColorIndex, tokens.primaryContainer);
 
-  const visibleIconOptions = iconOptions.filter((option) => option.kind === activeIconKind);
+  const minimalistIconOptions = iconOptions.filter((option) => option.kind === 'minimalist');
+  const emojiIconOptions = iconOptions.filter((option) => option.kind === 'emoji');
+  const minimalistPageCount = Math.ceil(minimalistIconOptions.length / MINIMALIST_ICON_PAGE_SIZE);
+  const visibleIconOptions = activeIconKind === 'minimalist'
+    ? minimalistIconOptions.slice(
+      minimalistPage * MINIMALIST_ICON_PAGE_SIZE,
+      (minimalistPage + 1) * MINIMALIST_ICON_PAGE_SIZE,
+    )
+    : emojiIconOptions;
 
   return (
     <View style={styles.container}>
       <Text variant="caption" style={{ color: tokens.textMuted }}>Ícone</Text>
       <SegmentedControl
         accessibilityLabel="Tipo de ícone"
-        onChange={setActiveIconKind}
+        onChange={(kind) => {
+          setActiveIconKind(kind);
+          if (kind === 'minimalist') setMinimalistPage(getMinimalistPage(iconOptions, iconValue));
+        }}
         options={[
           { label: 'Minimalistas', value: 'minimalist' },
           { label: 'Emojis', value: 'emoji' },
@@ -112,40 +130,52 @@ export function VisualPicker({
           const selected = iconValue === option.value;
 
           return (
-            <Pressable
-              accessibilityLabel={option.label}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              key={option.value}
-              onPress={() => onIconChange(option.value)}
-              style={({ pressed }) => [
-                styles.option,
-                {
-                  backgroundColor: resolvedBackgroundColorValue,
-                  borderColor: selected ? tokens.focusRing : tokens.border,
-                  borderRadius: tokens.radius.md,
-                  borderWidth: selected ? 3 : 1,
-                  opacity: pressed ? 0.74 : 1,
-                },
-              ]}
-            >
-              <IconGlyph color={resolvedColorValue} size={22} value={option.value} />
-              {selected ? <SelectionBadge /> : null}
-            </Pressable>
+            <SelectionMotion key={option.value} selected={selected}>
+              <Pressable
+                accessibilityLabel={option.label}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => onIconChange(option.value)}
+                style={({ pressed }) => [
+                  styles.option,
+                  {
+                    backgroundColor: resolvedBackgroundColorValue,
+                    borderColor: selected ? tokens.focusRing : tokens.border,
+                    borderRadius: tokens.radius.md,
+                    borderWidth: selected ? 3 : 1,
+                    opacity: pressed ? 0.74 : 1,
+                  },
+                ]}
+              >
+                <IconGlyph color={resolvedColorValue} size={22} value={option.value} />
+                {selected ? <SelectionBadge /> : null}
+              </Pressable>
+            </SelectionMotion>
           );
         })}
       </View>
 
-      <ColorSelection
-        colorOptions={themeColorOptions}
-        customSelected={themeColorIndex === null}
-        label="Cor do ícone"
-        onCustomColorChange={onCustomColorChange}
-        onCustomPress={() => setActiveMixer('icon')}
-        onThemeColorChange={onThemeColorChange}
-        selectedIndex={themeColorIndex}
-        selectedCustomColor={resolvedColorValue}
-      />
+      {activeIconKind === 'minimalist' ? (
+        <IconPageNavigation
+          onNext={() => setMinimalistPage((page) => Math.min(page + 1, minimalistPageCount - 1))}
+          onPrevious={() => setMinimalistPage((page) => Math.max(page - 1, 0))}
+          page={minimalistPage}
+          pageCount={minimalistPageCount}
+        />
+      ) : null}
+
+      {activeIconKind === 'minimalist' ? (
+        <ColorSelection
+          colorOptions={themeColorOptions}
+          customSelected={themeColorIndex === null}
+          label="Cor do ícone"
+          onCustomColorChange={onCustomColorChange}
+          onCustomPress={() => setActiveMixer('icon')}
+          onThemeColorChange={onThemeColorChange}
+          selectedIndex={themeColorIndex}
+          selectedCustomColor={resolvedColorValue}
+        />
+      ) : null}
       <ColorSelection
         colorOptions={backgroundThemeColorOptions}
         customSelected={backgroundThemeColorIndex === null}
@@ -293,6 +323,62 @@ function ColorMixerMenu({
   );
 }
 
+function IconPageNavigation({
+  onNext,
+  onPrevious,
+  page,
+  pageCount,
+}: {
+  onNext: () => void;
+  onPrevious: () => void;
+  page: number;
+  pageCount: number;
+}) {
+  const { tokens } = useTheme();
+  const previousDisabled = page === 0;
+  const nextDisabled = page >= pageCount - 1;
+
+  return (
+    <View accessibilityLabel="Navegação de páginas dos ícones minimalistas" style={styles.pageNavigation}>
+      <Pressable
+        accessibilityLabel="Página anterior de ícones minimalistas"
+        accessibilityRole="button"
+        disabled={previousDisabled}
+        onPress={onPrevious}
+        style={({ pressed }) => [
+          styles.pageButton,
+          {
+            backgroundColor: tokens.surfaceSubtle,
+            borderColor: tokens.border,
+            borderRadius: tokens.radius.md,
+            opacity: previousDisabled ? 0.48 : pressed ? 0.76 : 1,
+          },
+        ]}
+      >
+        <Text style={{ color: tokens.text }}>Anterior</Text>
+      </Pressable>
+      <Text tone="muted" variant="caption">Página {page + 1} de {pageCount}</Text>
+      <Pressable
+        accessibilityLabel="Próxima página de ícones minimalistas"
+        accessibilityRole="button"
+        disabled={nextDisabled}
+        onPress={onNext}
+        style={({ pressed }) => [
+          styles.pageButton,
+          {
+            backgroundColor: tokens.surfaceSubtle,
+            borderColor: tokens.border,
+            borderRadius: tokens.radius.md,
+            opacity: nextDisabled ? 0.48 : pressed ? 0.76 : 1,
+          },
+        ]}
+      >
+        <Text style={{ color: tokens.text }}>Próxima</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function ColorSelection({
   colorOptions,
   customSelected,
@@ -320,10 +406,12 @@ function ColorSelection({
       <View accessibilityLabel={label} accessibilityRole="radiogroup" style={styles.grid}>
         {colorOptions.map((option, index) => <ColorOption key={`theme-${option.value}`} color={option.value} label={option.label} onPress={() => onThemeColorChange(index as ThemeColorIndex, option.value)} selected={selectedIndex === index} />)}
         {NEUTRAL_COLOR_OPTIONS.map((option) => <ColorOption key={`neutral-${option.value}`} color={option.value} label={option.label} onPress={() => onCustomColorChange(option.value)} selected={customSelected && selectedCustomColor === option.value} />)}
-        <Pressable accessibilityLabel="Misture sua cor" accessibilityRole="radio" accessibilityState={{ selected: customSelected && !hasNeutralSelected }} onPress={onCustomPress} style={({ pressed }) => [styles.option, { backgroundColor: tokens.surface, borderColor: customSelected && !hasNeutralSelected ? tokens.focusRing : tokens.border, borderRadius: tokens.radius.md, borderWidth: customSelected && !hasNeutralSelected ? 3 : 1, opacity: pressed ? 0.74 : 1 }]}>
-          <IconGlyph color={tokens.primary} size={22} value="lucide:sliders-horizontal" />
-          {customSelected && !hasNeutralSelected ? <SelectionBadge /> : null}
-        </Pressable>
+        <SelectionMotion selected={customSelected && !hasNeutralSelected}>
+          <Pressable accessibilityLabel="Misture sua cor" accessibilityRole="radio" accessibilityState={{ selected: customSelected && !hasNeutralSelected }} onPress={onCustomPress} style={({ pressed }) => [styles.option, { backgroundColor: tokens.surface, borderColor: customSelected && !hasNeutralSelected ? tokens.focusRing : tokens.border, borderRadius: tokens.radius.md, borderWidth: customSelected && !hasNeutralSelected ? 3 : 1, opacity: pressed ? 0.74 : 1 }]}>
+            <IconGlyph color={tokens.primary} size={22} value="lucide:sliders-horizontal" />
+            {customSelected && !hasNeutralSelected ? <SelectionBadge /> : null}
+          </Pressable>
+        </SelectionMotion>
       </View>
     </View>
   );
@@ -331,7 +419,35 @@ function ColorSelection({
 
 function ColorOption({ color, label, onPress, selected }: { color: string; label: string; onPress: () => void; selected: boolean }) {
   const { tokens } = useTheme();
-  return <Pressable accessibilityLabel={label} accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.option, { backgroundColor: color, borderColor: selected ? tokens.focusRing : tokens.border, borderRadius: tokens.radius.md, borderWidth: selected ? 3 : 1, opacity: pressed ? 0.74 : 1 }]}>{selected ? <SelectionBadge /> : null}</Pressable>;
+  return <SelectionMotion selected={selected}><Pressable accessibilityLabel={label} accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.option, { backgroundColor: color, borderColor: selected ? tokens.focusRing : tokens.border, borderRadius: tokens.radius.md, borderWidth: selected ? 3 : 1, opacity: pressed ? 0.74 : 1 }]}>{selected ? <SelectionBadge /> : null}</Pressable></SelectionMotion>;
+}
+
+function SelectionMotion({ children, selected, style }: { children: ReactNode; selected: boolean; style?: StyleProp<ViewStyle> }) {
+  const reduceMotion = useReducedMotion();
+  const [scale] = useState(() => new Animated.Value(1));
+  const previousSelected = useRef(selected);
+
+  useLayoutEffect(() => {
+    if (previousSelected.current === selected) return;
+    previousSelected.current = selected;
+
+    if (reduceMotion !== false) {
+      scale.setValue(1);
+      return;
+    }
+
+    scale.stopAnimation();
+    scale.setValue(0.94);
+    const animation = Animated.timing(scale, {
+      duration: SELECTION_ANIMATION_DURATION,
+      toValue: 1,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [reduceMotion, scale, selected]);
+
+  return <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>;
 }
 
 function ColorMixer({ onChange, value }: { onChange: (value: string) => void; value: string }) {
@@ -374,29 +490,38 @@ function ColorMixer({ onChange, value }: { onChange: (value: string) => void; va
           const swatchColor = hslToHex(option.value, 78, 52);
 
           return (
-            <Pressable
-              accessibilityLabel={option.label}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
+            <SelectionMotion
               key={option.value}
-              onPress={() => onChange(hslToHex(
-                option.value,
-                color.saturation < 20 ? 65 : color.saturation,
-                color.lightness,
-              ))}
-              style={({ pressed }) => [
+              selected={selected}
+              style={[
                 styles.hueButton,
                 {
-                  backgroundColor: selected ? tokens.primaryContainer : tokens.surfaceSubtle,
-                  borderColor: selected ? tokens.focusRing : 'transparent',
                   left: 88 + Math.cos(angle) * 78,
-                  opacity: pressed ? 0.72 : 1,
                   top: 88 + Math.sin(angle) * 78,
                 },
               ]}
             >
-              <View style={[styles.hueSwatch, { backgroundColor: swatchColor }]} />
-            </Pressable>
+              <Pressable
+                accessibilityLabel={option.label}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => onChange(hslToHex(
+                  option.value,
+                  color.saturation < 20 ? 65 : color.saturation,
+                  color.lightness,
+                ))}
+                style={({ pressed }) => [
+                  styles.hueButtonContent,
+                  {
+                    backgroundColor: selected ? tokens.primaryContainer : tokens.surfaceSubtle,
+                    borderColor: selected ? tokens.focusRing : 'transparent',
+                    opacity: pressed ? 0.72 : 1,
+                  },
+                ]}
+              >
+                <View style={[styles.hueSwatch, { backgroundColor: swatchColor }]} />
+              </Pressable>
+            </SelectionMotion>
           );
         })}
 
@@ -460,29 +585,30 @@ function MixerControl({
           const selected = option.value === selectedValue;
 
           return (
-            <Pressable
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              key={option.value}
-              onPress={() => onSelect(option.value)}
-              style={({ pressed }) => [
-                styles.controlOption,
-                {
-                  backgroundColor: selected ? tokens.primaryContainer : tokens.surface,
-                  borderColor: selected ? tokens.focusRing : tokens.border,
-                  borderRadius: tokens.radius.md,
-                  opacity: pressed ? 0.76 : 1,
-                },
-              ]}
-            >
-              <View style={[styles.controlSwatch, { backgroundColor: colorForValue(option.value) }]} />
-              <Text
-                variant="caption"
-                style={{ color: selected ? tokens.onPrimaryContainer : tokens.text }}
+            <SelectionMotion key={option.value} selected={selected}>
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => onSelect(option.value)}
+                style={({ pressed }) => [
+                  styles.controlOption,
+                  {
+                    backgroundColor: selected ? tokens.primaryContainer : tokens.surface,
+                    borderColor: selected ? tokens.focusRing : tokens.border,
+                    borderRadius: tokens.radius.md,
+                    opacity: pressed ? 0.76 : 1,
+                  },
+                ]}
               >
-                {option.label}
-              </Text>
-            </Pressable>
+                <View style={[styles.controlSwatch, { backgroundColor: colorForValue(option.value) }]} />
+                <Text
+                  variant="caption"
+                  style={{ color: selected ? tokens.onPrimaryContainer : tokens.text }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            </SelectionMotion>
           );
         })}
       </View>
@@ -515,6 +641,13 @@ function findClosestValue(options: readonly { value: number }[], value: number):
   );
 }
 
+function getMinimalistPage(iconOptions: readonly IconOption[], iconValue: string): number {
+  const minimalistIndex = iconOptions
+    .filter((option) => option.kind === 'minimalist')
+    .findIndex((option) => option.value === iconValue);
+  return minimalistIndex < 0 ? 0 : Math.floor(minimalistIndex / MINIMALIST_ICON_PAGE_SIZE);
+}
+
 const styles = StyleSheet.create({
   badge: {
     alignItems: 'center',
@@ -541,14 +674,11 @@ const styles = StyleSheet.create({
   entityPreviewText: { flex: 1, gap: 3 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   hueButton: {
-    alignItems: 'center',
-    borderRadius: 22,
-    borderWidth: 2,
     height: 44,
-    justifyContent: 'center',
     position: 'absolute',
     width: 44,
   },
+  hueButtonContent: { alignItems: 'center', borderRadius: 22, borderWidth: 2, flex: 1, justifyContent: 'center' },
   hueSwatch: { borderRadius: 16, height: 32, width: 32 },
   mixer: { borderWidth: 1, gap: 16, padding: 14 },
   mixerPreview: {
@@ -575,6 +705,8 @@ const styles = StyleSheet.create({
   },
   modalScroll: { flexShrink: 1 },
   option: { alignItems: 'center', height: 48, justifyContent: 'center', width: 48 },
+  pageButton: { alignItems: 'center', borderWidth: 1, justifyContent: 'center', minHeight: 40, paddingHorizontal: 12 },
+  pageNavigation: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   selectedHueLabel: { textAlign: 'center' },
   wheel: { alignSelf: 'center', borderWidth: 1, height: 220, position: 'relative', width: 220 },
 });
